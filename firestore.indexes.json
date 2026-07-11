@@ -7,6 +7,14 @@
         { "fieldPath": "hasPhoto", "order": "ASCENDING" },
         { "fieldPath": "allViewedAt", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "beers",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "ownerUid", "order": "ASCENDING" },
+        { "fieldPath": "expiresAt", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": [

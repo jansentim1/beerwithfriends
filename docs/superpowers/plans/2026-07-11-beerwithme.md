@@ -1262,10 +1262,13 @@ Key requirements the implementer must honor (full Firebase SDK code, ~350 lines 
 - `PushRegistrar`: request notification permission, register FCM token into `users/{uid}.fcmToken` on launch and on token refresh.
 - `AppState`: listens to Auth state; loads `users/{uid}` to decide `.needsUsername` vs `.ready`.
 
-- [ ] **Step 1: Implement all files per requirements above** (no compile gate available — write carefully against the protocol signatures).
-- [ ] **Step 2: Run `cd BeerKit && swift test`** — Expected: still PASS (App/ is outside the package; this guards accidental BeerKit edits).
-- [ ] **Step 3: Reviewer pass** (code-reviewer subagent on the diff; fix must-fix findings).
-- [ ] **Step 4: Commit** — `git commit -am "feat(app): entry, app state, Firebase services (compile-parked)"`
+- [x] **Step 1: Implement all files per requirements above** (no compile gate available — write carefully against the protocol signatures).
+- [x] **Step 2: Run `cd BeerKit && swift test`** — Expected: still PASS (App/ is outside the package; this guards accidental BeerKit edits).
+- [x] **Step 3: Reviewer pass** (code-reviewer subagent on the diff; fix must-fix findings).
+
+**Review outcome (applied):** reviewer verified all rules/protocol contracts conform (writes match schemas, no denied reads, chunk-of-10 feed, details.code error mapping, private push token path). Fixed: Swift 6 actor-isolation hazard in PushRegistrar (Task { @MainActor } for registerForRemoteNotifications); cross-account push leak (new `PushRegistrar.clearToken()` deletes users/{uid}/private/push BEFORE signOut/deleteAccount — `AppState.signOut()` is now async). **Task 10 notes:** `AppState.signOut()` is `async` (call with `await`); parked v1 limitation — `observeFeed()` snapshots the friend list at subscribe time, so new friends appear after the feed stream restarts (HomeView should re-run `vm.start()` on scene-active / view identity change). Feed composite index (ownerUid+expiresAt) added to firestore.indexes.json.
+
+- [x] **Step 4: Commit** — `git commit -am "feat(app): entry, app state, Firebase services (compile-parked)"`
 
 ### Task 10: Screens — Onboarding, Home/Feed, Camera, PhotoViewer, Friends, Settings
 
