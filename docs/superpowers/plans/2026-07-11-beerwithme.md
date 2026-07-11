@@ -231,7 +231,7 @@ targets:
 **Interfaces:**
 - Produces: `Username.normalize(_ raw: String) -> String?`; `UserProfile`, `BeerLog`, `FriendRequest` structs (Codable, Equatable, Identifiable, Sendable) with the exact fields below. Later tasks (3, 9, 10) consume these verbatim.
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 `UsernameTests.swift`:
 ```swift
@@ -269,9 +269,9 @@ final class ModelTests: XCTestCase {
 }
 ```
 
-- [ ] **Step 2: Run `cd BeerKit && swift test`** — Expected: FAIL (Username/BeerLog undefined).
+- [x] **Step 2: Run `cd BeerKit && swift test`** — Expected: FAIL (Username/BeerLog undefined).
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `Username.swift`:
 ```swift
@@ -335,8 +335,8 @@ public struct FriendRequest: Codable, Equatable, Identifiable, Sendable {
 }
 ```
 
-- [ ] **Step 4: Run `cd BeerKit && swift test`** — Expected: PASS (all).
-- [ ] **Step 5: Commit** — `git commit -am "feat(beerkit): username validation + domain models"`
+- [x] **Step 4: Run `cd BeerKit && swift test`** — Expected: PASS (all).
+- [x] **Step 5: Commit** — `git commit -am "feat(beerkit): username validation + domain models"`
 
 ### Task 3: Photo chip state, service protocols, HomeViewModel
 

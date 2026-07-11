@@ -1,0 +1,1 @@
+// intentionally empty. The CLT on this Mac is a mixed install where usr/include/swift/module.modulemap (Aug 2023) and bridging.modulemap (Dec 2024) both define module SwiftBridging, breaking every swiftinterface build. This file shadows the stale module.modulemap via a VFS overlay (see clt-fix-overlay.yaml).

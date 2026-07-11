@@ -24,6 +24,8 @@ find tools/swiftpm-libs -name '*.private.swiftinterface' -delete
 
 Tests use Swift Testing (`import Testing`) rather than XCTest, because the CLT does not ship XCTest (it never has — XCTest requires Xcode).
 
+A second CLT defect: `usr/include/swift/module.modulemap` (stale) and `bridging.modulemap` both define module `SwiftBridging`, which breaks every swiftinterface build (the first `import Foundation` dies with a misleading "SDK not supported by the compiler" error). `BeerKit/Package.swift` shadows the stale modulemap via the VFS overlay `tools/clt-fix-overlay.yaml` — but only when `SWIFTPM_CUSTOM_LIBS_DIR` is set, so the package stays a normal dependency once Xcode is installed. The real fix for both defects: reinstall CLT, or install Xcode.
+
 Emulator gate (from repo root):
 
 ```
