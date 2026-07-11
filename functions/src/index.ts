@@ -1,8 +1,11 @@
 import { onCall, HttpsError, FunctionsErrorCode } from "firebase-functions/v2/https";
+import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { initializeApp } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
+import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
+import { getMessaging } from "firebase-admin/messaging";
 import { getPhotoOnceCore, PhotoError, PhotoErrorCode } from "./photo";
+import { fanoutBeerCreated, notifyCheers, Pusher } from "./pushes";
 
 initializeApp();
 
@@ -34,4 +37,23 @@ export const getPhotoOnce = onCall(async (req) => {
     }
     throw e;
   }
+});
+
+const fcmPush: Pusher = async (tokens, title, body, data) => {
+  await getMessaging().sendEachForMulticast({ tokens, notification: { title, body }, data });
+};
+
+export const onBeerCreated = onDocumentCreated("beers/{beerId}", async (event) => {
+  const beer = event.data?.data();
+  if (!beer) return;
+  await fanoutBeerCreated(getFirestore(), fcmPush, event.params.beerId,
+    beer as { ownerUid: string; ownerName: string; hasPhoto: boolean });
+});
+
+export const onCheersCreated = onDocumentCreated("beers/{beerId}/cheers/{uid}", async (event) => {
+  const db = getFirestore();
+  const beerRef = db.doc(`beers/${event.params.beerId}`);
+  await beerRef.update({ cheersCount: FieldValue.increment(1) });
+  const beer = await beerRef.get();
+  if (beer.exists) await notifyCheers(db, fcmPush, beer.get("ownerUid"), event.params.uid);
 });

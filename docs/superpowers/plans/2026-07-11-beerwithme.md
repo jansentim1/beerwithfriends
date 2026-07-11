@@ -791,7 +791,7 @@ export const getPhotoOnce = onCall(async (req) => {
 - Consumes: harness (Task 4).
 - Produces: `fanoutBeerCreated(db, push, beerId, beer)` and `notifyCheers(db, push, beerOwnerUid, cheererUid)` with `type Pusher = (tokens: string[], title: string, body: string, data: Record<string, string>) => Promise<void>`; Firestore triggers `onBeerCreated` (`beers/{beerId}`), `onCheersCreated` (`beers/{beerId}/cheers/{uid}`) wired to FCM. `onCheersCreated` also increments `beers/{beerId}.cheersCount`.
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 `functions/test/emu/pushes.test.ts`:
 ```ts
@@ -841,9 +841,9 @@ describe("notifyCheers", () => {
 });
 ```
 
-- [ ] **Step 2: Run emulator gate** — Expected: FAIL.
+- [x] **Step 2: Run emulator gate** — Expected: FAIL.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `functions/src/pushes.ts`:
 ```ts
@@ -904,8 +904,11 @@ export const onCheersCreated = onDocumentCreated("beers/{beerId}/cheers/{uid}", 
 });
 ```
 
-- [ ] **Step 4: Run emulator gate + build** — Expected: PASS.
-- [ ] **Step 5: Commit** — `git commit -am "feat(functions): push fanout for beers and cheers"`
+- [x] **Step 4: Run emulator gate + build** — Expected: PASS.
+
+**Review outcome (applied):** block filtering in `fanoutBeerCreated` is bidirectional (owner-blocked-friend AND friend-blocked-owner), matching `getPhotoOnce`; extra emulator test covers it. `vitest.config.ts` gained `fileParallelism: false` (all emu test files share one Firestore emulator + `clearDb`). **Task 8 must extend the rules the same way: `beers` read and `cheers` create must be denied when a block exists in either direction** (add block-negative rules tests).
+
+- [x] **Step 5: Commit** — `git commit -am "feat(functions): push fanout for beers and cheers"`
 
 ### Task 7: Friendship mirror, expiry cleanup, account deletion
 
