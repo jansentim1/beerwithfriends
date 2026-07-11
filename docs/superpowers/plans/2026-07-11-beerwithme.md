@@ -569,7 +569,7 @@ public final class HomeViewModel: ObservableObject {
 **Interfaces:**
 - Produces: `initTestDb(): Firestore` (admin SDK bound to emulator) and `seedFriends(db, a: string, b: string): Promise<void>` + `seedUser(db, uid, username, fcmToken?)` used by Tasks 5–8.
 
-- [ ] **Step 1: Write helpers + a seed round-trip test**
+- [x] **Step 1: Write helpers + a seed round-trip test**
 
 `functions/test/emu/helpers.ts`:
 ```ts
@@ -623,10 +623,10 @@ describe("harness", () => {
 });
 ```
 
-- [ ] **Step 2: Run the emulator gate from repo root** —
+- [x] **Step 2: Run the emulator gate from repo root** —
 `npx firebase-tools emulators:exec --project demo-beerwithme --only firestore,auth,storage "npm --prefix functions run test:emu"`
 Expected: PASS. (First run downloads emulator JARs; needs Java — if missing, `brew install openjdk` and park if brew prompts for a password.)
-- [ ] **Step 3: Commit** — `git commit -am "test(functions): emulator harness"`
+- [x] **Step 3: Commit** — `git commit -am "test(functions): emulator harness"`
 
 ### Task 5: `getPhotoOnce` — the view-once gate
 
