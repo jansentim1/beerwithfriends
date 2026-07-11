@@ -639,7 +639,7 @@ Expected: PASS. (First run downloads emulator JARs; needs Java — if missing, `
 - Consumes: harness from Task 4.
 - Produces: `getPhotoOnceCore(db, signedUrl, callerUid, beerId, now?) => Promise<string>`; `PhotoError` with `code: "NOT_FOUND"|"NOT_FRIENDS"|"EXPIRED"|"ALREADY_VIEWED"|"NO_PHOTO"`; callable export `getPhotoOnce` mapping PhotoError → HttpsError (`failed-precondition`, message = code). Task 9's `FirebaseBeerService.fetchPhotoOnce` maps these codes to `PhotoFetchError`.
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 `functions/test/emu/photo.test.ts`:
 ```ts
@@ -708,9 +708,9 @@ describe("getPhotoOnceCore", () => {
 });
 ```
 
-- [ ] **Step 2: Run emulator gate** — Expected: FAIL (module missing).
+- [x] **Step 2: Run emulator gate** — Expected: FAIL (module missing).
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `functions/src/photo.ts`:
 ```ts
@@ -774,8 +774,11 @@ export const getPhotoOnce = onCall(async (req) => {
 });
 ```
 
-- [ ] **Step 4: Run emulator gate + `npm --prefix functions run build`** — Expected: tests PASS, tsc clean.
-- [ ] **Step 5: Commit** — `git commit -am "feat(functions): getPhotoOnce view-once gate"`
+- [x] **Step 4: Run emulator gate + `npm --prefix functions run build`** — Expected: tests PASS, tsc clean.
+
+**Review outcome (applied post-implementation, security review):** `getPhotoOnceCore` now (a) enforces blocks in BOTH directions (`blocks/{owner}/blocked/{caller}` and reverse) — missing spec requirement; (b) decides friendship+blocks+already-viewed atomically INSIDE the view transaction (no TOCTOU); (c) discloses NO_PHOTO/EXPIRED only after authorization passes; (d) validates `beerId` against `^[A-Za-z0-9_-]{1,128}$` and never signs a `photoPath` that isn't exactly `photos/{beerId}.jpg`; (e) stamps `allViewedAt` on the beer doc once every current friend has viewed — **Task 7's `cleanupExpiredCore` must ALSO early-delete photo objects (object only, not the doc) for beers with `allViewedAt` older than ~10 minutes, and Task 7 tests must cover it**. The callable maps errors to proper statuses (`permission-denied` for NOT_FRIENDS, `not-found` for NOT_FOUND/NO_PHOTO, `failed-precondition` for EXPIRED/ALREADY_VIEWED) with the machine code in `details.code` — **Task 9's `fetchPhotoOnce` must read `details.code`, not the message**. 12 emulator tests.
+
+- [x] **Step 5: Commit** — `git commit -am "feat(functions): getPhotoOnce view-once gate"`
 
 ### Task 6: Push fanout (`onBeerCreated`, `onCheersCreated`)
 
