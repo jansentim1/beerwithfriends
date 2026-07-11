@@ -1,11 +1,14 @@
 import { onCall, HttpsError, FunctionsErrorCode } from "firebase-functions/v2/https";
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
+import { onSchedule } from "firebase-functions/v2/scheduler";
 import { initializeApp } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
 import { getMessaging } from "firebase-admin/messaging";
 import { getPhotoOnceCore, PhotoError, PhotoErrorCode } from "./photo";
 import { fanoutBeerCreated, notifyCheers, Pusher } from "./pushes";
+import { mirrorFriendship, cleanupExpiredCore, deleteAccountCore, PhotoDeleter } from "./lifecycle";
 
 initializeApp();
 
@@ -56,4 +59,31 @@ export const onCheersCreated = onDocumentCreated("beers/{beerId}/cheers/{uid}", 
   await beerRef.update({ cheersCount: FieldValue.increment(1) });
   const beer = await beerRef.get();
   if (beer.exists) await notifyCheers(db, fcmPush, beer.get("ownerUid"), event.params.uid);
+});
+
+const storagePhotoDeleter: PhotoDeleter = async (path) => {
+  await getStorage().bucket().file(path).delete({ ignoreNotFound: true });
+};
+
+export const onFriendAccepted = onDocumentCreated("friendships/{uid}/friends/{friendUid}", async (event) => {
+  await mirrorFriendship(getFirestore(), event.params.uid, event.params.friendUid);
+});
+
+export const cleanupExpired = onSchedule("every 60 minutes", async () => {
+  await cleanupExpiredCore(getFirestore(), storagePhotoDeleter);
+});
+
+export const deleteAccount = onCall(async (req) => {
+  if (!req.auth) throw new HttpsError("unauthenticated", "Sign in required");
+  // Firestore first: deleteAccountCore is idempotent, so if the auth delete
+  // fails the client can retry and skip straight to it. The reverse order
+  // would strand unreachable data.
+  await deleteAccountCore(getFirestore(), storagePhotoDeleter, req.auth.uid);
+  try {
+    await getAuth().deleteUser(req.auth.uid);
+  } catch (e) {
+    console.error(`deleteAccount: data erased but auth delete failed for ${req.auth.uid}; client must retry`, e);
+    throw new HttpsError("internal", "RETRY_DELETE");
+  }
+  return { ok: true };
 });

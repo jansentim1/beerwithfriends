@@ -44,7 +44,9 @@ export async function getPhotoOnceCore(
       }
       checkState();
       if (view.exists) throw new PhotoError("ALREADY_VIEWED");
-      tx.set(viewRef, { viewedAt: Timestamp.fromDate(now) });
+      // uid duplicated into the doc so deleteAccountCore can find views via
+      // a collection-group query (doc IDs aren't queryable that way).
+      tx.set(viewRef, { viewedAt: Timestamp.fromDate(now), uid: callerUid });
     });
 
     // Data minimization: once every current friend has used their view, stamp the

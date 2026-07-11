@@ -921,7 +921,7 @@ export const onCheersCreated = onDocumentCreated("beers/{beerId}/cheers/{uid}", 
 - Consumes: harness (Task 4).
 - Produces: `mirrorFriendship(db, uid, friendUid)`; `cleanupExpiredCore(db, deletePhoto, now) => Promise<number>` (returns count deleted; `deletePhoto: (path: string) => Promise<void>`); `deleteAccountCore(db, deletePhoto, uid)`. Exports: trigger `onFriendAccepted` (`friendships/{uid}/friends/{friendUid}` created → mirror + delete the incoming request), scheduled `cleanupExpired` (hourly), callable `deleteAccount`.
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 `functions/test/emu/lifecycle.test.ts`:
 ```ts
@@ -986,9 +986,9 @@ describe("deleteAccountCore", () => {
 });
 ```
 
-- [ ] **Step 2: Run emulator gate** — Expected: FAIL.
+- [x] **Step 2: Run emulator gate** — Expected: FAIL.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `functions/src/lifecycle.ts`:
 ```ts
@@ -1056,8 +1056,11 @@ export const deleteAccount = onCall(async (req) => {
 ```
 Note: `mirrorFriendship` sets the reverse edge, which re-fires `onFriendAccepted` once for the mirror; the second invocation's `set` is idempotent and its request-delete is a no-op, so it terminates.
 
-- [ ] **Step 4: Run emulator gate + build** — Expected: PASS.
-- [ ] **Step 5: Commit** — `git commit -am "feat(functions): friendship mirror, cleanup, account deletion"`
+- [x] **Step 4: Run emulator gate + build** — Expected: PASS.
+
+**Review outcome (applied):** `deleteAccountCore` also purges traces of the user under OTHER users' docs via collection-group queries: friend requests they SENT (`incoming` where `fromUid == uid`) and `cheers`/`views` they left on friends' beers (`uid` field). **Contract for Tasks 8/9:** cheers docs are `{uid, at}` and incoming-request docs are `{fromUid, fromUsername, fromDisplayName, sentAt}` — Task 8 rules MUST require `request.resource.data.uid == me()` on cheers create and `request.resource.data.fromUid == me()` on request create; Task 9 clients MUST write these fields. `getPhotoOnce` view records now include `uid`. New `firestore.indexes.json` (composite beers hasPhoto+allViewedAt; collection-group fieldOverrides for incoming.fromUid, cheers.uid, views.uid) wired into firebase.json — deploy includes it. `cleanupExpiredCore` bounds each run to 500 docs per query and isolates per-doc failures; returns count of deleted expired docs only. `deleteAccount` callable: Firestore-first ordering, idempotent retry (throws RETRY_DELETE if auth deletion fails after data erasure). 8 lifecycle tests.
+
+- [x] **Step 5: Commit** — `git commit -am "feat(functions): friendship mirror, cleanup, account deletion"`
 
 ---
 
