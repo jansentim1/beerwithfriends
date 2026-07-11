@@ -1,2 +1,135 @@
 rules_version = '2';
-service cloud.firestore { match /databases/{db}/documents { match /{doc=**} { allow read, write: if request.auth != null; } } }
+service cloud.firestore {
+  match /databases/{db}/documents {
+    function signedIn() { return request.auth != null; }
+    function me() { return request.auth.uid; }
+    function isFriendOf(ownerUid) {
+      return exists(/databases/$(db)/documents/friendships/$(ownerUid)/friends/$(me()));
+    }
+    // Blocks cut both ways: deny when either side blocked the other. Blocking
+    // also severs the friendship (onBlockCreated), so this check is only needed
+    // on paths that don't already require a friendship edge (friend requests).
+    function noBlockBetween(otherUid) {
+      return !exists(/databases/$(db)/documents/blocks/$(otherUid)/blocked/$(me()))
+        && !exists(/databases/$(db)/documents/blocks/$(me())/blocked/$(otherUid));
+    }
+    function beerOwner(beerId) {
+      return get(/databases/$(db)/documents/beers/$(beerId)).data.ownerUid;
+    }
+    // Owner or friend may see/leave reactions (cheers, screenshots) on a beer.
+    // No block clause: blocking unfriends, so the friendship edge is the gate.
+    function canReactTo(beerId) {
+      return beerOwner(beerId) == me() || isFriendOf(beerOwner(beerId));
+    }
+
+    match /users/{uid} {
+      allow get: if signedIn();
+      allow list: if false;  // no directory dumping
+      allow create, update: if signedIn() && me() == uid;
+      allow delete: if false;
+
+      // Owner-only material (e.g. the FCM push token in private/push) lives
+      // here so other users can't scrape it off the public profile doc.
+      match /private/{doc} {
+        allow read, write: if signedIn() && me() == uid;
+      }
+    }
+
+    match /usernames/{name} {
+      allow get: if signedIn();
+      allow list: if false;  // no directory dumping
+      // Anti-squat: one reservation per account. exists() sees pre-batch state,
+      // so the claimUsername batched write (username + user doc together) still
+      // passes; a second reservation fails on the usernameLower already set.
+      allow create: if signedIn() && request.resource.data.uid == me()
+        && (!exists(/databases/$(db)/documents/users/$(me()))
+          || !('usernameLower' in get(/databases/$(db)/documents/users/$(me())).data));
+      allow update, delete: if false;
+    }
+
+    match /friendRequests/{uid}/incoming/{fromUid} {
+      allow read: if signedIn() && me() == uid;
+      allow create: if signedIn() && me() == fromUid && uid != fromUid
+        && noBlockBetween(uid)
+        && request.resource.data.keys().hasOnly(['fromUid','fromUsername','fromDisplayName','sentAt'])
+        && request.resource.data.fromUid == me()
+        && request.resource.data.fromUsername is string
+        && request.resource.data.fromUsername.size() <= 60
+        && request.resource.data.fromDisplayName is string
+        && request.resource.data.fromDisplayName.size() <= 60
+        && request.resource.data.sentAt is timestamp;
+      allow delete: if signedIn() && (me() == uid || me() == fromUid);
+    }
+
+    match /friendships/{uid}/friends/{friendUid} {
+      allow read: if signedIn() && (me() == uid || me() == friendUid);
+      // accept = recipient materializes the edge; function mirrors the reverse
+      allow create: if signedIn() && me() == uid
+        && exists(/databases/$(db)/documents/friendRequests/$(uid)/incoming/$(friendUid));
+      allow delete: if signedIn() && (me() == uid || me() == friendUid);
+    }
+
+    match /beers/{beerId} {
+      // No block clause: blocking severs the friendship edge, which keeps the
+      // feed's multi-owner `in` query within the rules get() budget.
+      allow read: if signedIn() && (resource.data.ownerUid == me()
+        || isFriendOf(resource.data.ownerUid));
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['ownerUid','ownerName','createdAt','expiresAt','hasPhoto','photoPath','cheersCount'])
+        && request.resource.data.ownerUid == me()
+        && request.resource.data.ownerName is string
+        && request.resource.data.ownerName.size() >= 1
+        && request.resource.data.ownerName.size() <= 60
+        // == request.time pins clients to serverTimestamp() for createdAt.
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.createdAt == request.time
+        // Beers must actually expire, and within ~a day (kills immortal beers
+        // and future-dated feed pinning).
+        && request.resource.data.expiresAt is timestamp
+        && request.resource.data.expiresAt > request.time
+        && request.resource.data.expiresAt <= request.time + duration.value(25, 'h')
+        && request.resource.data.hasPhoto is bool
+        && request.resource.data.photoPath is string
+        && request.resource.data.photoPath.size() <= 200
+        && request.resource.data.cheersCount == 0;
+      allow update: if false;
+      allow delete: if signedIn() && resource.data.ownerUid == me();
+
+      match /views/{viewerUid} {
+        allow read: if signedIn() && (viewerUid == me()
+          || get(/databases/$(db)/documents/beers/$(beerId)).data.ownerUid == me());
+        allow write: if false;  // getPhotoOnce (admin SDK) only
+      }
+
+      match /cheers/{uid} {
+        allow read: if signedIn() && canReactTo(beerId);
+        allow create: if signedIn() && me() == uid
+          && request.resource.data.keys().hasOnly(['uid','at'])
+          && request.resource.data.uid == me()
+          && request.resource.data.at is timestamp
+          && canReactTo(beerId);
+        allow update, delete: if false;
+      }
+
+      match /screenshots/{uid} {
+        allow read: if signedIn() && canReactTo(beerId);
+        allow create: if signedIn() && me() == uid
+          && request.resource.data.keys().hasOnly(['uid','at'])
+          && request.resource.data.uid == me()
+          && request.resource.data.at is timestamp
+          && canReactTo(beerId);
+        allow update, delete: if false;
+      }
+    }
+
+    match /blocks/{uid}/blocked/{other} {
+      allow read, create, delete: if signedIn() && me() == uid;
+      allow update: if false;
+    }
+
+    match /reports/{reportId} {
+      allow create: if signedIn() && request.resource.data.reporterUid == me();
+      allow read, update, delete: if false;
+    }
+  }
+}

@@ -1077,7 +1077,7 @@ Note: `mirrorFriendship` sets the reverse edge, which re-fires `onFriendAccepted
 - Consumes: schema from spec §2.
 - Produces: locked rules relied on by Tasks 9–10 (clients write only what rules allow; photo reads impossible client-side).
 
-- [ ] **Step 1: Write failing rules tests**
+- [x] **Step 1: Write failing rules tests**
 
 `functions/test/emu/rules.test.ts`:
 ```ts
@@ -1142,9 +1142,9 @@ describe("storage rules", () => {
 });
 ```
 
-- [ ] **Step 2: `npm --prefix functions install -D @firebase/rules-unit-testing firebase` then run emulator gate** — Expected: rules tests FAIL against the permissive placeholder (the "stranger cannot" / "views" assertions fail).
+- [x] **Step 2: `npm --prefix functions install -D @firebase/rules-unit-testing firebase` then run emulator gate** — Expected: rules tests FAIL against the permissive placeholder (the "stranger cannot" / "views" assertions fail).
 
-- [ ] **Step 3: Write real rules**
+- [x] **Step 3: Write real rules**
 
 `firestore.rules`:
 ```
@@ -1235,8 +1235,11 @@ service firebase.storage {
 }
 ```
 
-- [ ] **Step 4: Run emulator gate** — Expected: ALL tests pass (Tasks 4–8 suites).
-- [ ] **Step 5: Commit** — `git commit -am "feat(rules): lock down Firestore and Storage"`
+- [x] **Step 4: Run emulator gate** — Expected: ALL tests pass (Tasks 4–8 suites).
+
+**Review outcome (applied, adversarial security review — 5 MUST-FIX):** (1) beer create now schema-validated: `hasOnly` seven keys, `createdAt == request.time` (**Task 9: createdAt MUST be `FieldValue.serverTimestamp()`**), `expiresAt is timestamp`, `> request.time`, `<= request.time + 25h` (**Task 9: compute expiresAt client-side as now+24h Timestamp**) — kills immortal beers that cleanup could never match; (2) **design change: blocking severs friendship** — new `severOnBlock` + `onBlockCreated` trigger delete both friendship edges and pending requests both directions; beers/cheers/screenshots rules gate on friendship only (keeps the feed `in`-query inside the rules get() budget; photo.ts/pushes.ts block checks remain as defense in depth). **Task 9 `FriendServicing.block` just writes the block doc — the server does the unfriending**; (3) cheers/screenshots reads gated by owner-or-friend (were world-readable — leaked social graph); (4) **fcmToken moved to `users/{uid}/private/push` field `token`** (was scrapeable by any signed-in user); `users`/`usernames` are get-only (`list: false` — no directory dumping); **Task 9 PushRegistrar writes users/{uid}/private/push {token}`**; (5) friend-request create checks blocks + full schema; usernames create is anti-squat (one reservation per account). 41 rules tests incl. multi-owner feed `in` query. Emulator suite: 68/68.
+
+- [x] **Step 5: Commit** — `git commit -am "feat(rules): lock down Firestore and Storage"`
 
 ---
 

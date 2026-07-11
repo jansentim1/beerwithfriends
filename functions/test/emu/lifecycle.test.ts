@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Timestamp } from "firebase-admin/firestore";
 import { initTestDb, seedUser, seedFriends, clearDb } from "./helpers";
-import { mirrorFriendship, cleanupExpiredCore, deleteAccountCore } from "../../src/lifecycle";
+import { mirrorFriendship, severOnBlock, cleanupExpiredCore, deleteAccountCore } from "../../src/lifecycle";
 
 const db = initTestDb();
 let deletedPhotos: string[] = [];
@@ -27,6 +27,24 @@ describe("mirrorFriendship", () => {
     await mirrorFriendship(db, "u1", "u2");
     expect((await db.doc("friendships/u2/friends/u1").get()).exists).toBe(true);
     expect((await db.doc("friendRequests/u1/incoming/u2").get()).exists).toBe(false);
+  });
+});
+
+describe("severOnBlock", () => {
+  it("removes friendship on both sides and pending requests in both directions", async () => {
+    await seedFriends(db, "u1", "u2");
+    await db.doc("friendRequests/u1/incoming/u2").set({ fromUid: "u2", sentAt: Timestamp.now() });
+    await db.doc("friendRequests/u2/incoming/u1").set({ fromUid: "u1", sentAt: Timestamp.now() });
+    await severOnBlock(db, "u1", "u2");
+    expect((await db.doc("friendships/u1/friends/u2").get()).exists).toBe(false);
+    expect((await db.doc("friendships/u2/friends/u1").get()).exists).toBe(false);
+    expect((await db.doc("friendRequests/u1/incoming/u2").get()).exists).toBe(false);
+    expect((await db.doc("friendRequests/u2/incoming/u1").get()).exists).toBe(false);
+  });
+
+  it("is a no-op when no relationship exists", async () => {
+    await severOnBlock(db, "u1", "u2"); // must not throw
+    expect((await db.doc("friendships/u1/friends/u2").get()).exists).toBe(false);
   });
 });
 
@@ -71,12 +89,14 @@ describe("cleanupExpiredCore", () => {
 
 describe("deleteAccountCore", () => {
   it("erases user, username, friendships both sides, beers+photos", async () => {
-    await seedUser(db, "u1", "tim");
+    await seedUser(db, "u1", "tim", "tok-u1");
     await seedUser(db, "u2", "joost");
     await seedFriends(db, "u1", "u2");
     await seedBeer("b1", "u1", 1);
     await deleteAccountCore(db, deletePhoto, "u1");
     expect((await db.doc("users/u1").get()).exists).toBe(false);
+    // private subcollection (push token) must go with the user doc
+    expect((await db.doc("users/u1/private/push").get()).exists).toBe(false);
     expect((await db.doc("usernames/tim").get()).exists).toBe(false);
     expect((await db.doc("friendships/u2/friends/u1").get()).exists).toBe(false);
     expect((await db.doc("beers/b1").get()).exists).toBe(false);

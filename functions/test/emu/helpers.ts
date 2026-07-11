@@ -10,8 +10,11 @@ export function initTestDb(): Firestore {
 export async function seedUser(db: Firestore, uid: string, username: string, fcmToken?: string) {
   await db.doc(`users/${uid}`).set({
     usernameLower: username, displayName: username, beerCount: 0,
-    createdAt: Timestamp.now(), ...(fcmToken ? { fcmToken } : {}),
+    createdAt: Timestamp.now(),
   });
+  // Push tokens live in the owner-only private subcollection, never on the
+  // (readable-by-any-signed-in-user) profile doc.
+  if (fcmToken) await db.doc(`users/${uid}/private/push`).set({ token: fcmToken });
   await db.doc(`usernames/${username}`).set({ uid });
 }
 

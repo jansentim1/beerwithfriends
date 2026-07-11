@@ -8,7 +8,7 @@ import { getStorage } from "firebase-admin/storage";
 import { getMessaging } from "firebase-admin/messaging";
 import { getPhotoOnceCore, PhotoError, PhotoErrorCode } from "./photo";
 import { fanoutBeerCreated, notifyCheers, Pusher } from "./pushes";
-import { mirrorFriendship, cleanupExpiredCore, deleteAccountCore, PhotoDeleter } from "./lifecycle";
+import { mirrorFriendship, severOnBlock, cleanupExpiredCore, deleteAccountCore, PhotoDeleter } from "./lifecycle";
 
 initializeApp();
 
@@ -67,6 +67,10 @@ const storagePhotoDeleter: PhotoDeleter = async (path) => {
 
 export const onFriendAccepted = onDocumentCreated("friendships/{uid}/friends/{friendUid}", async (event) => {
   await mirrorFriendship(getFirestore(), event.params.uid, event.params.friendUid);
+});
+
+export const onBlockCreated = onDocumentCreated("blocks/{uid}/blocked/{blockedUid}", async (event) => {
+  await severOnBlock(getFirestore(), event.params.uid, event.params.blockedUid);
 });
 
 export const cleanupExpired = onSchedule("every 60 minutes", async () => {

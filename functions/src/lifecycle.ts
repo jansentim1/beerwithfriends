@@ -13,6 +13,21 @@ export async function mirrorFriendship(db: Firestore, uid: string, friendUid: st
   await db.doc(`friendRequests/${uid}/incoming/${friendUid}`).delete();
 }
 
+/**
+ * Blocking severs the relationship entirely: both friendship edges and any
+ * pending friend request in either direction. Security rules then gate on
+ * friendship alone; the bidirectional block checks in photo.ts/pushes.ts
+ * stay as defense in depth.
+ */
+export async function severOnBlock(db: Firestore, blockerUid: string, blockedUid: string) {
+  await Promise.all([
+    db.doc(`friendships/${blockerUid}/friends/${blockedUid}`).delete(),
+    db.doc(`friendships/${blockedUid}/friends/${blockerUid}`).delete(),
+    db.doc(`friendRequests/${blockerUid}/incoming/${blockedUid}`).delete(),
+    db.doc(`friendRequests/${blockedUid}/incoming/${blockerUid}`).delete(),
+  ]);
+}
+
 async function deleteBeer(db: Firestore, deletePhoto: PhotoDeleter, beerId: string, photoPath?: string, hasPhoto?: boolean) {
   if (hasPhoto && photoPath) await deletePhoto(photoPath).catch(() => {});
   await db.recursiveDelete(db.doc(`beers/${beerId}`));
@@ -79,5 +94,7 @@ export async function deleteAccountCore(db: Firestore, deletePhoto: PhotoDeleter
     for (const d of traces.docs) await d.ref.delete();
   }
   if (username) await db.doc(`usernames/${username}`).delete();
-  await db.doc(`users/${uid}`).delete();
+  // recursiveDelete so the private subcollection (users/{uid}/private/push
+  // with the FCM token) goes too.
+  await db.recursiveDelete(db.doc(`users/${uid}`));
 }

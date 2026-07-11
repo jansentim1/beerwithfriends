@@ -14,7 +14,7 @@ export async function fanoutBeerCreated(db: Firestore, push: Pusher, beerId: str
       db.doc(`blocks/${beer.ownerUid}/blocked/${f.id}`).get(),
     ]);
     if (friendBlockedOwner.exists || ownerBlockedFriend.exists) continue;
-    const token = (await db.doc(`users/${f.id}`).get()).get("fcmToken");
+    const token = (await db.doc(`users/${f.id}/private/push`).get()).get("token");
     if (token) tokens.push(token);
   }
   if (tokens.length === 0) return;
@@ -23,10 +23,10 @@ export async function fanoutBeerCreated(db: Firestore, push: Pusher, beerId: str
 }
 
 export async function notifyCheers(db: Firestore, push: Pusher, beerOwnerUid: string, cheererUid: string) {
-  const [owner, cheerser] = await Promise.all([
-    db.doc(`users/${beerOwnerUid}`).get(), db.doc(`users/${cheererUid}`).get(),
+  const [ownerPush, cheerser] = await Promise.all([
+    db.doc(`users/${beerOwnerUid}/private/push`).get(), db.doc(`users/${cheererUid}`).get(),
   ]);
-  const token = owner.get("fcmToken");
+  const token = ownerPush.get("token");
   if (!token) return;
   await push([token], `${cheerser.get("usernameLower")} cheersed you 🍻`, "Proost!", {});
 }
