@@ -1,0 +1,9 @@
+.build/
+node_modules/
+*.xcodeproj
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+functions/lib/
+.DS_Store
+tools/swiftpm-libs/

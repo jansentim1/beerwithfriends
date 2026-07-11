@@ -13,6 +13,7 @@ Spec: `docs/superpowers/specs/2026-07-11-beerwithme-design.md`
 ## Global Constraints
 
 - **No Xcode on this Mac.** `swift build/test` (CLT, macOS) is the only Swift gate. The iOS app target compiles only after Tim installs Xcode — app-shell tasks gate on `swift test` staying green + code review, and are marked **compile-parked**.
+- **CLT quirks (discovered Task 1):** the Swift gate is `SWIFTPM_CUSTOM_LIBS_DIR="$REPO/tools/swiftpm-libs" swift test` (broken CLT SwiftPM libs; see README). CLT ships no XCTest — all BeerKit tests use **Swift Testing** (`import Testing`, `#expect(a == b)`, `@Test func`, suites are structs) instead of the XCTest code shown in Tasks 2–3; convert mechanically, keep the same assertions. `@MainActor` view-model tests: annotate the test function `@Test @MainActor`.
 - Every gate is a command with a boolean/numeric result (Project Dirk rule). No LLM-opinion gates except the explicit reviewer step.
 - Firebase emulators must run with `--project demo-beerwithme` (demo prefix = fully offline, no credentials).
 - Photos: camera only, JPEG ≤ 5 MB, path `photos/{beerId}.jpg`. View-once enforced ONLY in `getPhotoOnce` (owner exempt). Expiry = createdAt + 24h.
@@ -47,7 +48,7 @@ Stop conditions: all tasks done/parked, or a blocker only Tim can clear (install
 **Interfaces:**
 - Produces: gate commands used by every later task — `cd BeerKit && swift test` and `cd functions && npm test`; emulator gate `npx firebase-tools emulators:exec --project demo-beerwithme --only firestore,auth,storage "npm --prefix functions run test:emu"`.
 
-- [ ] **Step 1: Write `.gitignore`, `README.md`, `STATE.md`**
+- [x] **Step 1: Write `.gitignore`, `README.md`, `STATE.md`**
 
 `.gitignore`:
 ```
@@ -72,7 +73,7 @@ functions/lib/
 
 `README.md`: one paragraph describing the app + how to run gates (copy the two gate commands from Interfaces above).
 
-- [ ] **Step 2: BeerKit package with a failing smoke test**
+- [x] **Step 2: BeerKit package with a failing smoke test**
 
 `BeerKit/Package.swift`:
 ```swift
@@ -107,9 +108,9 @@ final class SmokeTests: XCTestCase {
 }
 ```
 
-- [ ] **Step 3: Run `cd BeerKit && swift test`** — Expected: PASS (1 test).
+- [x] **Step 3: Run `cd BeerKit && swift test`** — Expected: PASS (1 test).
 
-- [ ] **Step 4: Functions scaffold**
+- [x] **Step 4: Functions scaffold**
 
 `functions/package.json`:
 ```json
@@ -188,9 +189,9 @@ rules_version = '2';
 service firebase.storage { match /b/{bucket}/o { match /{all=**} { allow read, write: if request.auth != null; } } }
 ```
 
-- [ ] **Step 5: Run `cd functions && npm install && npm test`** — Expected: PASS (1 test).
+- [x] **Step 5: Run `cd functions && npm install && npm test`** — Expected: PASS (1 test).
 
-- [ ] **Step 6: XcodeGen spec (compile-parked)**
+- [x] **Step 6: XcodeGen spec (compile-parked)**
 
 `project.yml`:
 ```yaml
@@ -215,7 +216,7 @@ targets:
         UIBackgroundModes: [remote-notification]
 ```
 
-- [ ] **Step 7: Commit** — `git add -A && git commit -m "chore: scaffold BeerKit, functions, emulator config"`
+- [x] **Step 7: Commit** — `git add -A && git commit -m "chore: scaffold BeerKit, functions, emulator config"`
 
 ---
 
