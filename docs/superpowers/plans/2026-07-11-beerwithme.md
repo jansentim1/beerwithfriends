@@ -348,11 +348,11 @@ public struct FriendRequest: Codable, Equatable, Identifiable, Sendable {
 - Consumes: `BeerLog` from Task 2.
 - Produces (Tasks 9–10 implement/consume these exact signatures):
   - `enum PhotoChipState { case none, sealed, seen, expired }`; `BeerLog.photoChipState(viewedByMe:now:) -> PhotoChipState`
-  - `protocol BeerServicing: Sendable { func logBeer(photoJPEG: Data?) async throws -> BeerLog; func observeFeed() -> AsyncStream<[BeerLog]>; func cheers(beerId: String) async throws; func fetchPhotoOnce(beerId: String) async throws -> URL; func viewedBeerIds() async throws -> Set<String> }`
+  - `protocol BeerServicing: Sendable { func logBeer(photoJPEG: Data?) async throws -> BeerLog; func observeFeed() -> AsyncThrowingStream<[BeerLog], Error>; func cheers(beerId: String) async throws; func fetchPhotoOnce(beerId: String) async throws -> URL; func viewedBeerIds() async throws -> Set<String> }`
   - `enum PhotoFetchError: Error { case alreadyViewed, expired, notFriends, notFound }`
   - `@MainActor final class HomeViewModel: ObservableObject` — `init(service:now:)`, `feed`, `viewedBeerIds`, `errorMessage`, `func start() async`, `func logBeer(photoJPEG: Data?) async`, `func cheers(_ beer: BeerLog) async`, `func openPhoto(_ beer: BeerLog) async -> URL?`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 `PhotoChipStateTests.swift`:
 ```swift
@@ -391,7 +391,7 @@ final class FakeBeerService: BeerServicing, @unchecked Sendable {
         return BeerLog(id: "new", ownerUid: "me", ownerName: "Me", createdAt: now,
                        expiresAt: BeerLog.expiry(from: now), hasPhoto: photoJPEG != nil)
     }
-    func observeFeed() -> AsyncStream<[BeerLog]> {
+    func observeFeed() -> AsyncThrowingStream<[BeerLog], Error> {
         AsyncStream { self.feedContinuation = $0 }
     }
     func cheers(beerId: String) async throws { cheersed.append(beerId) }
@@ -432,9 +432,9 @@ final class HomeViewModelTests: XCTestCase {
 }
 ```
 
-- [ ] **Step 2: Run `cd BeerKit && swift test`** — Expected: FAIL (types undefined).
+- [x] **Step 2: Run `cd BeerKit && swift test`** — Expected: FAIL (types undefined).
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `PhotoChipState.swift`:
 ```swift
@@ -459,7 +459,7 @@ public enum PhotoFetchError: Error, Equatable { case alreadyViewed, expired, not
 
 public protocol BeerServicing: Sendable {
     func logBeer(photoJPEG: Data?) async throws -> BeerLog
-    func observeFeed() -> AsyncStream<[BeerLog]>
+    func observeFeed() -> AsyncThrowingStream<[BeerLog], Error>
     func cheers(beerId: String) async throws
     func fetchPhotoOnce(beerId: String) async throws -> URL
     func viewedBeerIds() async throws -> Set<String>
@@ -550,8 +550,11 @@ public final class HomeViewModel: ObservableObject {
 }
 ```
 
-- [ ] **Step 4: Run `cd BeerKit && swift test`** — Expected: PASS.
-- [ ] **Step 5: Commit** — `git commit -am "feat(beerkit): chip state, service protocols, HomeViewModel"`
+- [x] **Step 4: Run `cd BeerKit && swift test`** — Expected: PASS.
+
+**Review outcome (applied post-implementation):** `cheers()` now has a duplicate-tap guard (`cheersedBeerIds`) and rollback + errorMessage on failure; `start()` has a re-entrancy guard and catches feed-stream errors; `observeFeed()` returns `AsyncThrowingStream<[BeerLog], Error>` (implementations MUST tie Firestore listener removal to `continuation.onTermination`); `UsernameClaimError.taken` added for Task 9's `claimUsername`; distinct copy for `PhotoFetchError.notFriends`. Task 9/10 must use these revised signatures.
+
+- [x] **Step 5: Commit** — `git commit -am "feat(beerkit): chip state, service protocols, HomeViewModel"`
 
 ---
 
