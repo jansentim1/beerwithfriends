@@ -174,6 +174,19 @@ final class FirebaseBeerService: BeerServicing, @unchecked Sendable {
         }
     }
 
+    // MARK: - Screenshot receipts (Task 10 — beyond the frozen BeerServicing protocol)
+
+    /// Best-effort screenshot receipt, fired by PhotoViewerView (via a closure
+    /// RootView builds from this concrete type — the BeerKit protocols are
+    /// frozen, so this method deliberately lives outside `BeerServicing`).
+    /// Schema pinned by rules: `beers/{beerId}/screenshots/{me}` = exactly `{uid, at}`.
+    func recordScreenshot(beerId: String) async {
+        try? await db.document("beers/\(beerId)/screenshots/\(uid)").setData([
+            "uid": uid,
+            "at": Timestamp(date: Date()),
+        ])
+    }
+
     // MARK: - Viewed beer ids
 
     /// Which of the currently visible photo-beers I've already consumed.

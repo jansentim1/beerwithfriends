@@ -71,6 +71,20 @@ final class AppState: ObservableObject {
         }
     }
 
+    /// Live availability check for the onboarding username picker (Task 10).
+    /// `friendService` doesn't exist yet while `phase == .needsUsername`, so
+    /// this reads the reservation doc directly (rules: any signed-in get).
+    /// Returns nil when the lookup itself failed (offline etc.) — unknown.
+    func isUsernameTaken(_ normalizedUsername: String) async -> Bool? {
+        do {
+            let snap = try await Firestore.firestore()
+                .document("usernames/\(normalizedUsername)").getDocument()
+            return snap.exists
+        } catch {
+            return nil
+        }
+    }
+
     func signOut() async {
         // While still authenticated: rules won't let us touch private/push after
         // sign-out, and a stale token would deliver this account's pushes to

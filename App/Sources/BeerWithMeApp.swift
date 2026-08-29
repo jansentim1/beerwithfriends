@@ -39,24 +39,54 @@ struct BeerWithMeApp: App {
     }
 }
 
-/// Routes on `AppState.phase`. Every leaf below is a placeholder that
-/// Task 10 replaces with the real screens (OnboardingView, HomeView, ...).
+/// Routes on `AppState.phase` (Task 10: real screens).
 struct RootView: View {
     @EnvironmentObject private var appState: AppState
 
     var body: some View {
         switch appState.phase {
         case .loading:
-            ProgressView("Pouring…") // Placeholder — Task 10 may restyle.
-        case .signedOut:
-            // Placeholder — replaced by OnboardingView (Sign in with Apple) in Task 10.
-            Text("Signed out — OnboardingView lands in Task 10")
-        case .needsUsername:
-            // Placeholder — replaced by OnboardingView's username picker in Task 10.
-            Text("Pick a username — OnboardingView lands in Task 10")
+            ProgressView("Pouring…")
+        case .signedOut, .needsUsername:
+            OnboardingView()
         case .ready(let profile):
-            // Placeholder — replaced by HomeView (feed + log button) in Task 10.
-            Text("🍺 Hello @\(profile.username) — HomeView lands in Task 10")
+            MainTabView(profile: profile)
+                .id(profile.id) // fresh view state (and HomeViewModel) per account
+        }
+    }
+}
+
+/// Tab shell for the signed-in app. Views consume only BeerKit protocols +
+/// AppState; the one concrete-type touch (screenshot receipts, which the
+/// frozen `BeerServicing` protocol doesn't cover) is wired HERE as a closure
+/// so HomeView/PhotoViewerView stay Firebase-free.
+private struct MainTabView: View {
+    @EnvironmentObject private var appState: AppState
+    let profile: UserProfile
+
+    var body: some View {
+        // Non-nil exactly while phase == .ready (see AppState).
+        if let beerService = appState.beerService, let friendService = appState.friendService {
+            TabView {
+                HomeView(
+                    profile: profile,
+                    beerService: beerService,
+                    friendService: friendService,
+                    screenshotReporter: { beerId in
+                        await (beerService as? FirebaseBeerService)?
+                            .recordScreenshot(beerId: beerId)
+                    }
+                )
+                .tabItem { Label("Beers", systemImage: "mug.fill") }
+
+                FriendsView(profile: profile, friendService: friendService)
+                    .tabItem { Label("Friends", systemImage: "person.2.fill") }
+
+                SettingsView(profile: profile)
+                    .tabItem { Label("Settings", systemImage: "gearshape.fill") }
+            }
+        } else {
+            ProgressView() // unreachable in practice; keeps the wiring total
         }
     }
 }

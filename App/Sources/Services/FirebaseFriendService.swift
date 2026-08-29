@@ -124,3 +124,43 @@ final class FirebaseFriendService: FriendServicing, @unchecked Sendable {
         _ = try await db.collection("reports").addDocument(data: data)
     }
 }
+
+// MARK: - Blocked-user management (Task 10 — beyond the frozen FriendServicing protocol)
+
+/// A row in Settings' blocked-users list. `username` is nil when the blocked
+/// account no longer exists.
+struct BlockedUser: Identifiable, Equatable, Sendable {
+    let id: String // blocked uid
+    let username: String?
+}
+
+/// `FriendServicing` is frozen in BeerKit (no unblock / blocked-list methods),
+/// so these live on the concrete type only; SettingsView reaches them by
+/// downcasting `AppState.friendService`. Same file → access to `me`/`db`.
+extension FirebaseFriendService {
+    /// Reads `blocks/{me}/blocked` (rules: owner-only) and resolves usernames
+    /// via public profile gets.
+    func blockedUsers() async throws -> [BlockedUser] {
+        let snapshot = try await db.collection("blocks/\(me.id)/blocked").getDocuments()
+        let uids = snapshot.documents.map(\.documentID)
+        return await withTaskGroup(of: BlockedUser.self) { group in
+            for uid in uids {
+                group.addTask {
+                    // Best effort — a deleted account still shows as blocked.
+                    BlockedUser(id: uid, username: (try? await self.profile(uid: uid))?.username)
+                }
+            }
+            var result: [BlockedUser] = []
+            for await blocked in group {
+                result.append(blocked)
+            }
+            return result.sorted { ($0.username ?? "~") < ($1.username ?? "~") }
+        }
+    }
+
+    /// Deletes my block doc (rules: owner delete). Unblocking does NOT restore
+    /// the severed friendship — either side must send a fresh request.
+    func unblock(uid: String) async throws {
+        try await db.document("blocks/\(me.id)/blocked/\(uid)").delete()
+    }
+}
