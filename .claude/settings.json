@@ -1,0 +1,34 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(swift test*)",
+      "Bash(swift build*)",
+      "Bash(cd BeerKit && swift test*)",
+      "Bash(npm test*)",
+      "Bash(npm run *)",
+      "Bash(npm --prefix functions *)",
+      "Bash(npx tsc*)",
+      "Bash(npx vitest*)",
+      "Bash(firebase emulators:exec *)",
+      "Bash(firebase deploy *)",
+      "Bash(firebase functions:log*)",
+      "Bash(tools/deploy.sh*)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push*)",
+      "Bash(git pull*)",
+      "Bash(git checkout *)",
+      "Bash(git switch *)",
+      "Bash(gh pr *)",
+      "Bash(gh issue *)",
+      "Bash(ls *)",
+      "Bash(cat *)",
+      "Bash(grep *)",
+      "Bash(rg *)",
+      "Bash(find *)"
+    ]
+  }
+}

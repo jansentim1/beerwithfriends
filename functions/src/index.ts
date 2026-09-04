@@ -1,6 +1,7 @@
 import { onCall, HttpsError, FunctionsErrorCode } from "firebase-functions/v2/https";
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { onSchedule } from "firebase-functions/v2/scheduler";
+import { setGlobalOptions } from "firebase-functions/v2";
 import { initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
@@ -10,6 +11,8 @@ import { getPhotoOnceCore, PhotoError, PhotoErrorCode } from "./photo";
 import { fanoutBeerCreated, notifyCheers, Pusher } from "./pushes";
 import { mirrorFriendship, severOnBlock, cleanupExpiredCore, deleteAccountCore, PhotoDeleter } from "./lifecycle";
 
+// Colocated with Firestore + Storage (europe-west4); see .firebaserc / tools/deploy.sh.
+setGlobalOptions({ region: "europe-west4" });
 initializeApp();
 
 async function signedUrl(photoPath: string): Promise<string> {
