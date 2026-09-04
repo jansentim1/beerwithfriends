@@ -60,7 +60,9 @@ jobs:
             build 2>&1 | tee build.log | grep -E 'error:|warning: unre|Compiling|BUILD|Build target' || true
           echo "=== errors ==="
           grep -E ' error: ' build.log | sort -u || true
-          ! grep -qE '\*\* BUILD FAILED \*\*' build.log
+          echo "=== warnings in our code ==="
+          grep -E '(App|BeerKit)/Sources.*warning:' build.log | sort -u || true
+          grep -q '\*\* BUILD SUCCEEDED \*\*' build.log
 
       - name: Upload build log
         if: always()

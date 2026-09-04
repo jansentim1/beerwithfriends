@@ -7,13 +7,28 @@ targets:
   BeerWithMe:
     type: application
     platform: iOS
-    sources: [App/Sources]
+    sources:
+      - App/Sources
+      # GoogleService-Info.plist lives here (gitignored; CI writes it from a secret).
+      - { path: App/Resources, optional: true, excludes: ["README.md"] }
     dependencies:
       - package: BeerKit
       - package: Firebase
         products: [FirebaseAuth, FirebaseFirestore, FirebaseStorage, FirebaseMessaging, FirebaseFunctions]
+    settings:
+      base:
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        TARGETED_DEVICE_FAMILY: "1"   # iPhone only
+        INFOPLIST_KEY_CFBundleDisplayName: BeerWithMe
+    entitlements:
+      path: App/BeerWithMe.entitlements
+      properties:
+        com.apple.developer.applesignin: [Default]
+        aps-environment: production
     info:
       path: App/Info.plist
       properties:
         NSCameraUsageDescription: "Take a live photo of your beer to share with friends."
         UIBackgroundModes: [remote-notification]
+        ITSAppUsesNonExemptEncryption: false

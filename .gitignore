@@ -7,3 +7,4 @@ ui-debug.log
 functions/lib/
 .DS_Store
 tools/swiftpm-libs/
+App/Resources/GoogleService-Info.plist

@@ -81,7 +81,9 @@ struct HomeView: View {
                 url: item.url,
                 ownerName: item.ownerName,
                 beerId: item.id,
-                screenshotReporter: screenshotReporter,
+                // Explicit @Sendable wrapper: passing the stored property through
+                // the SwiftUI content closure drops the attribute (compiler warning).
+                screenshotReporter: { [screenshotReporter] id in await screenshotReporter(id) },
                 onDismiss: { photoViewer = nil }
             )
         }

@@ -45,10 +45,8 @@ final class PushRegistrar: NSObject, MessagingDelegate, @unchecked Sendable {
     /// `users/{uid}/private/*`) — i.e. before Auth.signOut()/account deletion —
     /// or a reused device keeps receiving the previous account's pushes.
     func clearToken() async {
-        lock.lock()
-        let boundUid = uid
-        lock.unlock()
-        guard let boundUid else { return }
+        // withLock (not lock()/unlock()): the latter are unavailable in async contexts.
+        guard let boundUid = lock.withLock({ uid }) else { return }
         try? await Firestore.firestore()
             .document("users/\(boundUid)/private/push")
             .delete()
