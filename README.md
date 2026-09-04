@@ -26,6 +26,17 @@ Tests use Swift Testing (`import Testing`) rather than XCTest, because the CLT d
 
 A second CLT defect: `usr/include/swift/module.modulemap` (stale) and `bridging.modulemap` both define module `SwiftBridging`, which breaks every swiftinterface build (the first `import Foundation` dies with a misleading "SDK not supported by the compiler" error). `BeerKit/Package.swift` shadows the stale modulemap via the VFS overlay `tools/clt-fix-overlay.yaml` — but only when `SWIFTPM_CUSTOM_LIBS_DIR` is set, so the package stays a normal dependency once Xcode is installed. The real fix for both defects: reinstall CLT, or install Xcode.
 
+## Developing on tim-server (Linux)
+
+`ssh tim-server`, repo at `~/beerwithme` (origin uses the `github-beerwithme` SSH alias, a
+write deploy key). Toolchain lives in the home dir, on PATH via `~/.bashrc`: Swift via
+swiftly (`~/.local/share/swiftly`), Temurin JDK 21 (`~/.local/jdk/current`, firebase-tools
+refuses < 21; the apt JDK 17 is still installed but shadowed), `firebase` from
+`npm -g --prefix ~/.local`, Node 20 from apt. All three gates run unchanged there; plain
+`swift test` works (no CLT workaround needed). Only BeerKit and functions build on Linux;
+the SwiftUI `App` target needs Xcode. The Firestore emulator is on port 8085 because the
+WhatsApp bridge on the server owns 8080.
+
 Emulator gate (from repo root):
 
 ```
