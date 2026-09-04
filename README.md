@@ -37,6 +37,31 @@ refuses < 21; the apt JDK 17 is still installed but shadowed), `firebase` from
 the SwiftUI `App` target needs Xcode. The Firestore emulator is on port 8085 because the
 WhatsApp bridge on the server owns 8080.
 
+**Autonomy on tim-server:** the `claude` tmux session has a `beerwithme` window running
+Claude Code in `~/beerwithme` (attach with `ssh tim-server`, then `Ctrl-b 4` or
+`tmux select-window -t claude:beerwithme`). `CLAUDE.md` is the working agreement;
+`.claude/settings.json` allowlists gates, git and deploys. `~/bin/bwm-sync pull` runs on
+ssh login and `bwm-sync push` (auto-commit + push) runs on shutdown via
+`bwm-sync.service`. GitHub PRs/issues from the server need a one-time
+`ssh tim-server 'gh auth login --with-token'` with a fine-grained PAT scoped to
+jansentim1/beerwithme (Contents, Pull requests, Issues: read/write); git push itself
+already works via the deploy key.
+
+## Deploying
+
+Firebase project `beerwithme-prod` (GCP 344187290414, Blaze), everything in europe-west4,
+default bucket `beerwithme-prod.firebasestorage.app`. `.firebaserc` points at it.
+
+```
+tools/deploy.sh            # all three gates, then rules + indexes + functions
+tools/deploy.sh --no-gates # deploy only
+```
+
+On tim-server this authenticates as the VM service account (Editor + Firebase Admin on
+the project, quota project pinned via `GOOGLE_CLOUD_QUOTA_PROJECT`), so no key files.
+On a Mac run `firebase login` first. Firebase Auth has no sign-in provider yet: Sign in
+with Apple needs the Apple Developer account, as does the APNs key for push.
+
 Emulator gate (from repo root):
 
 ```
