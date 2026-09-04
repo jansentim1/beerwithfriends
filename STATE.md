@@ -1,7 +1,7 @@
 # Loop state
-- Current task: 10 (SwiftUI screens, compile-parked)
-- Done: 1-8, 9 (app services; reviewed: Swift6 isolation fix, push-token clearing, contracts verified)
+- Current task: 12 (handover; compile loop now lives in CI)
+- Done: 1-8, 9, 10 (all screens compiled on GitHub macOS runner, run 33852266356), 11 (report/block wired; docs/privacy-policy.md, docs/app-store-checklist.md)
+- Infra done 2026-09-04: `ios-build` workflow (unsigned simulator compile on every App/BeerKit push), `ios-testflight` workflow (manual, cloud-managed signing), iOS app registered in beerwithme-prod, GoogleService-Info.plist in App/Resources (gitignored) + GitHub secret FIREBASE_PLIST_B64. All 7 functions deployed in europe-west4 and matching source.
 - Parked: —
-- Needs Tim: install Xcode (App Store, Mac only); Apple Developer account (Sign in with Apple provider, APNs key for FCM); gh PAT on tim-server for PRs (see README).
-- Done 2026-09-04: Firebase project beerwithme-prod (Blaze, europe-west4) created; rules + 7 functions deployed from tim-server via tools/deploy.sh; tim-server is the full-dev box (see README).
-- Needs Tim (env): Command Line Tools install is corrupted (Swift 5.10 private swiftinterfaces mixed with 6.0.3 dylibs, root-owned) — plain `swift test` cannot compile any Package.swift. Workaround in README (SWIFTPM_CUSTOM_LIBS_DIR + tools/swiftpm-libs). Fix permanently: reinstall CLT or install Xcode. Also: CLT has no XCTest, so BeerKit tests use Swift Testing (`import Testing`) instead of XCTest.
+- Needs Tim (see docs/RUNBOOK.md steps 1-3): Apple Developer Program enrollment; App Store Connect API key + 4 GitHub secrets (ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8, APPLE_TEAM_ID); App ID with Push + Sign in with Apple; App Store Connect app record; APNs key uploaded to FCM; Firebase Auth initialized with the Apple provider.
+- Mac note (historical): the Mac's Command Line Tools are corrupted (see README). No longer on the critical path; nothing requires a Mac.

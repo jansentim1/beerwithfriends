@@ -17,7 +17,9 @@ firebase emulators:exec --project demo-beerwithme --only firestore,auth,storage 
 
 - **tim-server** (Linux, `~/beerwithme`): full backend + BeerKit dev; `swift`, `java` (21),
   `firebase`, `gh` on PATH. Deploys via the VM service account (no key file).
-- **Mac**: same gates with the CLT workaround in README. Only Xcode can build `App/`.
+- **GitHub Actions macOS runners** build `App/`: `ios-build` (unsigned compile, auto on push)
+  and `ios-testflight` (manual, signed upload). See `docs/RUNBOOK.md`. There is no Mac.
+- **Mac** (optional): same gates with the CLT workaround in README.
 - **Firebase project**: `beerwithme-prod` (GCP 344187290414), everything in europe-west4.
   Bucket `beerwithme-prod.firebasestorage.app`. Blaze plan. Firestore emulator port is 8085.
 
@@ -28,5 +30,8 @@ firebase emulators:exec --project demo-beerwithme --only firestore,auth,storage 
    or `storage.rules`: run `tools/deploy.sh --no-gates`. Never deploy on red.
 3. Never commit `node_modules`, `.build`, `functions/lib`, generated Xcode projects, or secrets.
 4. Blockers only Tim can clear go under "Needs Tim" in `STATE.md`. Known ones: Apple
-   Developer account (Sign in with Apple, APNs key for FCM), Xcode for `App/`.
+   Developer account (Sign in with Apple, APNs key for FCM, TestFlight secrets).
+6. Cloud Functions callables are in europe-west4: the app must use
+   `Functions.functions(region: "europe-west4")`. `git push` goes over HTTPS (gh token);
+   the SSH deploy key cannot push workflow files.
 5. Firebase Auth has no providers configured yet; do not fake sign-in in production data.

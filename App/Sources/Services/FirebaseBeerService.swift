@@ -146,7 +146,7 @@ final class FirebaseBeerService: BeerServicing, @unchecked Sendable {
     /// `details.code` (the message is human copy) — map from there ONLY.
     func fetchPhotoOnce(beerId: String) async throws -> URL {
         do {
-            let result = try await Functions.functions()
+            let result = try await Functions.functions(region: "europe-west4")
                 .httpsCallable("getPhotoOnce").call(["beerId": beerId])
             guard let payload = result.data as? [String: Any],
                   let urlString = payload["url"] as? String,
