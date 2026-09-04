@@ -8,6 +8,9 @@
 #   tools/deploy.sh            # gates + deploy
 #   tools/deploy.sh --no-gates # deploy only (you already ran the gates)
 set -euo pipefail
+# Service-account auth (tim-server) bills API quota to the SA's home project unless told
+# otherwise; firebase-tools honors this env var.
+export GOOGLE_CLOUD_QUOTA_PROJECT="${GOOGLE_CLOUD_QUOTA_PROJECT:-beerwithme-prod}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
