@@ -46,14 +46,14 @@ jobs:
           restore-keys: spm-${{ runner.os }}-
 
       - name: Resolve packages
-        run: xcodebuild -project BeerWithMe.xcodeproj -scheme BeerWithMe -resolvePackageDependencies -skipPackagePluginValidation -skipMacroValidation
+        run: xcodebuild -project BeerWithFriends.xcodeproj -scheme BeerWithFriends -resolvePackageDependencies -skipPackagePluginValidation -skipMacroValidation
 
       - name: Build (simulator, unsigned)
         run: |
           set -o pipefail
           xcodebuild \
-            -project BeerWithMe.xcodeproj \
-            -scheme BeerWithMe \
+            -project BeerWithFriends.xcodeproj \
+            -scheme BeerWithFriends \
             -destination 'generic/platform=iOS Simulator' \
             -skipPackagePluginValidation -skipMacroValidation \
             CODE_SIGNING_ALLOWED=NO \

@@ -1,4 +1,4 @@
-# BeerWithMe
+# Beer With Friends
 
 iPhone app: tap to log a beer → friends get a push and can cheers back; optionally attach a live camera photo that each friend can view exactly once (server-enforced), expiring after 24 hours. The testable core lives in the local Swift package `BeerKit`; the backend is Firebase (Firestore, Storage, TypeScript Cloud Functions) locked down by security rules.
 
@@ -44,7 +44,7 @@ Claude Code in `~/beerwithme` (attach with `ssh tim-server`, then `Ctrl-b 4` or
 ssh login and `bwm-sync push` (auto-commit + push) runs on shutdown via
 `bwm-sync.service`. GitHub PRs/issues from the server need a one-time
 `ssh tim-server 'gh auth login --with-token'` with a fine-grained PAT scoped to
-jansentim1/beerwithme (Contents, Pull requests, Issues: read/write); git push itself
+jansentim1/beerwithfriends (Contents, Pull requests, Issues: read/write); git push itself
 already works via the deploy key.
 
 ## Deploying

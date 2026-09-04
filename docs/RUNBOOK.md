@@ -10,7 +10,7 @@ that need Xcode. Tim's iPhone does the Apple-side clicking and installs via Test
 | Firebase project `beerwithme-prod` (GCP 344187290414) | Blaze plan, europe-west4 |
 | Firestore `(default)`, bucket `beerwithme-prod.firebasestorage.app` | exist |
 | All 7 Cloud Functions | deployed, match `functions/src` |
-| iOS app registered in Firebase | app id `1:344187290414:ios:d52b6e5c9c02e4f75870bf`, bundle `com.timjansen.BeerWithMe` |
+| iOS app registered in Firebase | app id `1:344187290414:ios:92093f630d8114015870bf`, bundle `com.timjansen.BeerWithFriends` |
 | `App/Resources/GoogleService-Info.plist` | on tim-server (gitignored) and in GitHub secret `FIREBASE_PLIST_B64` |
 | Firebase Auth | **not initialized, no Apple provider yet** (step 3) |
 | `ios-build` workflow | compiles the app unsigned on every push touching App/BeerKit |
@@ -29,7 +29,7 @@ that need Xcode. Tim's iPhone does the Apple-side clicking and installs via Test
    (first time: Request Access, then generate). Name `github-ci`, role **App Manager**.
 2. Write down the **Key ID** and the **Issuer ID** shown on that page.
 3. Download the `.p8` file once. Open it in Files, share, copy its full text.
-4. https://github.com/jansentim1/beerwithme/settings/secrets/actions, add four secrets:
+4. https://github.com/jansentim1/beerwithfriends/settings/secrets/actions, add four secrets:
 
    | Secret | Value |
    |---|---|
@@ -42,12 +42,12 @@ that need Xcode. Tim's iPhone does the Apple-side clicking and installs via Test
 
 5. Register the App ID and capabilities, in the browser at
    https://developer.apple.com/account/resources/identifiers/list:
-   Register, App IDs, App, Bundle ID **explicit** `com.timjansen.BeerWithMe`,
+   Register, App IDs, App, Bundle ID **explicit** `com.timjansen.BeerWithFriends`,
    tick **Push Notifications** and **Sign in with Apple**, Continue, Register.
    (xcodebuild can create this itself, but doing it here is more predictable.)
 
 6. Create the app record in App Store Connect: https://appstoreconnect.apple.com/apps,
-   plus button, New App, iOS, name BeerWithMe, primary language English, bundle id
+   plus button, New App, iOS, name Beer With Friends, primary language English, bundle id
    from the list, SKU `beerwithme`, full access. TestFlight builds attach to this record.
 
 ## 3. Push and Sign in with Apple wiring (Tim, iPhone browser, one time)
@@ -84,7 +84,7 @@ https://appstoreconnect.apple.com/agreements.
 ## 5. Install on iPhones (Tim, iPhone)
 
 1. Install TestFlight from the App Store.
-2. App Store Connect, BeerWithMe, TestFlight tab. The processed build appears after
+2. App Store Connect, Beer With Friends, TestFlight tab. The processed build appears after
    5 to 15 minutes. The first build of a version asks you to answer the export
    compliance question once; later builds inherit it (Info.plist already says no
    non-exempt encryption).

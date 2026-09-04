@@ -1,10 +1,10 @@
-name: BeerWithMe
+name: BeerWithFriends
 options: { bundleIdPrefix: com.timjansen, deploymentTarget: { iOS: "17.0" } }
 packages:
   BeerKit: { path: BeerKit }
   Firebase: { url: https://github.com/firebase/firebase-ios-sdk, from: 11.0.0 }
 targets:
-  BeerWithMe:
+  BeerWithFriends:
     type: application
     platform: iOS
     sources:
@@ -22,7 +22,7 @@ targets:
         TARGETED_DEVICE_FAMILY: "1"   # iPhone only
         INFOPLIST_KEY_CFBundleDisplayName: "Beer With Friends"
     entitlements:
-      path: App/BeerWithMe.entitlements
+      path: App/BeerWithFriends.entitlements
       properties:
         com.apple.developer.applesignin: [Default]
         aps-environment: production

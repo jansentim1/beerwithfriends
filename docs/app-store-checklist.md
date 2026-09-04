@@ -1,10 +1,10 @@
 # App Store submission checklist
 
-Everything App Review will look at for BeerWithMe, and where it is handled.
+Everything App Review will look at for Beer With Friends, and where it is handled.
 
 ## App Store Connect app record
 
-- Bundle id: `com.timjansen.BeerWithMe` (from `project.yml` `bundleIdPrefix` + target name).
+- Bundle id: `com.timjansen.BeerWithFriends` (from `project.yml` `bundleIdPrefix` + target name).
 - Category: Social Networking. Secondary: Food & Drink.
 - Age rating: **17+**. In the questionnaire answer "Frequent/Intense" for
   "Alcohol, Tobacco, or Drug Use or References" and "Frequent/Intense" for

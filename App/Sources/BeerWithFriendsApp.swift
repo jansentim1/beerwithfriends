@@ -26,7 +26,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
 }
 
 @main
-struct BeerWithMeApp: App {
+struct BeerWithFriendsApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var appState = AppState()
 

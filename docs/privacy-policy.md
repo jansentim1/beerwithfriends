@@ -2,7 +2,7 @@
 
 _Last updated: 2026-09-04_
 
-Beer With Friends (repo name BeerWithMe) is a small app for telling friends you are having a beer. This policy explains
+Beer With Friends is a small app for telling friends you are having a beer. This policy explains
 what the app stores, why, and how to get rid of it. It is written to be read, not to be
 scrolled past.
 
