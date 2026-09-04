@@ -1,0 +1,70 @@
+# Compile the SwiftUI app on a GitHub-hosted Mac (there is no Mac in this project).
+# Simulator build, no signing: this is the compiler for App/Sources.
+# Trigger manually (workflow_dispatch) to keep the macOS minutes budget under control.
+name: ios-build
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'App/**'
+      - 'BeerKit/**'
+      - 'project.yml'
+      - '.github/workflows/ios-build.yml'
+
+concurrency:
+  group: ios-build
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: |
+          sudo xcode-select -p
+          xcodebuild -version
+          swift --version
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate project
+        run: xcodegen generate
+
+      - name: Cache SwiftPM checkouts
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/org.swift.swiftpm
+            ~/Library/Developer/Xcode/DerivedData/**/SourcePackages
+          key: spm-${{ runner.os }}-${{ hashFiles('project.yml', 'BeerKit/Package.swift') }}
+          restore-keys: spm-${{ runner.os }}-
+
+      - name: Resolve packages
+        run: xcodebuild -project BeerWithMe.xcodeproj -scheme BeerWithMe -resolvePackageDependencies -skipPackagePluginValidation -skipMacroValidation
+
+      - name: Build (simulator, unsigned)
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project BeerWithMe.xcodeproj \
+            -scheme BeerWithMe \
+            -destination 'generic/platform=iOS Simulator' \
+            -skipPackagePluginValidation -skipMacroValidation \
+            CODE_SIGNING_ALLOWED=NO \
+            build 2>&1 | tee build.log | grep -E 'error:|warning: unre|Compiling|BUILD|Build target' || true
+          echo "=== errors ==="
+          grep -E ' error: ' build.log | sort -u || true
+          ! grep -qE '\*\* BUILD FAILED \*\*' build.log
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build.log
