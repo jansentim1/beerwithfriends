@@ -169,7 +169,7 @@ final class CameraCaptureViewController: UIViewController {
         flipButton.isHidden = true
 
         let label = UILabel()
-        label.text = "Camera access is off.\nBeer With Friends only uses the camera to snap the beer in your hand — turn it on in Settings."
+        label.text = "Camera access is off.\nPints With Mates only uses the camera to snap the beer in your hand — turn it on in Settings."
         label.textColor = .white
         label.textAlignment = .center
         label.numberOfLines = 0

@@ -1,6 +1,6 @@
 # App Store submission checklist
 
-Everything App Review will look at for Beer With Friends, and where it is handled.
+Everything App Review will look at for Pints With Mates, and where it is handled.
 
 ## App Store Connect app record
 

@@ -195,7 +195,7 @@ struct FriendsView: View {
 
     private var inviteSection: some View {
         Section {
-            ShareLink(item: "Add me on Beer With Friends! My username is @\(profile.username) 🍺") {
+            ShareLink(item: "Add me on Pints With Mates! My username is @\(profile.username) 🍺") {
                 Label("Invite a friend", systemImage: "square.and.arrow.up")
             }
         }

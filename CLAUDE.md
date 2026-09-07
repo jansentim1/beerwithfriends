@@ -1,4 +1,4 @@
-# Beer With Friends — working agreement
+# Pints With Mates — working agreement
 
 iPhone app (SwiftUI, iOS 17+) + Firebase backend. Testable core in `BeerKit/` (Swift
 package), Cloud Functions in `functions/` (TypeScript, Node 20), rules at repo root.
