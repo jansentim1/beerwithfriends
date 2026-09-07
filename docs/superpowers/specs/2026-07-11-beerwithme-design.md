@@ -54,7 +54,7 @@ Firestore:
 - `blocks/{uid}/blocked/{blockedUid}` — user blocks.
 
 Storage: `photos/{beerId}.jpg` (JPEG ≤1080p, ~80% quality). **No client read
-access at all** — rules deny all reads; only `getPhotoOnce`'s signed URLs work.
+access at all** — rules deny all reads; only `getPhotoOnce` (which returns the bytes) can read them.
 Client write access only for the owner at beer-creation time, ≤5MB,
 content-type image/jpeg.
 

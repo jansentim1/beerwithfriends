@@ -10,6 +10,7 @@
 - 2026-09-07 pm: Milestone C started. PRODUCT.md + docs/design/direction.md written; all six screens redesigned (Opus workers) on Theme.swift; compiled clean. Screenshot rig (ios-test workflow: simulator + emulators, light/dark PNGs) being stabilised.
 - 2026-09-07: build 3 (redesign, launch screen fix, bundle name) uploaded to TestFlight. Screenshot rig green light+dark.
 - 2026-09-07 late: finish review (Fable) → fix round (3 Opus workers) → verdict ship; DESIGN.md written. QR add-a-mate (QRMateView, pubdates://add/<u>, sticky AppState inbox). Build 4 uploaded. tools/reset-prod.sh for Tim to wipe prod data.
-- Needs Tim: rename the App Store Connect record to PubDates (App Information, Name) so the title is reserved and matches the next build. APNs key (RUNBOOK step 3.1, upload the .p8 to tim-server and give me the Key ID). Then step 5 (external testers).
+- 2026-09-07 eve: photos failed in prod (functions SA lacks iam.serviceAccounts.signBlob; VM SA cannot grant it). Fixed by delivering photo bytes in the callable (no signed URL). Build 5 shipped. Backlog from Tim: location on a beer (opt-in place name), quick replies to a beer push.
+- Needs Tim: run tools/reset-prod.sh himself (classifier blocks Claude from wiping prod). APNs key. rename the App Store Connect record to PubDates (App Information, Name) so the title is reserved and matches the next build. APNs key (RUNBOOK step 3.1, upload the .p8 to tim-server and give me the Key ID). Then step 5 (external testers).
 - Next code work: fix review findings 1-5 + CameraView crash (see session 2026-09-04 review), then item 6-10.
 - Mac note (historical): the Mac's Command Line Tools are corrupted (see README). No longer on the critical path; nothing requires a Mac.

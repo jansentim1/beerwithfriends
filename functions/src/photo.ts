@@ -62,7 +62,7 @@ export async function getPhotoOnceCore(
 
   // Data minimization: once every current friend has used their view, stamp the
   // beer so cleanup (Task 7) can delete the photo object early. Stamped rather
-  // than deleted here so this viewer's ~60s signed URL stays valid.
+  // than deleted here so a concurrent viewer's delivery is not cut off.
   const [friends, views] = await Promise.all([
     db.collection(`friendships/${beer.ownerUid}/friends`).get(),
     beerRef.collection("views").get(),
