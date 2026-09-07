@@ -20,7 +20,7 @@ targets:
         MARKETING_VERSION: "1.0"
         CURRENT_PROJECT_VERSION: "1"
         TARGETED_DEVICE_FAMILY: "1"   # iPhone only
-        INFOPLIST_KEY_CFBundleDisplayName: "Pints With Mates"
+        INFOPLIST_KEY_CFBundleDisplayName: "PubDates"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         # Manual distribution signing, scoped to this target only (command-line
         # overrides would also hit the Firebase SwiftPM targets, which reject profiles).
@@ -28,6 +28,7 @@ targets:
         DEVELOPMENT_TEAM: G4S9QDYP4H
         CODE_SIGN_STYLE: Manual
         CODE_SIGN_IDENTITY: "Apple Distribution"
+        # Must match the Name inside the DIST_PROFILE_B64 profile (created before the rename to PubDates).
         PROVISIONING_PROFILE_SPECIFIER: "Pints With Mates App Store"
     entitlements:
       path: App/BeerWithFriends.entitlements

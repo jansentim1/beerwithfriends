@@ -47,7 +47,7 @@ struct HomeView: View {
                 logButtons
                 feedList
             }
-            .navigationTitle("Pints With Mates")
+            .navigationTitle("PubDates")
             .alert("Oops", isPresented: errorBinding) {
                 Button("OK", role: .cancel) {}
             } message: {

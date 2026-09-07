@@ -6,7 +6,7 @@
 #   tools/notify.sh -t "Title" -p high "message"    # title + priority (min/low/default/high/urgent)
 #   tools/notify.sh -a "https://..." "message"      # tap-to-open URL
 set -euo pipefail
-TITLE="Pints With Mates"; PRIO="default"; CLICK=""
+TITLE="PubDates"; PRIO="default"; CLICK=""
 while getopts "t:p:a:" opt; do
   case $opt in
     t) TITLE="$OPTARG" ;;

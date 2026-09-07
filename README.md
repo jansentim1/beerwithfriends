@@ -1,4 +1,4 @@
-# Pints With Mates
+# PubDates
 
 iPhone app: tap to log a beer → friends get a push and can cheers back; optionally attach a live camera photo that each friend can view exactly once (server-enforced), expiring after 24 hours. The testable core lives in the local Swift package `BeerKit`; the backend is Firebase (Firestore, Storage, TypeScript Cloud Functions) locked down by security rules.
 

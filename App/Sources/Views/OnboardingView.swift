@@ -50,7 +50,7 @@ private struct SignInStep: View {
             Spacer()
             Text("🍺")
                 .font(.system(size: 88))
-            Text("Pints With Mates")
+            Text("PubDates")
                 .font(.largeTitle.bold())
             Text("Tap once when you crack open a beer. Your friends get a push and can cheers you back — add a photo they can look at exactly once.")
                 .font(.callout)

@@ -1,8 +1,8 @@
-# Pints With Mates Privacy Policy
+# PubDates Privacy Policy
 
 _Last updated: 2026-09-04_
 
-Pints With Mates is a small app for telling friends you are having a beer. This policy explains
+PubDates is a small app for telling friends you are having a beer. This policy explains
 what the app stores, why, and how to get rid of it. It is written to be read, not to be
 scrolled past.
 
@@ -42,7 +42,7 @@ without your identifier for abuse-prevention purposes.
 
 ## Children
 
-BeerWithMe is about beer and is rated 17+. It is not intended for anyone under the legal
+PubDates is about beer and is rated 17+. It is not intended for anyone under the legal
 drinking age in their country.
 
 ## Security

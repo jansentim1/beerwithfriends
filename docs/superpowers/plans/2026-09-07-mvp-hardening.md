@@ -1,4 +1,4 @@
-# Pints With Mates: MVP hardening plan (speed, tests, design)
+# PubDates: MVP hardening plan (speed, tests, design)
 
 Date: 2026-09-07. Status: proposed, awaiting Tim's go.
 Context: build 1 is on Tim's iPhone via TestFlight. Sign in works, logging a beer works but

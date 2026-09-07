@@ -47,7 +47,7 @@ that need Xcode. Tim's iPhone does the Apple-side clicking and installs via Test
    (xcodebuild can create this itself, but doing it here is more predictable.)
 
 6. Create the app record in App Store Connect: https://appstoreconnect.apple.com/apps,
-   plus button, New App, iOS, name Pints With Mates, primary language English, bundle id
+   plus button, New App, iOS, name PubDates, primary language English, bundle id
    from the list, SKU `beerwithme`, full access. TestFlight builds attach to this record.
 
 ## 3. Push and Sign in with Apple wiring (Tim, iPhone browser, one time)
@@ -87,7 +87,7 @@ processed build appears in his TestFlight app automatically.
 ## 5. Install on iPhones (Tim, iPhone)
 
 1. Install TestFlight from the App Store.
-2. App Store Connect, Pints With Mates, TestFlight tab. The processed build appears after
+2. App Store Connect, PubDates, TestFlight tab. The processed build appears after
    5 to 15 minutes. The first build of a version asks you to answer the export
    compliance question once; later builds inherit it (Info.plist already says no
    non-exempt encryption).
