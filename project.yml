@@ -21,6 +21,13 @@ targets:
         CURRENT_PROJECT_VERSION: "1"
         TARGETED_DEVICE_FAMILY: "1"   # iPhone only
         INFOPLIST_KEY_CFBundleDisplayName: "Pints With Mates"
+        # Manual distribution signing, scoped to this target only (command-line
+        # overrides would also hit the Firebase SwiftPM targets, which reject profiles).
+        # The simulator compile passes CODE_SIGNING_ALLOWED=NO so these are inert there.
+        DEVELOPMENT_TEAM: G4S9QDYP4H
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_IDENTITY: "Apple Distribution"
+        PROVISIONING_PROFILE_SPECIFIER: "Pints With Mates App Store"
     entitlements:
       path: App/BeerWithFriends.entitlements
       properties:
