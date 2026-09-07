@@ -45,6 +45,10 @@ targets:
       path: App/Info.plist
       properties:
         NSCameraUsageDescription: "Take a live photo of your beer to share with friends."
+        # Name shown in system dialogs ("PubDates would like to access the camera").
+        CFBundleName: PubDates
+        # Without a launch screen iOS letterboxes the app in a compatibility window.
+        UILaunchScreen: {}
         # XcodeGen writes literal "1"/"1.0" otherwise; CI sets CURRENT_PROJECT_VERSION per run.
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         CFBundleShortVersionString: "$(MARKETING_VERSION)"

@@ -23,6 +23,8 @@ enum EmulatorConfig {
         #if DEBUG
         guard isEnabled else { return }
         Auth.auth().useEmulator(withHost: host, port: 9099)
+        // Each UI test run starts signed out (the keychain survives reinstalls).
+        try? Auth.auth().signOut()
         let settings = Firestore.firestore().settings
         settings.host = "\(host):8085"
         settings.isSSLEnabled = false

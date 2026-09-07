@@ -66,6 +66,8 @@ jobs:
           echo "udid=$UDID" >> "$GITHUB_OUTPUT"
           xcrun simctl boot "$UDID" || true
           xcrun simctl bootstatus "$UDID" -b
+          # No permission alerts in the walkthrough.
+          xcrun simctl privacy "$UDID" grant camera com.timjansen.BeerWithFriends || true
 
       - name: Build for testing
         run: |
