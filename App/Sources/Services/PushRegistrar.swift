@@ -18,6 +18,7 @@ final class PushRegistrar: NSObject, MessagingDelegate, @unchecked Sendable {
     private let lock = NSLock()
     private var uid: String?
     private var lastToken: String?
+    private var lastApnsToken: String?
     private var didStart = false
 
     /// Ask permission + register. Called by AppState once the user is `.ready`
@@ -61,7 +62,9 @@ final class PushRegistrar: NSObject, MessagingDelegate, @unchecked Sendable {
         lock.lock()
         self.uid = uid
         let pendingToken = lastToken
+        let pendingApns = lastApnsToken
         lock.unlock()
+        if let uid, let pendingApns { writeApns(token: pendingApns, uid: uid) }
         if let uid, let pendingToken {
             write(token: pendingToken, uid: uid)
         } else if uid != nil {
@@ -71,9 +74,26 @@ final class PushRegistrar: NSObject, MessagingDelegate, @unchecked Sendable {
         }
     }
 
-    /// AppDelegate hook: FCM can only mint/return a token once APNs registered.
-    func apnsTokenDidArrive() {
+    /// AppDelegate hook. The raw APNs token is stored too: the server delivers
+    /// pushes straight to Apple with it (FCM delivery needs a console-only step).
+    func apnsTokenDidArrive(_ deviceToken: Data) {
+        let hex = deviceToken.map { String(format: "%02x", $0) }.joined()
+        lock.lock()
+        lastApnsToken = hex
+        let boundUid = uid
+        lock.unlock()
+        if let boundUid { writeApns(token: hex, uid: boundUid) }
         fetchToken()
+    }
+
+    private func writeApns(token: String, uid: String) {
+        Firestore.firestore()
+            .document("users/\(uid)/private/push")
+            .setData(["apnsToken": token], merge: true) { error in
+                if let error {
+                    print("PushRegistrar: apns token write failed: \(error.localizedDescription)")
+                }
+            }
     }
 
     private func fetchToken() {

@@ -9,11 +9,17 @@ import { getStorage } from "firebase-admin/storage";
 import { getMessaging } from "firebase-admin/messaging";
 import { getPhotoOnceCore, PhotoError, PhotoErrorCode } from "./photo";
 import { fanoutBeerCreated, notifyCheers, Pusher } from "./pushes";
+import { sendApns, deadTokens } from "./apns";
+import { defineSecret } from "firebase-functions/params";
 import { mirrorFriendship, severOnBlock, cleanupExpiredCore, deleteAccountCore, PhotoDeleter } from "./lifecycle";
 
 // Colocated with Firestore + Storage (europe-west4); see .firebaserc / tools/deploy.sh.
 setGlobalOptions({ region: "europe-west4" });
 initializeApp();
+
+// APNs auth key (.p8) from Secret Manager; set with
+//   firebase functions:secrets:set APNS_KEY --data-file AuthKey_XXXX.p8
+const apnsKey = defineSecret("APNS_KEY");
 
 // The photo is delivered as bytes inside the callable response (base64), not as
 // a signed URL: no reusable link exists, and no IAM signBlob permission is needed.
@@ -48,23 +54,43 @@ export const getPhotoOnce = onCall(async (req) => {
   }
 });
 
-const fcmPush: Pusher = async (tokens, title, body, data) => {
-  await getMessaging().sendEachForMulticast({ tokens, notification: { title, body }, data });
+// Delivery: APNs directly for every device that registered an APNs token; FCM for
+// the rest (only useful once the APNs key is also uploaded in the Firebase console).
+const push: Pusher = async (targets, title, body, data) => {
+  const db = getFirestore();
+  const apnsTargets = targets.filter((t) => t.apns);
+  const fcmTokens = targets.filter((t) => !t.apns && t.fcm).map((t) => t.fcm!);
+  const work: Promise<unknown>[] = [];
+  if (apnsTargets.length > 0) {
+    work.push((async () => {
+      const results = await sendApns(apnsKey.value(), apnsTargets.map((t) => t.apns!), title, body, data);
+      for (const r of results) {
+        if (r.status !== 200) console.warn(`apns ${r.status} ${r.reason ?? ""} for ${r.token.slice(0, 8)}…`);
+      }
+      const dead = new Set(deadTokens(results));
+      await Promise.all(apnsTargets.filter((t) => dead.has(t.apns!)).map((t) =>
+        db.doc(`users/${t.uid}/private/push`).update({ apnsToken: FieldValue.delete() })));
+    })());
+  }
+  if (fcmTokens.length > 0) {
+    work.push(getMessaging().sendEachForMulticast({ tokens: fcmTokens, notification: { title, body }, data }));
+  }
+  await Promise.all(work);
 };
 
-export const onBeerCreated = onDocumentCreated("beers/{beerId}", async (event) => {
+export const onBeerCreated = onDocumentCreated({ document: "beers/{beerId}", secrets: [apnsKey] }, async (event) => {
   const beer = event.data?.data();
   if (!beer) return;
-  await fanoutBeerCreated(getFirestore(), fcmPush, event.params.beerId,
+  await fanoutBeerCreated(getFirestore(), push, event.params.beerId,
     beer as { ownerUid: string; ownerName: string; hasPhoto: boolean });
 });
 
-export const onCheersCreated = onDocumentCreated("beers/{beerId}/cheers/{uid}", async (event) => {
+export const onCheersCreated = onDocumentCreated({ document: "beers/{beerId}/cheers/{uid}", secrets: [apnsKey] }, async (event) => {
   const db = getFirestore();
   const beerRef = db.doc(`beers/${event.params.beerId}`);
   await beerRef.update({ cheersCount: FieldValue.increment(1) });
   const beer = await beerRef.get();
-  if (beer.exists) await notifyCheers(db, fcmPush, beer.get("ownerUid"), event.params.uid);
+  if (beer.exists) await notifyCheers(db, push, beer.get("ownerUid"), event.params.uid);
 });
 
 const storagePhotoDeleter: PhotoDeleter = async (path) => {

@@ -24,7 +24,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     ) {
         // Hand the APNs token to FCM so it can mint/refresh the registration token.
         Messaging.messaging().apnsToken = deviceToken
-        PushRegistrar.shared.apnsTokenDidArrive()
+        PushRegistrar.shared.apnsTokenDidArrive(deviceToken)
     }
 }
 

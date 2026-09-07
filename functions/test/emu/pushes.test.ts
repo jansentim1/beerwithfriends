@@ -1,12 +1,14 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Timestamp } from "firebase-admin/firestore";
 import { initTestDb, seedUser, seedFriends, clearDb } from "./helpers";
-import { fanoutBeerCreated, notifyCheers, Pusher } from "../../src/pushes";
+import { fanoutBeerCreated, notifyCheers, Pusher, PushTarget } from "../../src/pushes";
 
 const db = initTestDb();
-type Sent = { tokens: string[]; title: string; body: string };
+type Sent = { tokens: string[]; targets: PushTarget[]; title: string; body: string };
 let sent: Sent[] = [];
-const push: Pusher = async (tokens, title, body) => { sent.push({ tokens, title, body }); };
+const push: Pusher = async (targets, title, body) => {
+  sent.push({ tokens: targets.map((t) => t.fcm ?? t.apns ?? ""), targets, title, body });
+};
 
 beforeEach(async () => {
   await clearDb(db);
