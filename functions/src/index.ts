@@ -15,10 +15,12 @@ import { mirrorFriendship, severOnBlock, cleanupExpiredCore, deleteAccountCore, 
 setGlobalOptions({ region: "europe-west4" });
 initializeApp();
 
-async function signedUrl(photoPath: string): Promise<string> {
-  const [url] = await getStorage().bucket().file(photoPath)
-    .getSignedUrl({ action: "read", expires: Date.now() + 60_000 });
-  return url;
+// The photo is delivered as bytes inside the callable response (base64), not as
+// a signed URL: no reusable link exists, and no IAM signBlob permission is needed.
+// Photos are ≤ 1080 px JPEGs (a few hundred KB); the callable limit is 10 MB.
+async function photoBase64(photoPath: string): Promise<string> {
+  const [bytes] = await getStorage().bucket().file(photoPath).download();
+  return bytes.toString("base64");
 }
 
 const photoErrorStatus: Record<PhotoErrorCode, FunctionsErrorCode> = {
@@ -36,7 +38,8 @@ export const getPhotoOnce = onCall(async (req) => {
     throw new HttpsError("invalid-argument", "invalid beerId");
   }
   try {
-    return { url: await getPhotoOnceCore(getFirestore(), signedUrl, req.auth.uid, beerId) };
+    const photo = await getPhotoOnceCore(getFirestore(), photoBase64, req.auth.uid, beerId);
+    return { photo, contentType: "image/jpeg" };
   } catch (e) {
     if (e instanceof PhotoError) {
       throw new HttpsError(photoErrorStatus[e.code], e.code, { code: e.code });

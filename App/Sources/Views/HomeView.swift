@@ -128,7 +128,11 @@ struct HomeView: View {
                 // Explicit @Sendable wrapper: passing the stored property through
                 // the SwiftUI content closure drops the attribute (compiler warning).
                 screenshotReporter: { [screenshotReporter] id in await screenshotReporter(id) },
-                onDismiss: { photoViewer = nil }
+                onDismiss: {
+                    // View-once: the temp file goes with the viewer.
+                    try? FileManager.default.removeItem(at: item.url)
+                    photoViewer = nil
+                }
             )
         }
         .confirmationDialog(

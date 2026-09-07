@@ -34,9 +34,8 @@ export async function getPhotoOnceCore(
     return signedUrl(expectedPath);
   }
 
-  // Sign BEFORE recording the view: if signing fails (IAM, outage) the caller must
-  // keep their one view. The URL is only returned after authorization below, and
-  // it expires in ~60s regardless.
+  // Fetch the photo BEFORE recording the view: if delivery fails (outage) the
+  // caller must keep their one view. It is only returned after authorization.
   const url = await signedUrl(expectedPath);
 
   // Authorization (friendship + blocks, both directions) is decided inside the

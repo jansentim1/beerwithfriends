@@ -180,10 +180,15 @@ final class FirebaseBeerService: BeerServicing, @unchecked Sendable {
         do {
             let result = try await EmulatorConfig.functions(region: "europe-west4")
                 .httpsCallable("getPhotoOnce").call(["beerId": beerId])
+            // The server returns the JPEG bytes (base64), never a reusable URL.
+            // Written to a temp file so the viewer can load it like any local image.
             guard let payload = result.data as? [String: Any],
-                  let urlString = payload["url"] as? String,
-                  let url = URL(string: urlString)
+                  let base64 = payload["photo"] as? String,
+                  let data = Data(base64Encoded: base64)
             else { throw PhotoFetchError.notFound }
+            let url = FileManager.default.temporaryDirectory
+                .appendingPathComponent("viewonce-\(beerId).jpg")
+            try data.write(to: url, options: [.atomic, .completeFileProtection])
             return url
         } catch let error as PhotoFetchError {
             throw error
