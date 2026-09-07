@@ -59,5 +59,7 @@ targets:
     settings:
       base:
         TEST_TARGET_NAME: BeerWithFriends
+        GENERATE_INFOPLIST_FILE: YES
         CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_IDENTITY: "-"
         PROVISIONING_PROFILE_SPECIFIER: ""
