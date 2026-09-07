@@ -53,6 +53,10 @@ targets:
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         CFBundleShortVersionString: "$(MARKETING_VERSION)"
         UIBackgroundModes: [remote-notification]
+        # pubdates://add/<username> — the QR / invite mate link.
+        CFBundleURLTypes:
+          - CFBundleURLName: com.timjansen.BeerWithFriends
+            CFBundleURLSchemes: [pubdates]
         ITSAppUsesNonExemptEncryption: false
   PubDatesUITests:
     type: bundle.ui-testing

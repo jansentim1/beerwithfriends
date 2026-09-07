@@ -21,6 +21,10 @@ struct FriendsView: View {
     @State private var searchStatus: String?
     @State private var isWorking = false
     @State private var errorMessage: String?
+    @State private var showQRSheet = false
+    /// The `pubdates://add/<username>` deep link lands in AppState.pendingMateUsername;
+    /// drained by the `onChange` below into the normal add flow.
+    @EnvironmentObject private var appState: AppState
 
     @State private var removeTarget: UserProfile?
     @State private var showRemoveDialog = false
@@ -50,6 +54,17 @@ struct FriendsView: View {
             .navigationBarTitleDisplayMode(.large)
             .task { await reload() }
             .refreshable { await reload() }
+            .sheet(isPresented: $showQRSheet) {
+                QRMateView(profile: profile) { username in
+                    // Same flow as typing the name: search, then send.
+                    showQRSheet = false
+                    searchText = username
+                    addFriend()
+                }
+                .presentationDetents([.large])
+            }
+            .onAppear { consumePendingMateLink() }
+            .onChange(of: appState.pendingMateUsername) { _, _ in consumePendingMateLink() }
             .alert("Oops", isPresented: errorBinding) {
                 Button("OK", role: .cancel) {}
             } message: {
@@ -100,6 +115,7 @@ struct FriendsView: View {
                     searchField
                     addButton
                 }
+                qrButton
                 if let searchStatus {
                     Text(searchStatus)
                         .font(.footnote)
@@ -158,6 +174,25 @@ struct FriendsView: View {
         .animation(Theme.quick, value: canAdd)
         .accessibilityLabel("Send mate request")
         .accessibilityIdentifier("friends.add")
+    }
+
+    /// The face-to-face route into the same flow: show your code or scan a
+    /// mate's, instead of spelling a username out loud.
+    private var qrButton: some View {
+        HStack(spacing: 0) {
+            Button {
+                Haptics.light()
+                showQRSheet = true
+            } label: {
+                Label("Add with QR", systemImage: "qrcode")
+                    .frame(minHeight: 44)
+            }
+            .buttonStyle(PillButtonStyle(emphasis: .tinted))
+            .accessibilityLabel("Add with QR code")
+            .accessibilityHint("Shows your code, or scans a mate's")
+            .accessibilityIdentifier("friends.qr")
+            Spacer(minLength: 0)
+        }
     }
 
     // MARK: - Requests
@@ -304,6 +339,15 @@ struct FriendsView: View {
         } catch {
             errorMessage = "Couldn't load your mates — pull to retry."
         }
+    }
+
+    /// `pubdates://add/<username>`: AppState holds the name until this screen exists.
+    private func consumePendingMateLink() {
+        guard let username = appState.pendingMateUsername else { return }
+        appState.pendingMateUsername = nil
+        showQRSheet = false
+        searchText = username
+        addFriend()
     }
 
     private func reloadFriends() async {

@@ -23,6 +23,9 @@ final class AppState: ObservableObject {
     }
 
     @Published private(set) var phase: Phase = .loading
+    /// Username from a `pubdates://add/<username>` link, waiting for the Mates
+    /// screen to consume it (survives cold launch and onboarding).
+    @Published var pendingMateUsername: String?
     /// One-shot error copy for the active flow (sign-in / username claim / account).
     @Published var errorMessage: String?
 
