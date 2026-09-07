@@ -74,6 +74,13 @@ final class PushRegistrar: NSObject, MessagingDelegate, @unchecked Sendable {
         }
     }
 
+    private func recordApnsMissingIfNeeded() {
+        lock.lock()
+        let missing = lastApnsToken == nil
+        lock.unlock()
+        if missing { record(status: "apns-token-missing-after-5s", error: nil) }
+    }
+
     /// AppDelegate hook: Apple refused to register (entitlement, network...).
     func apnsRegistrationFailed(_ error: Error) {
         record(status: "apns-failed", error: error)
@@ -112,12 +119,29 @@ final class PushRegistrar: NSObject, MessagingDelegate, @unchecked Sendable {
             }
     }
 
+    /// Fallback: FCM keeps the APNs token it was handed (by us or by its proxy).
+    /// If the AppDelegate callback never reached us, this still gets it stored.
+    private func adoptApnsTokenFromMessaging() {
+        guard let data = Messaging.messaging().apnsToken else { return }
+        let hex = data.map { String(format: "%02x", $0) }.joined()
+        lock.lock()
+        let known = lastApnsToken == hex
+        lock.unlock()
+        if !known { apnsTokenDidArrive(data) }
+    }
+
     private func fetchToken() {
+        adoptApnsTokenFromMessaging()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
+            self?.adoptApnsTokenFromMessaging()
+            self?.recordApnsMissingIfNeeded()
+        }
         Messaging.messaging().token { [weak self] token, error in
             guard let self, let token else {
                 if let error { print("PushRegistrar: token fetch failed: \(error.localizedDescription)") }
                 return
             }
+            self.adoptApnsTokenFromMessaging()
             self.lock.lock()
             self.lastToken = token
             let boundUid = self.uid

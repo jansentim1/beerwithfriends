@@ -49,6 +49,9 @@ targets:
         CFBundleName: PubDates
         # Without a launch screen iOS letterboxes the app in a compatibility window.
         UILaunchScreen: {}
+        # SwiftUI lifecycle: Firebase's app-delegate proxy can swallow the APNs
+        # token callback. We set Messaging.apnsToken ourselves in the AppDelegate.
+        FirebaseAppDelegateProxyEnabled: false
         # XcodeGen writes literal "1"/"1.0" otherwise; CI sets CURRENT_PROJECT_VERSION per run.
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         CFBundleShortVersionString: "$(MARKETING_VERSION)"
