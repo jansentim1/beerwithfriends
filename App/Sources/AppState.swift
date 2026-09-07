@@ -51,6 +51,18 @@ final class AppState: ObservableObject {
 
     // MARK: - Flows driven by Task 10 views
 
+    #if DEBUG
+    /// UI tests only (emulator mode): anonymous auth stands in for Sign in with Apple.
+    func signInForUITests() async {
+        guard EmulatorConfig.isEnabled else { return }
+        do {
+            _ = try await Auth.auth().signInAnonymously()
+        } catch {
+            errorMessage = "Emulator sign-in failed: \(error.localizedDescription)"
+        }
+    }
+    #endif
+
     func signInWithApple(idToken: String, nonce: String) async {
         do {
             _ = try await authService.signInWithApple(idToken: idToken, nonce: nonce)
@@ -178,7 +190,9 @@ final class AppState: ObservableObject {
         friendService = FirebaseFriendService(me: profile)
         phase = .ready(profile)
         // Ask for notification permission only once the user is fully onboarded,
-        // then keep users/{uid}/private/push.token fresh.
+        // then keep users/{uid}/private/push.token fresh. (Skipped in emulator
+        // mode: the permission alert would block UI tests.)
+        guard !EmulatorConfig.isEnabled else { return }
         pushRegistrar.startRegistration()
         pushRegistrar.setUser(uid: profile.id)
     }

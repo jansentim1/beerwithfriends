@@ -130,6 +130,7 @@ struct HomeView: View {
                     .padding(.vertical, 16)
             }
             .buttonStyle(.borderedProminent)
+            .accessibilityIdentifier("home.log")
 
             Button {
                 showCamera = true
@@ -141,6 +142,7 @@ struct HomeView: View {
             }
             .buttonStyle(.bordered)
             .accessibilityLabel("Log a beer with a photo")
+            .accessibilityIdentifier("home.camera")
         }
         .disabled(viewModel.isUploadingPhoto)
         .padding(.horizontal)

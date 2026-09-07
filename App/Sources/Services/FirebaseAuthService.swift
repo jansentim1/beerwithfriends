@@ -58,7 +58,7 @@ final class FirebaseAuthService: AuthServicing, @unchecked Sendable {
     /// then deletes the auth user (idempotent retry server-side).
     func deleteAccount() async throws {
         do {
-            _ = try await Functions.functions(region: "europe-west4").httpsCallable("deleteAccount").call([:])
+            _ = try await EmulatorConfig.functions(region: "europe-west4").httpsCallable("deleteAccount").call([:])
         } catch {
             let nsError = error as NSError
             if nsError.domain == FunctionsErrorDomain, nsError.localizedDescription.contains("RETRY_DELETE") {

@@ -35,6 +35,8 @@ targets:
       properties:
         com.apple.developer.applesignin: [Default]
         aps-environment: production
+    scheme:
+      testTargets: [PubDatesUITests]
     info:
       path: App/Info.plist
       properties:
@@ -44,3 +46,14 @@ targets:
         CFBundleShortVersionString: "$(MARKETING_VERSION)"
         UIBackgroundModes: [remote-notification]
         ITSAppUsesNonExemptEncryption: false
+  PubDatesUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [App/UITests]
+    dependencies:
+      - target: BeerWithFriends
+    settings:
+      base:
+        TEST_TARGET_NAME: BeerWithFriends
+        CODE_SIGN_STYLE: Automatic
+        PROVISIONING_PROFILE_SPECIFIER: ""

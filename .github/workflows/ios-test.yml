@@ -1,0 +1,125 @@
+# UI walkthrough on a simulator against the Firebase emulators; saves a screenshot
+# of every screen in light and dark mode as an artifact (Claude reviews the PNGs).
+name: ios-test
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 3 * * *'
+
+concurrency:
+  group: ios-test
+  cancel-in-progress: true
+
+jobs:
+  ui:
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Firebase config
+        run: |
+          mkdir -p App/Resources
+          echo "${{ secrets.FIREBASE_PLIST_B64 }}" | base64 -d > App/Resources/GoogleService-Info.plist
+          plutil -lint App/Resources/GoogleService-Info.plist
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate project
+        run: xcodegen generate
+
+      - name: Cache SwiftPM checkouts
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/org.swift.swiftpm
+            ~/Library/Developer/Xcode/DerivedData/**/SourcePackages
+          key: spm-${{ runner.os }}-${{ hashFiles('project.yml', 'BeerKit/Package.swift') }}
+          restore-keys: spm-${{ runner.os }}-
+
+      - name: Start Firebase emulators
+        run: |
+          java -version 2>&1 | head -1
+          npx -y firebase-tools@latest emulators:start --only auth,firestore,storage --project demo-pubdates > emulators.log 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -s http://127.0.0.1:8085 >/dev/null && curl -s http://127.0.0.1:9099 >/dev/null; then echo "emulators up after ${i}s"; break; fi
+            sleep 2
+          done
+          tail -5 emulators.log
+
+      - name: Pick a simulator
+        id: sim
+        run: |
+          UDID=$(xcrun simctl list devices available -j | python3 -c '
+          import sys, json
+          d = json.load(sys.stdin)["devices"]
+          cands = []
+          for runtime, devs in d.items():
+              if "iOS" not in runtime: continue
+              for dev in devs:
+                  if dev["name"].startswith("iPhone") and dev["isAvailable"]:
+                      cands.append((runtime, dev["name"], dev["udid"]))
+          cands.sort()
+          print(cands[-1][2]); print(cands[-1][:2], file=sys.stderr)')
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b
+
+      - name: Build for testing
+        run: |
+          set -o pipefail
+          xcodebuild build-for-testing \
+            -project BeerWithFriends.xcodeproj -scheme BeerWithFriends \
+            -destination "id=${{ steps.sim.outputs.udid }}" \
+            -skipPackagePluginValidation -skipMacroValidation \
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tee build.log | grep -E ' error: |BUILD' || true
+          grep -q '\*\* TEST BUILD SUCCEEDED \*\*' build.log
+
+      - name: UI walkthrough (light)
+        env:
+          TEST_RUNNER_SCREENSHOT_DIR: ${{ github.workspace }}/screens
+          TEST_RUNNER_SCREENSHOT_SUFFIX: -light
+        run: |
+          set -o pipefail
+          xcrun simctl ui "${{ steps.sim.outputs.udid }}" appearance light
+          xcodebuild test-without-building \
+            -project BeerWithFriends.xcodeproj -scheme BeerWithFriends \
+            -destination "id=${{ steps.sim.outputs.udid }}" \
+            -resultBundlePath results-light.xcresult \
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tee test-light.log | grep -E 'Test Case|error:|failed|passed' || true
+          grep -q 'TEST EXECUTE SUCCEEDED\|\*\* TEST SUCCEEDED \*\*' test-light.log
+
+      - name: UI walkthrough (dark)
+        if: always()
+        env:
+          TEST_RUNNER_SCREENSHOT_DIR: ${{ github.workspace }}/screens
+          TEST_RUNNER_SCREENSHOT_SUFFIX: -dark
+        run: |
+          set -o pipefail
+          xcrun simctl ui "${{ steps.sim.outputs.udid }}" appearance dark
+          xcodebuild test-without-building \
+            -project BeerWithFriends.xcodeproj -scheme BeerWithFriends \
+            -destination "id=${{ steps.sim.outputs.udid }}" \
+            -resultBundlePath results-dark.xcresult \
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tee test-dark.log | grep -E 'Test Case|error:|failed|passed' || true
+          grep -q 'TEST EXECUTE SUCCEEDED\|\*\* TEST SUCCEEDED \*\*' test-dark.log
+
+      - name: Collect
+        if: always()
+        run: |
+          ls -la screens || true
+          tail -30 emulators.log || true
+
+      - name: Upload screenshots and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-screens
+          path: |
+            screens/
+            test-light.log
+            test-dark.log
+            build.log
+            emulators.log

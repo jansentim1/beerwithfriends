@@ -69,6 +69,15 @@ private struct SignInStep: View {
             .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
             .frame(height: 52)
             .disabled(isSigningIn)
+            .accessibilityIdentifier("signin.apple")
+            #if DEBUG
+            if EmulatorConfig.isEnabled {
+                Button("Sign in (test account)") {
+                    Task { await appState.signInForUITests() }
+                }
+                .accessibilityIdentifier("signin.test")
+            }
+            #endif
             Text("No email, no password — just your Apple ID.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
@@ -187,6 +196,7 @@ private struct UsernamePickerStep: View {
 
             VStack(alignment: .leading, spacing: 8) {
                 TextField("username", text: $username)
+                    .accessibilityIdentifier("onboarding.username")
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .keyboardType(.asciiCapable)
@@ -211,6 +221,7 @@ private struct UsernamePickerStep: View {
                 .padding(.vertical, 6)
             }
             .buttonStyle(.borderedProminent)
+            .accessibilityIdentifier("onboarding.claim")
             .disabled(isClaiming || !(availability == .available || availability == .unknown))
 
             HStack(alignment: .top, spacing: 12) {
