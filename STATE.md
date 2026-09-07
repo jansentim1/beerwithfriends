@@ -3,5 +3,7 @@
 - Done: 1-8, 9, 10 (all screens compiled on GitHub macOS runner, run 33852266356), 11 (report/block wired; docs/privacy-policy.md, docs/app-store-checklist.md)
 - Infra done 2026-09-04: `ios-build` workflow (unsigned simulator compile on every App/BeerKit push), `ios-testflight` workflow (manual, cloud-managed signing), iOS app registered in beerwithme-prod, GoogleService-Info.plist in App/Resources (gitignored) + GitHub secret FIREBASE_PLIST_B64. All 7 functions deployed in europe-west4 and matching source.
 - Parked: —
-- Needs Tim (see docs/RUNBOOK.md steps 1-3): Apple Developer Program enrollment; App Store Connect API key + 4 GitHub secrets (ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8, APPLE_TEAM_ID); App ID with Push + Sign in with Apple; App Store Connect app record; APNs key uploaded to FCM; Firebase Auth initialized with the Apple provider.
+- 2026-09-07: build 1 (Pints With Mates, com.timjansen.BeerWithFriends) uploaded to TestFlight via ios-testflight, IN_BETA_TESTING, Tim is internal tester. Signing: manual cert+profile from the ASC API (secrets DIST_*).
+- Needs Tim: RUNBOOK step 3 (APNs key to FCM; Firebase Auth: enable Apple provider). Then step 5 (external testers).
+- Next code work: fix review findings 1-5 + CameraView crash (see session 2026-09-04 review), then item 6-10.
 - Mac note (historical): the Mac's Command Line Tools are corrupted (see README). No longer on the critical path; nothing requires a Mac.

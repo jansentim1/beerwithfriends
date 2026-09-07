@@ -70,16 +70,19 @@ gh run watch                              # follow it, about 15 minutes
 ```
 
 The build number is the GitHub run number, so every run is a new TestFlight build.
+Signing is manual: an Apple Distribution certificate and an App Store profile were created
+through the App Store Connect API from tim-server (`~/bin/asc`, key material in
+`~/private_keys/`) and stored as the secrets `DIST_P12_B64`, `DIST_P12_PASSWORD`,
+`DIST_PROFILE_B64`. Both expire 2027-09-07; regenerate the same way and update the secrets.
+Automatic signing is not an option: it needs a registered device, and a Mac-less team has none.
 When it fails, download the logs:
 
 ```
 gh run download <run-id> -n archive-logs
 ```
 
-First-time signing: xcodebuild with the API key creates the distribution certificate
-and provisioning profile automatically (cloud-managed signing). If it complains about
-a missing agreement, accept the latest Paid Apps agreement at
-https://appstoreconnect.apple.com/agreements.
+Internal testing group "Internal" (all builds, no review) exists with Tim in it; every
+processed build appears in his TestFlight app automatically.
 
 ## 5. Install on iPhones (Tim, iPhone)
 
