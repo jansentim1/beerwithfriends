@@ -38,5 +38,8 @@ targets:
       path: App/Info.plist
       properties:
         NSCameraUsageDescription: "Take a live photo of your beer to share with friends."
+        # XcodeGen writes literal "1"/"1.0" otherwise; CI sets CURRENT_PROJECT_VERSION per run.
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
         UIBackgroundModes: [remote-notification]
         ITSAppUsesNonExemptEncryption: false
