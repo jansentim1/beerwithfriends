@@ -54,19 +54,16 @@ struct HomeView: View {
                 Text(viewModel.errorMessage ?? "")
             }
         }
+        // Changing the id cancels the previous start(); the new one awaits the old
+        // stream's teardown itself, so no sleep is needed here.
         .task(id: feedEpoch) {
-            if feedEpoch > 0 {
-                // Restart: .task(id:) just cancelled the previous stream — give it
-                // a beat to unwind so start()'s internal isObserving guard is clear.
-                try? await Task.sleep(for: .milliseconds(200))
-                guard !Task.isCancelled else { return }
-            }
             await viewModel.start()
         }
         .onChange(of: scenePhase) { oldPhase, newPhase in
-            // Feed staleness mitigation: coming back from background restarts the
-            // stream, re-snapshotting the friend list.
-            if newPhase == .active, oldPhase == .background {
+            // Coming back to the foreground restarts the stream (re-snapshots the
+            // friend list). iOS goes background → inactive → active, so compare
+            // against anything-but-active rather than `.background`.
+            if newPhase == .active, oldPhase != .active {
                 feedEpoch += 1
             }
         }
@@ -145,7 +142,7 @@ struct HomeView: View {
             .buttonStyle(.bordered)
             .accessibilityLabel("Log a beer with a photo")
         }
-        .disabled(viewModel.isLogging)
+        .disabled(viewModel.isUploadingPhoto)
         .padding(.horizontal)
     }
 
@@ -154,12 +151,20 @@ struct HomeView: View {
     @ViewBuilder
     private var feedList: some View {
         if viewModel.feed.isEmpty {
-            ContentUnavailableView(
-                "No beers yet",
-                systemImage: "mug",
-                description: Text("Log one above, or add friends to see theirs.")
-            )
-            .frame(maxHeight: .infinity)
+            // Inside a List so pull-to-refresh works on the empty state too.
+            List {
+                ContentUnavailableView(
+                    "No beers yet",
+                    systemImage: "mug",
+                    description: Text("Log one above, or add friends to see theirs.")
+                )
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
+            }
+            .listStyle(.plain)
+            .refreshable {
+                feedEpoch += 1
+            }
         } else {
             List(viewModel.feed) { beer in
                 feedRow(beer)

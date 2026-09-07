@@ -4,14 +4,29 @@ public enum PhotoFetchError: Error, Equatable { case alreadyViewed, expired, not
 
 public enum UsernameClaimError: Error, Equatable { case taken }
 
+/// Server rejected the cheers because it already exists (rules: cheers docs are
+/// create-only). The UI keeps the beer marked as cheersed.
+public enum CheersError: Error, Equatable { case alreadyCheersed }
+
+/// `deleteAccount` contract: `.retryDelete` means the server erased all data but
+/// failed to delete the auth user; the client retries, then signs out locally.
+public enum AccountDeletionError: Error, Equatable { case retryDelete }
+
 public protocol BeerServicing: Sendable {
-    func logBeer(photoJPEG: Data?) async throws -> BeerLog
+    /// Instant, local: a fresh id + timestamps for an optimistic feed row. Nothing is
+    /// written until `logBeer(_:photoJPEG:)`.
+    func newBeerLog(hasPhoto: Bool) -> BeerLog
+    /// Persists `beer` (uploading `photoJPEG` first when present). Returns once the
+    /// server accepted the write; the caller has already shown the row.
+    func logBeer(_ beer: BeerLog, photoJPEG: Data?) async throws
     /// Implementations must tie listener teardown to `continuation.onTermination` —
     /// `for await` cancellation alone does not cancel an underlying Firestore registration.
     func observeFeed() -> AsyncThrowingStream<[BeerLog], Error>
     func cheers(beerId: String) async throws
     func fetchPhotoOnce(beerId: String) async throws -> URL
     func viewedBeerIds() async throws -> Set<String>
+    /// Which of `beerIds` the current user has already cheersed (survives relaunch).
+    func cheersedBeerIds(among beerIds: [String]) async throws -> Set<String>
 }
 
 public protocol AuthServicing: Sendable {

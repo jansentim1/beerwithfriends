@@ -215,6 +215,14 @@ struct FriendsView: View {
         }
     }
 
+    private func reloadFriends() async {
+        do {
+            friends = try await friendService.friends()
+        } catch {
+            errorMessage = "Couldn't load your friends — pull to retry."
+        }
+    }
+
     private func addFriend() {
         let raw = searchText
         searchStatus = nil
@@ -252,7 +260,9 @@ struct FriendsView: View {
             do {
                 try await friendService.accept(request)
                 requests.removeAll { $0.id == request.id }
-                await reload()
+                // Refresh friends only: the server trigger deletes the request doc
+                // a moment later, so re-reading requests now would resurrect it.
+                await reloadFriends()
             } catch {
                 errorMessage = "Couldn't accept the request — try again."
             }

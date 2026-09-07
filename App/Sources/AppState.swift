@@ -15,6 +15,10 @@ final class AppState: ObservableObject {
         case loading
         case signedOut
         case needsUsername
+        /// Signed in, but users/{uid} could not be fetched (offline, etc.).
+        /// Onboarding shows a retry screen; never guess `.needsUsername` here
+        /// (that could double-claim a username).
+        case profileUnavailable
         case ready(UserProfile)
     }
 
@@ -27,8 +31,11 @@ final class AppState: ObservableObject {
     private(set) var beerService: (any BeerServicing)?
     private(set) var friendService: (any FriendServicing)?
 
-    private let pushRegistrar = PushRegistrar()
+    private let pushRegistrar = PushRegistrar.shared
     private var authListener: AuthStateDidChangeListenerHandle?
+    /// How long sign-out / deletion wait for the push-token cleanup. Firestore's
+    /// async delete never returns offline, so this must not block the user.
+    private let tokenCleanupTimeout: Double = 2
 
     /// Attach the Firebase auth listener. Call once from the root view's `.task`
     /// (after `FirebaseApp.configure()` has run in the AppDelegate).
@@ -85,11 +92,22 @@ final class AppState: ObservableObject {
         }
     }
 
+    /// Retry for `.profileUnavailable`.
+    func retryLoadProfile() async {
+        guard let uid = Auth.auth().currentUser?.uid else {
+            phase = .signedOut
+            return
+        }
+        phase = .loading
+        await loadProfile(uid: uid)
+    }
+
     func signOut() async {
         // While still authenticated: rules won't let us touch private/push after
         // sign-out, and a stale token would deliver this account's pushes to
-        // whoever uses the device next.
-        await pushRegistrar.clearToken()
+        // whoever uses the device next. Bounded: offline it must still sign out.
+        let registrar = pushRegistrar
+        _ = await Timeout.run(seconds: tokenCleanupTimeout) { await registrar.clearToken() }
         do {
             try authService.signOut()
             // The auth state listener flips `phase` to `.signedOut`.
@@ -99,10 +117,22 @@ final class AppState: ObservableObject {
     }
 
     func deleteAccount() async {
-        await pushRegistrar.clearToken()
+        let registrar = pushRegistrar
+        _ = await Timeout.run(seconds: tokenCleanupTimeout) { await registrar.clearToken() }
         do {
             try await authService.deleteAccount()
             // Server erased data + auth user; the listener flips to `.signedOut`.
+        } catch AccountDeletionError.retryDelete {
+            // Data is gone, only the auth user survived. Retry once; if that also
+            // fails, sign out locally rather than leave a zombie session on a uid
+            // whose profile no longer exists.
+            try? await Task.sleep(for: .seconds(1))
+            do {
+                try await authService.deleteAccount()
+            } catch {
+                try? authService.signOut()
+                errorMessage = "Your data was deleted. Sign in again if you want a fresh start."
+            }
         } catch {
             errorMessage = "Couldn't delete your account — try again."
         }
@@ -138,10 +168,8 @@ final class AppState: ObservableObject {
             becomeReady(profile)
         } catch {
             // Signed in but the profile fetch failed (offline, etc.). Don't force
-            // `.needsUsername` — that could double-claim. Surface the error and
-            // fall back to signedOut so the user can retry the flow.
-            errorMessage = "Couldn't load your profile — check your connection."
-            phase = .signedOut
+            // `.needsUsername` — that could double-claim. Dedicated phase with retry.
+            phase = .profileUnavailable
         }
     }
 

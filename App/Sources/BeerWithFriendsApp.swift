@@ -22,6 +22,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     ) {
         // Hand the APNs token to FCM so it can mint/refresh the registration token.
         Messaging.messaging().apnsToken = deviceToken
+        PushRegistrar.shared.apnsTokenDidArrive()
     }
 }
 
@@ -47,7 +48,7 @@ struct RootView: View {
         switch appState.phase {
         case .loading:
             ProgressView("Pouring…")
-        case .signedOut, .needsUsername:
+        case .signedOut, .needsUsername, .profileUnavailable:
             OnboardingView()
         case .ready(let profile):
             MainTabView(profile: profile)

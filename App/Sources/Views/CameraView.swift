@@ -316,6 +316,12 @@ final class CameraSessionController: @unchecked Sendable {
 
     func capturePhoto(delegate: PhotoCaptureDelegate) {
         queue.async {
+            // No input (permission revoked mid-session, simulator, device failure):
+            // AVCapturePhotoOutput raises an ObjC exception instead of erroring.
+            guard let connection = self.photoOutput.connection(with: .video), connection.isActive else {
+                delegate.fail()
+                return
+            }
             let settings: AVCapturePhotoSettings
             if self.photoOutput.availablePhotoCodecTypes.contains(.jpeg) {
                 settings = AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.jpeg])
@@ -352,6 +358,14 @@ final class PhotoCaptureDelegate: NSObject, AVCapturePhotoCaptureDelegate, @unch
 
     init(completion: @escaping @MainActor (Data?) -> Void) {
         self.completion = completion
+    }
+
+    /// Capture could not even start (no active video connection).
+    func fail() {
+        let completion = completion
+        Task { @MainActor in
+            completion(nil)
+        }
     }
 
     func photoOutput(

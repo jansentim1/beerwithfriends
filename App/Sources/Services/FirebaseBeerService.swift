@@ -24,42 +24,44 @@ final class FirebaseBeerService: BeerServicing, @unchecked Sendable {
 
     // MARK: - Log a beer
 
+    func newBeerLog(hasPhoto: Bool) -> BeerLog {
+        let now = Date()
+        return BeerLog(id: UUID().uuidString.lowercased(), ownerUid: uid, ownerName: ownerName,
+                       createdAt: now, expiresAt: BeerLog.expiry(from: now), hasPhoto: hasPhoto)
+    }
+
     /// Photo (if any) is uploaded to `photos/{beerId}.jpg` BEFORE the doc is
-    /// created, so `getPhotoOnce` never signs a URL for a missing object.
+    /// created, so `getPhotoOnce` never signs a URL for a missing object (beer
+    /// docs are immutable, so hasPhoto can't be flipped afterwards). The caller
+    /// already shows the optimistic row; this returns on server ack.
     /// Doc schema is pinned by the rules: exactly the seven keys below,
     /// `createdAt == request.time` (hence serverTimestamp) and
     /// `expiresAt` within (now, now + 25h] (hence client-computed now + 24h).
-    func logBeer(photoJPEG: Data?) async throws -> BeerLog {
-        let beerId = UUID().uuidString.lowercased()
-        let hasPhoto = photoJPEG != nil
-        let photoPath = hasPhoto ? "photos/\(beerId).jpg" : ""
-
-        if let photoJPEG {
+    func logBeer(_ beer: BeerLog, photoJPEG: Data?) async throws {
+        let photoPath = beer.hasPhoto ? "photos/\(beer.id).jpg" : ""
+        if let photoJPEG, beer.hasPhoto {
             let metadata = StorageMetadata()
             metadata.contentType = "image/jpeg"
             _ = try await Storage.storage().reference(withPath: photoPath)
                 .putDataAsync(photoJPEG, metadata: metadata)
         }
-
-        let now = Date()
-        let expiresAt = BeerLog.expiry(from: now)
-        try await db.document("beers/\(beerId)").setData([
+        try await db.document("beers/\(beer.id)").setData([
             "ownerUid": uid,
             "ownerName": String(ownerName.prefix(60)),
             "createdAt": FieldValue.serverTimestamp(),
-            "expiresAt": Timestamp(date: expiresAt),
-            "hasPhoto": hasPhoto,
+            "expiresAt": Timestamp(date: beer.expiresAt),
+            "hasPhoto": beer.hasPhoto,
             "photoPath": photoPath,
             "cheersCount": 0,
         ])
-
-        // Best effort — a failed counter bump must not fail the logged beer.
-        try? await db.document("users/\(uid)")
-            .updateData(["beerCount": FieldValue.increment(Int64(1))])
-
-        return BeerLog(id: beerId, ownerUid: uid, ownerName: ownerName,
-                       createdAt: now, expiresAt: expiresAt,
-                       hasPhoto: hasPhoto, cheersCount: 0)
+        // Off the tap path and best effort: a failed counter bump must not fail
+        // (or slow down) the logged beer.
+        let db = self.db
+        let uid = self.uid
+        Task.detached {
+            try? await db.document("users/\(uid)")
+                .updateData(["beerCount": FieldValue.increment(Int64(1))])
+        }
     }
 
     // MARK: - Feed
@@ -134,10 +136,40 @@ final class FirebaseBeerService: BeerServicing, @unchecked Sendable {
 
     /// Schema pinned by rules: `beers/{beerId}/cheers/{me}` = exactly `{uid, at}`.
     func cheers(beerId: String) async throws {
-        try await db.document("beers/\(beerId)/cheers/\(uid)").setData([
-            "uid": uid,
-            "at": Timestamp(date: Date()),
-        ])
+        do {
+            try await db.document("beers/\(beerId)/cheers/\(uid)").setData([
+                "uid": uid,
+                "at": Timestamp(date: Date()),
+            ])
+        } catch {
+            let nsError = error as NSError
+            if nsError.domain == FirestoreErrorDomain,
+               nsError.code == FirestoreErrorCode.permissionDenied.rawValue {
+                // Cheers docs are create-only: a rejected write means it exists.
+                throw CheersError.alreadyCheersed
+            }
+            throw error
+        }
+    }
+
+    /// Per-beer `cheers/{me}` gets (readable via the rules' canReactTo clause).
+    func cheersedBeerIds(among beerIds: [String]) async throws -> Set<String> {
+        let mine = beerIds
+        let db = self.db
+        let uid = self.uid
+        return try await withThrowingTaskGroup(of: String?.self) { group in
+            for beerId in mine {
+                group.addTask {
+                    let doc = try await db.document("beers/\(beerId)/cheers/\(uid)").getDocument()
+                    return doc.exists ? beerId : nil
+                }
+            }
+            var found = Set<String>()
+            for try await id in group {
+                if let id { found.insert(id) }
+            }
+            return found
+        }
     }
 
     // MARK: - View-once photo

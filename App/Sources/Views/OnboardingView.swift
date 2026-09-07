@@ -13,9 +13,12 @@ struct OnboardingView: View {
 
     var body: some View {
         Group {
-            if case .needsUsername = appState.phase {
+            switch appState.phase {
+            case .needsUsername:
                 UsernamePickerStep()
-            } else {
+            case .profileUnavailable:
+                ProfileUnavailableStep()
+            default:
                 SignInStep()
             }
         }
@@ -113,6 +116,48 @@ private func sha256Hex(_ input: String) -> String {
     SHA256.hash(data: Data(input.utf8))
         .map { String(format: "%02x", $0) }
         .joined()
+}
+
+// MARK: - Recovery: signed in, profile unreachable
+
+private struct ProfileUnavailableStep: View {
+    @EnvironmentObject private var appState: AppState
+    @State private var isRetrying = false
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Spacer()
+            Image(systemName: "wifi.slash")
+                .font(.system(size: 56))
+                .foregroundStyle(.secondary)
+            Text("Couldn't load your profile")
+                .font(.title2.bold())
+            Text("You're signed in, but we couldn't reach the server. Check your connection and try again.")
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Button {
+                isRetrying = true
+                Task {
+                    await appState.retryLoadProfile()
+                    isRetrying = false
+                }
+            } label: {
+                Group {
+                    if isRetrying { ProgressView() } else { Text("Try again") }
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 6)
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(isRetrying)
+            Button("Sign out") {
+                Task { await appState.signOut() }
+            }
+            .font(.footnote)
+        }
+        .padding(24)
+    }
 }
 
 // MARK: - Step 2: Username picker

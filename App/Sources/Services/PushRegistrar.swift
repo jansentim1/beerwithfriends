@@ -12,6 +12,9 @@ import UserNotifications
 /// user doc, so other users can't scrape it. Handles the token arriving before
 /// sign-in completes by caching it and flushing once a uid is set.
 final class PushRegistrar: NSObject, MessagingDelegate, @unchecked Sendable {
+    /// One instance: the AppDelegate feeds it the APNs token, AppState binds the user.
+    static let shared = PushRegistrar()
+
     private let lock = NSLock()
     private var uid: String?
     private var lastToken: String?
@@ -61,6 +64,31 @@ final class PushRegistrar: NSObject, MessagingDelegate, @unchecked Sendable {
         lock.unlock()
         if let uid, let pendingToken {
             write(token: pendingToken, uid: uid)
+        } else if uid != nil {
+            // The delegate only fires on mint/refresh. On every later launch the
+            // cached token is delivered before the delegate exists, so ask for it.
+            fetchToken()
+        }
+    }
+
+    /// AppDelegate hook: FCM can only mint/return a token once APNs registered.
+    func apnsTokenDidArrive() {
+        fetchToken()
+    }
+
+    private func fetchToken() {
+        Messaging.messaging().token { [weak self] token, error in
+            guard let self, let token else {
+                if let error { print("PushRegistrar: token fetch failed: \(error.localizedDescription)") }
+                return
+            }
+            self.lock.lock()
+            self.lastToken = token
+            let boundUid = self.uid
+            self.lock.unlock()
+            if let boundUid {
+                self.write(token: token, uid: boundUid)
+            }
         }
     }
 

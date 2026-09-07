@@ -57,7 +57,15 @@ final class FirebaseAuthService: AuthServicing, @unchecked Sendable {
     /// The `deleteAccount` callable (Task 7) erases Firestore data + photos,
     /// then deletes the auth user (idempotent retry server-side).
     func deleteAccount() async throws {
-        _ = try await Functions.functions(region: "europe-west4").httpsCallable("deleteAccount").call([:])
+        do {
+            _ = try await Functions.functions(region: "europe-west4").httpsCallable("deleteAccount").call([:])
+        } catch {
+            let nsError = error as NSError
+            if nsError.domain == FunctionsErrorDomain, nsError.localizedDescription.contains("RETRY_DELETE") {
+                throw AccountDeletionError.retryDelete
+            }
+            throw error
+        }
         // Auth user is gone server-side; clear local session state too.
         try? Auth.auth().signOut()
     }
