@@ -5,8 +5,12 @@
 #   ASC_KEY_P8        Contents of the AuthKey_XXXX.p8 file (paste the whole file)
 #   APPLE_TEAM_ID     10-character team id from developer.apple.com/account
 #   FIREBASE_PLIST_B64  `base64 -w0 GoogleService-Info.plist`
-# The API key needs the App Manager (or Admin) role so xcodebuild can create
-# the distribution certificate and profile itself (-allowProvisioningUpdates).
+#   DIST_P12_B64        Apple Distribution certificate + key as base64 .p12
+#   DIST_P12_PASSWORD   password of that .p12
+#   DIST_PROFILE_B64    App Store provisioning profile (.mobileprovision) as base64
+# Signing is MANUAL with the certificate/profile above (created via the App Store
+# Connect API from tim-server; automatic signing needs a registered device, which
+# a Mac-less team never has). The API key is still used for the upload.
 name: ios-testflight
 
 on:
@@ -34,6 +38,8 @@ jobs:
           done
           [ -n "${{ secrets.ASC_KEY_P8 }}" ] || { echo "missing secret ASC_KEY_P8"; exit 1; }
           [ -n "${{ secrets.FIREBASE_PLIST_B64 }}" ] || { echo "missing secret FIREBASE_PLIST_B64"; exit 1; }
+          [ -n "${{ secrets.DIST_P12_B64 }}" ] || { echo "missing secret DIST_P12_B64"; exit 1; }
+          [ -n "${{ secrets.DIST_PROFILE_B64 }}" ] || { echo "missing secret DIST_PROFILE_B64"; exit 1; }
 
       - name: Materialize secrets
         run: |
@@ -41,6 +47,28 @@ jobs:
           printf '%s' "${{ secrets.ASC_KEY_P8 }}" > ~/private_keys/AuthKey_${ASC_KEY_ID}.p8
           echo "${{ secrets.FIREBASE_PLIST_B64 }}" | base64 -d > App/Resources/GoogleService-Info.plist
           plutil -lint App/Resources/GoogleService-Info.plist
+
+      - name: Install signing certificate and profile
+        run: |
+          set -euo pipefail
+          KEYCHAIN="$RUNNER_TEMP/signing.keychain-db"
+          KC_PASS="$(uuidgen)"
+          security create-keychain -p "$KC_PASS" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KC_PASS" "$KEYCHAIN"
+          echo "${{ secrets.DIST_P12_B64 }}" | base64 -d > "$RUNNER_TEMP/dist.p12"
+          security import "$RUNNER_TEMP/dist.p12" -P "${{ secrets.DIST_P12_PASSWORD }}" -A -t cert -f pkcs12 -k "$KEYCHAIN"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KC_PASS" "$KEYCHAIN" >/dev/null
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+          security find-identity -v -p codesigning "$KEYCHAIN"
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles ~/Library/Developer/Xcode/UserData/Provisioning\ Profiles
+          echo "${{ secrets.DIST_PROFILE_B64 }}" | base64 -d > "$RUNNER_TEMP/dist.mobileprovision"
+          UUID=$(security cms -D -i "$RUNNER_TEMP/dist.mobileprovision" | plutil -extract UUID raw -)
+          NAME=$(security cms -D -i "$RUNNER_TEMP/dist.mobileprovision" | plutil -extract Name raw -)
+          cp "$RUNNER_TEMP/dist.mobileprovision" ~/Library/MobileDevice/Provisioning\ Profiles/"$UUID".mobileprovision
+          cp "$RUNNER_TEMP/dist.mobileprovision" ~/Library/Developer/Xcode/UserData/Provisioning\ Profiles/"$UUID".mobileprovision
+          echo "PROFILE_NAME=$NAME" >> "$GITHUB_ENV"
+          echo "installed profile '$NAME' ($UUID)"
 
       - name: Toolchain
         run: xcodebuild -version
@@ -60,7 +88,7 @@ jobs:
           key: spm-${{ runner.os }}-${{ hashFiles('project.yml', 'BeerKit/Package.swift') }}
           restore-keys: spm-${{ runner.os }}-
 
-      - name: Archive (cloud-managed signing)
+      - name: Archive (manual distribution signing)
         run: |
           set -o pipefail
           xcodebuild archive \
@@ -70,12 +98,10 @@ jobs:
             -destination 'generic/platform=iOS' \
             -archivePath build/BeerWithFriends.xcarchive \
             -skipPackagePluginValidation -skipMacroValidation \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath ~/private_keys/AuthKey_${ASC_KEY_ID}.p8 \
-            -authenticationKeyID "$ASC_KEY_ID" \
-            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
             DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
-            CODE_SIGN_STYLE=Automatic \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
             CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
             2>&1 | tee archive.log | grep -E 'error:|warning: unre|ARCHIVE|Signing|Provisioning' || true
           grep -E ' error: ' archive.log | sort -u || true
@@ -89,7 +115,11 @@ jobs:
           <plist version="1.0"><dict>
             <key>method</key><string>app-store-connect</string>
             <key>destination</key><string>upload</string>
-            <key>signingStyle</key><string>automatic</string>
+            <key>signingStyle</key><string>manual</string>
+            <key>signingCertificate</key><string>Apple Distribution</string>
+            <key>provisioningProfiles</key><dict>
+              <key>com.timjansen.BeerWithFriends</key><string>${PROFILE_NAME}</string>
+            </dict>
             <key>teamID</key><string>${APPLE_TEAM_ID}</string>
             <key>uploadSymbols</key><true/>
             <key>manageAppVersionAndBuildNumber</key><false/>
