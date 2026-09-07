@@ -34,4 +34,4 @@ firebase emulators:exec --project demo-beerwithme --only firestore,auth,storage 
 6. Cloud Functions callables are in europe-west4: the app must use
    `Functions.functions(region: "europe-west4")`. `git push` goes over HTTPS (gh token);
    the SSH deploy key cannot push workflow files.
-5. Firebase Auth has no providers configured yet; do not fake sign-in in production data.
+5. Firebase Auth (Identity Platform, free tier) has only the Apple provider enabled (2026-09-07, via API); do not fake sign-in in production data.

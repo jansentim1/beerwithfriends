@@ -58,7 +58,7 @@ that need Xcode. Tim's iPhone does the Apple-side clicking and installs via Test
 2. Firebase console, project beerwithme-prod, Project settings, Cloud Messaging,
    Apple app configuration, APNs Authentication Key, Upload: the `.p8`, its Key ID,
    and your Team ID. https://console.firebase.google.com/project/beerwithme-prod/settings/cloudmessaging
-3. Firebase Auth: https://console.firebase.google.com/project/beerwithme-prod/authentication,
+3. Firebase Auth: DONE 2026-09-07 via the Identity Toolkit API (initializeAuth + apple.com provider). For reference:
    Get started, Sign-in method, Add new provider, **Apple**, Enable, Save.
    Nothing else is required for a native iOS app (Services ID is web only).
 
