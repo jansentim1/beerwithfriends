@@ -9,3 +9,6 @@ functions/lib/
 tools/swiftpm-libs/
 App/Resources/GoogleService-Info.plist
 *.p8
+.claude/skills/impeccable/
+.claude/agents/impeccable-*
+PRODUCT.md.bak
