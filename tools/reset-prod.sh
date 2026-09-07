@@ -3,8 +3,9 @@
 # start from scratch. Deletes every Firestore collection, every photo in Storage, and
 # every Firebase Auth user. Cloud Functions, rules and indexes are untouched.
 #
-# Run on tim-server (VM service account auth):   tools/reset-prod.sh
-# It asks you to type the project id before doing anything.
+# Run on tim-server (VM service account auth):
+#   tools/reset-prod.sh                 # asks you to type the project id
+#   tools/reset-prod.sh --yes           # non-interactive (e.g. from the "!" runner)
 set -euo pipefail
 PROJECT=beerwithme-prod
 BUCKET="gs://$PROJECT.firebasestorage.app"
@@ -14,8 +15,12 @@ cd "$ROOT"
 
 echo "== $PROJECT: this deletes ALL users, usernames, beers, friendships, requests,"
 echo "   blocks, reports, photos and auth accounts. Functions and rules stay."
-read -r -p "Type the project id to confirm: " answer
-[[ "$answer" == "$PROJECT" ]] || { echo "aborted"; exit 1; }
+if [[ "${1:-}" == "--yes" ]]; then
+  echo "== confirmed with --yes"
+else
+  read -r -p "Type the project id to confirm: " answer
+  [[ "$answer" == "$PROJECT" ]] || { echo "aborted"; exit 1; }
+fi
 
 echo "== Firestore: all collections"
 firebase firestore:delete --all-collections --force --project "$PROJECT"
