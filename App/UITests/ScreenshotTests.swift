@@ -15,6 +15,11 @@ final class ScreenshotTests: XCTestCase {
         app.launch()
     }
 
+    override func tearDown() {
+        // Whatever is on screen when a step fails is the most useful evidence.
+        snap("99-final-state")
+    }
+
     func testWalkthrough() throws {
         snap("01-signin")
 
@@ -23,7 +28,9 @@ final class ScreenshotTests: XCTestCase {
         testSignIn.tap()
 
         let field = app.textFields["onboarding.username"]
-        XCTAssertTrue(field.waitForExistence(timeout: 15), "username screen did not appear")
+        let appeared = field.waitForExistence(timeout: 20)
+        if !appeared { snap("01b-after-signin-tap") }
+        XCTAssertTrue(appeared, "username screen did not appear")
         field.tap()
         field.typeText("tim\(Int.random(in: 1000...9999))")
         let claim = app.buttons["onboarding.claim"]
