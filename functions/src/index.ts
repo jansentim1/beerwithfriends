@@ -10,16 +10,14 @@ import { getMessaging } from "firebase-admin/messaging";
 import { getPhotoOnceCore, PhotoError, PhotoErrorCode } from "./photo";
 import { fanoutBeerCreated, notifyCheers, Pusher } from "./pushes";
 import { sendApns, deadTokens } from "./apns";
-import { defineSecret } from "firebase-functions/params";
+import { loadApnsKey } from "./apnsKey";
 import { mirrorFriendship, severOnBlock, cleanupExpiredCore, deleteAccountCore, PhotoDeleter } from "./lifecycle";
 
 // Colocated with Firestore + Storage (europe-west4); see .firebaserc / tools/deploy.sh.
 setGlobalOptions({ region: "europe-west4" });
 initializeApp();
 
-// APNs auth key (.p8) from Secret Manager; set with
-//   firebase functions:secrets:set APNS_KEY --data-file AuthKey_XXXX.p8
-const apnsKey = defineSecret("APNS_KEY");
+// APNs auth key (.p8) lives in Secret Manager (APNS_KEY); see apnsKey.ts.
 
 // The photo is delivered as bytes inside the callable response (base64), not as
 // a signed URL: no reusable link exists, and no IAM signBlob permission is needed.
@@ -63,7 +61,7 @@ const push: Pusher = async (targets, title, body, data) => {
   const work: Promise<unknown>[] = [];
   if (apnsTargets.length > 0) {
     work.push((async () => {
-      const results = await sendApns(apnsKey.value(), apnsTargets.map((t) => t.apns!), title, body, data);
+      const results = await sendApns(await loadApnsKey(), apnsTargets.map((t) => t.apns!), title, body, data);
       for (const r of results) {
         if (r.status !== 200) console.warn(`apns ${r.status} ${r.reason ?? ""} for ${r.token.slice(0, 8)}…`);
       }
@@ -78,14 +76,14 @@ const push: Pusher = async (targets, title, body, data) => {
   await Promise.all(work);
 };
 
-export const onBeerCreated = onDocumentCreated({ document: "beers/{beerId}", secrets: [apnsKey] }, async (event) => {
+export const onBeerCreated = onDocumentCreated("beers/{beerId}", async (event) => {
   const beer = event.data?.data();
   if (!beer) return;
   await fanoutBeerCreated(getFirestore(), push, event.params.beerId,
     beer as { ownerUid: string; ownerName: string; hasPhoto: boolean });
 });
 
-export const onCheersCreated = onDocumentCreated({ document: "beers/{beerId}/cheers/{uid}", secrets: [apnsKey] }, async (event) => {
+export const onCheersCreated = onDocumentCreated("beers/{beerId}/cheers/{uid}", async (event) => {
   const db = getFirestore();
   const beerRef = db.doc(`beers/${event.params.beerId}`);
   await beerRef.update({ cheersCount: FieldValue.increment(1) });
