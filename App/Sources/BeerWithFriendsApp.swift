@@ -26,6 +26,13 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         Messaging.messaging().apnsToken = deviceToken
         PushRegistrar.shared.apnsTokenDidArrive(deviceToken)
     }
+
+    func application(
+        _ application: UIApplication,
+        didFailToRegisterForRemoteNotificationsWithError error: Error
+    ) {
+        PushRegistrar.shared.apnsRegistrationFailed(error)
+    }
 }
 
 @main

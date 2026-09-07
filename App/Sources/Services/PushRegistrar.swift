@@ -31,16 +31,16 @@ final class PushRegistrar: NSObject, MessagingDelegate, @unchecked Sendable {
         guard !alreadyStarted else { return }
 
         Messaging.messaging().delegate = self
+        // APNs registration does not need the user's permission (only showing
+        // alerts does), so register right away: the device token then exists even
+        // when permission is granted later in Settings.
+        Task { @MainActor in
+            UIApplication.shared.registerForRemoteNotifications()
+        }
         UNUserNotificationCenter.current().requestAuthorization(
             options: [.alert, .sound, .badge]
-        ) { granted, _ in
-            guard granted else { return }
-            // Task { @MainActor } (not DispatchQueue.main.async): the completion
-            // handler is nonisolated, and only hopping actors satisfies Swift 6's
-            // isolation checking for the MainActor-only UIApplication API.
-            Task { @MainActor in
-                UIApplication.shared.registerForRemoteNotifications()
-            }
+        ) { [weak self] granted, error in
+            self?.record(status: granted ? "granted" : "denied", error: error)
         }
     }
 
@@ -72,6 +72,22 @@ final class PushRegistrar: NSObject, MessagingDelegate, @unchecked Sendable {
             // cached token is delivered before the delegate exists, so ask for it.
             fetchToken()
         }
+    }
+
+    /// AppDelegate hook: Apple refused to register (entitlement, network...).
+    func apnsRegistrationFailed(_ error: Error) {
+        record(status: "apns-failed", error: error)
+    }
+
+    /// Diagnostics on the private push doc (owner-only): permission + last error.
+    private func record(status: String, error: Error?) {
+        lock.lock()
+        let boundUid = uid
+        lock.unlock()
+        guard let boundUid else { return }
+        var fields: [String: Any] = ["status": status, "updatedAt": FieldValue.serverTimestamp()]
+        if let error { fields["lastError"] = error.localizedDescription }
+        Firestore.firestore().document("users/\(boundUid)/private/push").setData(fields, merge: true)
     }
 
     /// AppDelegate hook. The raw APNs token is stored too: the server delivers
