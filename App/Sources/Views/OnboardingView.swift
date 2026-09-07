@@ -22,6 +22,7 @@ struct OnboardingView: View {
                 SignInStep()
             }
         }
+        .background(Theme.ground.ignoresSafeArea())
         .alert("Oops", isPresented: errorBinding) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -42,21 +43,67 @@ struct OnboardingView: View {
 private struct SignInStep: View {
     @EnvironmentObject private var appState: AppState
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var currentNonce: String?
     @State private var isSigningIn = false
+    @State private var didAppear = false
+    /// Theme's display font is a fixed size, so scale it with the reading size
+    /// by hand — the wordmark still has to answer to Dynamic Type.
+    @ScaledMetric(relativeTo: .largeTitle) private var wordmarkSize: CGFloat = 44
 
     var body: some View {
+        // Hero above, thumb-height action below: the scrolling half shrinks as the
+        // reading size grows, so the Apple button never walks off the screen.
+        VStack(spacing: 0) {
+            GeometryReader { proxy in
+                ScrollView {
+                    VStack(spacing: 20) {
+                        Spacer(minLength: 0)
+                        hero
+                        Spacer(minLength: 0)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: proxy.size.height)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 24)
+                }
+                .scrollBounceBehavior(.basedOnSize)
+            }
+            signInFooter
+        }
+    }
+
+    private var hero: some View {
         VStack(spacing: 16) {
-            Spacer()
             Text("🍺")
-                .font(.system(size: 88))
+                .font(.system(size: 64))
+                // Reduce Motion: no pop, just the final size. Never animates
+                // opacity, so a screenshot taken mid-launch is still complete.
+                .scaleEffect(didAppear ? 1 : 0.92)
+                .accessibilityHidden(true)
             Text("PubDates")
-                .font(.largeTitle.bold())
-            Text("Tap once when you crack open a beer. Your friends get a push and can cheers you back — add a photo they can look at exactly once.")
-                .font(.callout)
+                .font(Theme.display(wordmarkSize))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.5)
+                .accessibilityAddTraits(.isHeader)
+            Text("Tap when you crack one open — your mates hear it and cheers you back.")
+                .font(.body)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
-            Spacer()
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .onAppear {
+            guard !didAppear else { return }
+            if reduceMotion {
+                didAppear = true
+            } else {
+                withAnimation(Theme.spring) { didAppear = true }
+            }
+        }
+    }
+
+    private var signInFooter: some View {
+        VStack(spacing: 12) {
             SignInWithAppleButton(.signIn) { request in
                 // Fresh nonce per attempt: raw goes to Firebase, SHA256 to Apple.
                 let nonce = randomNonceString()
@@ -68,21 +115,30 @@ private struct SignInStep: View {
             }
             .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
             .frame(height: 52)
+            .frame(maxWidth: .infinity)
+            .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
             .disabled(isSigningIn)
+            .opacity(isSigningIn ? 0.6 : 1)
             .accessibilityIdentifier("signin.apple")
             #if DEBUG
             if EmulatorConfig.isEnabled {
                 Button("Sign in (test account)") {
                     Task { await appState.signInForUITests() }
                 }
+                .buttonStyle(PillButtonStyle(emphasis: .quiet))
+                .frame(minHeight: 44)
                 .accessibilityIdentifier("signin.test")
             }
             #endif
             Text("No email, no password — just your Apple ID.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(24)
+        .padding(.horizontal, 20)
+        .padding(.top, 8)
+        .padding(.bottom, 12)
     }
 
     private func handle(_ result: Result<ASAuthorization, Error>) {
@@ -132,40 +188,69 @@ private func sha256Hex(_ input: String) -> String {
 private struct ProfileUnavailableStep: View {
     @EnvironmentObject private var appState: AppState
     @State private var isRetrying = false
+    @ScaledMetric(relativeTo: .title2) private var titleSize: CGFloat = 28
 
     var body: some View {
-        VStack(spacing: 16) {
-            Spacer()
-            Image(systemName: "wifi.slash")
-                .font(.system(size: 56))
-                .foregroundStyle(.secondary)
-            Text("Couldn't load your profile")
-                .font(.title2.bold())
-            Text("You're signed in, but we couldn't reach the server. Check your connection and try again.")
-                .multilineTextAlignment(.center)
-                .foregroundStyle(.secondary)
-            Spacer()
-            Button {
-                isRetrying = true
-                Task {
-                    await appState.retryLoadProfile()
-                    isRetrying = false
+        VStack(spacing: 0) {
+            GeometryReader { proxy in
+                ScrollView {
+                    VStack(spacing: 16) {
+                        Spacer(minLength: 0)
+                        Image(systemName: "wifi.slash")
+                            .font(.system(size: 34, weight: .semibold))
+                            .foregroundStyle(Theme.accent)
+                            .frame(width: 88, height: 88)
+                            .background(Theme.accentSoft, in: Circle())
+                            .accessibilityHidden(true)
+                        Text("Couldn't load your profile")
+                            .font(Theme.display(titleSize))
+                            .multilineTextAlignment(.center)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityAddTraits(.isHeader)
+                        Text("You're signed in, but we couldn't reach the server. Check your connection and try again.")
+                            .font(.body)
+                            .multilineTextAlignment(.center)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Spacer(minLength: 0)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: proxy.size.height)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 24)
                 }
-            } label: {
-                Group {
-                    if isRetrying { ProgressView() } else { Text("Try again") }
+                .scrollBounceBehavior(.basedOnSize)
+            }
+
+            VStack(spacing: 12) {
+                Button {
+                    isRetrying = true
+                    Task {
+                        await appState.retryLoadProfile()
+                        isRetrying = false
+                    }
+                } label: {
+                    if isRetrying {
+                        ProgressView()
+                            .tint(Theme.onAccent)
+                    } else {
+                        Text("Try again")
+                    }
                 }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 6)
+                .buttonStyle(HeroButtonStyle())
+                .disabled(isRetrying)
+                .opacity(isRetrying ? 0.7 : 1)
+                .accessibilityLabel("Try again")
+
+                Button("Sign out") {
+                    Task { await appState.signOut() }
+                }
+                .font(.subheadline)
+                .tint(Theme.accent)
+                .frame(maxWidth: .infinity, minHeight: 44)
             }
-            .buttonStyle(.borderedProminent)
-            .disabled(isRetrying)
-            Button("Sign out") {
-                Task { await appState.signOut() }
-            }
-            .font(.footnote)
+            .padding(.horizontal, 20)
+            .padding(.bottom, 12)
         }
-        .padding(24)
     }
 }
 
@@ -177,6 +262,7 @@ private struct UsernamePickerStep: View {
     @State private var displayName = ""
     @State private var availability: Availability = .idle
     @State private var isClaiming = false
+    @ScaledMetric(relativeTo: .largeTitle) private var titleSize: CGFloat = 34
 
     private enum Availability: Equatable {
         case idle          // empty field
@@ -187,61 +273,91 @@ private struct UsernamePickerStep: View {
         case unknown       // availability lookup failed (offline etc.)
     }
 
+    private var canClaim: Bool {
+        !isClaiming && (availability == .available || availability == .unknown)
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Text("Pick your username")
-                .font(.largeTitle.bold())
-            Text("Friends add you by exact username — make it one you can shout across a bar.")
-                .foregroundStyle(.secondary)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Pick your username")
+                        .font(Theme.display(titleSize))
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityAddTraits(.isHeader)
+                    Text("Friends add you by exact username — make it one you can shout across a bar.")
+                        .font(.body)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
 
-            VStack(alignment: .leading, spacing: 8) {
-                TextField("username", text: $username)
-                    .accessibilityIdentifier("onboarding.username")
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .keyboardType(.asciiCapable)
-                    .textFieldStyle(.roundedBorder)
-                availabilityLabel
-            }
+                VStack(alignment: .leading, spacing: 10) {
+                    fieldSurface {
+                        HStack(spacing: 4) {
+                            Text("@")
+                                .font(.body.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                                .accessibilityHidden(true)
+                            TextField("username", text: $username)
+                                .accessibilityIdentifier("onboarding.username")
+                                .accessibilityLabel("Username")
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                                .keyboardType(.asciiCapable)
+                        }
+                    }
+                    availabilityLabel
+                        .animation(Theme.quick, value: availability)
+                }
 
-            TextField("Display name (optional)", text: $displayName)
-                .textFieldStyle(.roundedBorder)
+                fieldSurface {
+                    TextField("Display name (optional)", text: $displayName)
+                        .accessibilityLabel("Display name, optional")
+                }
 
-            Button {
-                claim()
-            } label: {
-                Group {
+                Button {
+                    Haptics.light()
+                    claim()
+                } label: {
                     if isClaiming {
                         ProgressView()
+                            .tint(Theme.onAccent)
                     } else {
                         Text("Claim it 🍺")
                     }
                 }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 6)
-            }
-            .buttonStyle(.borderedProminent)
-            .accessibilityIdentifier("onboarding.claim")
-            .disabled(isClaiming || !(availability == .available || availability == .unknown))
+                .buttonStyle(HeroButtonStyle())
+                .accessibilityIdentifier("onboarding.claim")
+                .accessibilityLabel("Claim it")
+                .disabled(!canClaim)
+                .opacity(canClaim ? 1 : 0.5)
+                .animation(Theme.quick, value: canClaim)
 
-            HStack(alignment: .top, spacing: 12) {
-                Image(systemName: "bell.badge.fill")
-                    .foregroundStyle(.tint)
-                Text("One more thing after this: we'll ask permission to send notifications. That's the whole app — you hear the moment a friend cracks one open, they hear when you do.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-            .padding(.top, 8)
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    Image(systemName: "bell.badge.fill")
+                        .font(.footnote)
+                        .foregroundStyle(Theme.accent)
+                        .accessibilityHidden(true)
+                    Text("Next: we'll ask permission to send notifications. That's the whole app — you hear the moment a mate cracks one open, they hear when you do.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .accessibilityElement(children: .combine)
 
-            Spacer()
-
-            Button("Not you? Sign out") {
-                Task { await appState.signOut() }
+                Button("Not you? Sign out") {
+                    Task { await appState.signOut() }
+                }
+                .font(.subheadline)
+                .tint(Theme.accent)
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .padding(.top, 4)
             }
-            .font(.footnote)
-            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 20)
+            .padding(.top, 24)
+            .padding(.bottom, 32)
         }
-        .padding(24)
+        .scrollDismissesKeyboard(.interactively)
         // Debounced live availability: retyping changes the id, which cancels
         // the in-flight check (including its sleep) and starts a new one.
         .task(id: username) {
@@ -249,35 +365,48 @@ private struct UsernamePickerStep: View {
         }
     }
 
+    /// Rounded card that holds a text field (Theme.surface, cardRadius).
+    private func fieldSurface<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        content()
+            .font(.body)
+            .padding(.horizontal, 14)
+            .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
+                    .fill(Theme.surface)
+            )
+    }
+
     @ViewBuilder
     private var availabilityLabel: some View {
-        switch availability {
-        case .idle:
-            Text("3–15 characters: a–z, 0–9, _ — starts with a letter.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-        case .invalid:
-            Label("3–15 characters: a–z, 0–9, _ — starts with a letter.", systemImage: "xmark.circle")
-                .font(.footnote)
-                .foregroundStyle(.red)
-        case .checking:
-            HStack(spacing: 6) {
-                ProgressView().controlSize(.small)
-                Text("Checking…").font(.footnote).foregroundStyle(.secondary)
+        Group {
+            switch availability {
+            case .idle:
+                Text("3–15 characters: a–z, 0–9, _ — starts with a letter.")
+                    .foregroundStyle(.secondary)
+            case .invalid:
+                Label("3–15 characters: a–z, 0–9, _ — starts with a letter.", systemImage: "xmark.circle")
+                    .foregroundStyle(.red)
+            case .checking:
+                HStack(spacing: 6) {
+                    ProgressView().controlSize(.small)
+                    Text("Checking…").foregroundStyle(.secondary)
+                }
+            case .available:
+                Label("Available 🍻", systemImage: "checkmark.circle")
+                    .foregroundStyle(.green)
+            case .taken:
+                Label("Taken — try another.", systemImage: "xmark.circle")
+                    .foregroundStyle(.red)
+            case .unknown:
+                Label("Couldn't check availability — you can still try to claim it.", systemImage: "wifi.slash")
+                    .foregroundStyle(.orange)
             }
-        case .available:
-            Label("Available 🍻", systemImage: "checkmark.circle")
-                .font(.footnote)
-                .foregroundStyle(.green)
-        case .taken:
-            Label("Taken — try another.", systemImage: "xmark.circle")
-                .font(.footnote)
-                .foregroundStyle(.red)
-        case .unknown:
-            Label("Couldn't check availability — you can still try to claim it.", systemImage: "wifi.slash")
-                .font(.footnote)
-                .foregroundStyle(.orange)
         }
+        .font(.footnote)
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 4)
     }
 
     private func checkAvailability() async {

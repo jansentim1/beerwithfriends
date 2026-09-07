@@ -4,9 +4,13 @@ import SwiftUI
 // COMPILE-PARKED (Task 10): no Xcode on this machine — written against
 // iOS 17 SDK APIs under Swift 6 concurrency, not yet compiled.
 
-/// Friend management: incoming requests, the friend list (remove / block /
-/// report via context menu), exact-username search + add, and a ShareLink
+/// Mates: incoming requests, the mate list (remove / block / report via swipe
+/// actions and context menu), exact-username search + add, and a ShareLink
 /// invite. Consumes only `FriendServicing` — never Firebase types.
+///
+/// Design: docs/design/direction.md screen 5 — inset grouped sections, avatar
+/// initials on amber, one accent carrying the primary pills, system everything
+/// else.
 struct FriendsView: View {
     private let profile: UserProfile
     private let friendService: any FriendServicing
@@ -40,7 +44,10 @@ struct FriendsView: View {
                 friendsSection
                 inviteSection
             }
-            .navigationTitle("Friends")
+            .listStyle(.insetGrouped)
+            .scrollDismissesKeyboard(.interactively)
+            .navigationTitle("Mates")
+            .navigationBarTitleDisplayMode(.large)
             .task { await reload() }
             .refreshable { await reload() }
             .alert("Oops", isPresented: errorBinding) {
@@ -84,120 +91,208 @@ struct FriendsView: View {
         }
     }
 
-    // MARK: - Sections
+    // MARK: - Add a mate
 
     private var addFriendSection: some View {
-        Section("Add a friend") {
-            HStack {
-                TextField("Exact username", text: $searchText)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .keyboardType(.asciiCapable)
-                Button {
-                    addFriend()
-                } label: {
+        Section {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 10) {
+                    searchField
+                    addButton
+                }
+                if let searchStatus {
+                    Text(searchStatus)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .padding(.vertical, 4)
+            .animation(Theme.quick, value: searchStatus)
+        } header: {
+            Eyebrow(text: "Add a mate")
+        }
+    }
+
+    private var searchField: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
+            TextField("Add by exact username", text: $searchText)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .keyboardType(.asciiCapable)
+                .submitLabel(.done)
+                .onSubmit {
+                    if !isWorking, !searchText.isEmpty { addFriend() }
+                }
+                .accessibilityLabel("Mate's exact username")
+                .accessibilityIdentifier("friends.search")
+        }
+        .padding(.horizontal, 12)
+        .frame(minHeight: 44)
+        .background(
+            Color(.tertiarySystemFill),
+            in: RoundedRectangle(cornerRadius: Theme.chipRadius, style: .continuous)
+        )
+    }
+
+    private var addButton: some View {
+        // The custom pill style can't read `isEnabled`, so the disabled look is
+        // applied here rather than in Theme.
+        let canAdd = !isWorking && !searchText.isEmpty
+        return Button {
+            addFriend()
+        } label: {
+            Text("Add")
+                .opacity(isWorking ? 0 : 1)
+                .overlay {
                     if isWorking {
                         ProgressView()
-                    } else {
-                        Image(systemName: "person.badge.plus")
+                            .controlSize(.small)
+                            .tint(Theme.onAccent)
                     }
                 }
-                .disabled(isWorking || searchText.isEmpty)
-                .accessibilityLabel("Send friend request")
-            }
-            if let searchStatus {
-                Text(searchStatus)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
+                .frame(minHeight: 44)
         }
+        .buttonStyle(PillButtonStyle(emphasis: .filled))
+        .disabled(!canAdd)
+        .opacity(canAdd ? 1 : 0.45)
+        .animation(Theme.quick, value: canAdd)
+        .accessibilityLabel("Send mate request")
+        .accessibilityIdentifier("friends.add")
     }
+
+    // MARK: - Requests
 
     private var requestsSection: some View {
-        Section("Requests") {
+        Section {
             ForEach(requests) { request in
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(request.fromDisplayName)
-                            .font(.headline)
-                        Text("@\(request.fromUsername)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    Button {
-                        accept(request)
-                    } label: {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.title2)
-                            .foregroundStyle(.green)
-                    }
+                requestRow(request)
+            }
+        } header: {
+            Eyebrow(text: "Requests")
+        }
+    }
+
+    private func requestRow(_ request: FriendRequest) -> some View {
+        HStack(spacing: 12) {
+            AvatarView(name: request.fromDisplayName, size: 44)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("@\(request.fromUsername)")
+                    .font(.headline)
+                Text(request.fromDisplayName)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            .lineLimit(1)
+            .accessibilityElement(children: .combine)
+
+            Spacer(minLength: 8)
+
+            HStack(spacing: 8) {
+                Button("Accept") { accept(request) }
+                    .buttonStyle(PillButtonStyle(emphasis: .filled))
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
                     .accessibilityLabel("Accept \(request.fromDisplayName)")
-                    Button {
-                        decline(request)
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.title2)
-                            .foregroundStyle(.secondary)
-                    }
+                Button("Decline") { decline(request) }
+                    .buttonStyle(PillButtonStyle(emphasis: .quiet))
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
                     .accessibilityLabel("Decline \(request.fromDisplayName)")
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    // MARK: - Mates
+
+    private var friendsSection: some View {
+        Section {
+            if friends.isEmpty {
+                Text("No mates yet. Add one above or send an invite.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .padding(.vertical, 8)
+            } else {
+                ForEach(friends) { friend in
+                    friendRow(friend)
                 }
-                // Borderless so both buttons stay independently tappable in a List row.
-                .buttonStyle(.borderless)
+            }
+        } header: {
+            Eyebrow(text: "Mates")
+        }
+    }
+
+    private func friendRow(_ friend: UserProfile) -> some View {
+        HStack(spacing: 12) {
+            AvatarView(name: friend.displayName, size: 44)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(friend.displayName)
+                    .font(.headline)
+                Text("@\(friend.username)")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            .lineLimit(1)
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, 6)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+        // Swipe actions and the context menu carry the same destructive pair;
+        // VoiceOver surfaces both as custom actions on the row.
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+            Button(role: .destructive) {
+                removeTarget = friend
+                showRemoveDialog = true
+            } label: {
+                Label("Remove", systemImage: "person.badge.minus")
+            }
+            Button {
+                blockTarget = friend
+                showBlockDialog = true
+            } label: {
+                Label("Block", systemImage: "hand.raised")
+            }
+            .tint(.orange)
+        }
+        .contextMenu {
+            Button {
+                removeTarget = friend
+                showRemoveDialog = true
+            } label: {
+                Label("Remove friend", systemImage: "person.badge.minus")
+            }
+            Button {
+                reportTarget = friend
+                showReportDialog = true
+            } label: {
+                Label("Report", systemImage: "exclamationmark.bubble")
+            }
+            Button(role: .destructive) {
+                blockTarget = friend
+                showBlockDialog = true
+            } label: {
+                Label("Block", systemImage: "hand.raised")
             }
         }
     }
 
-    private var friendsSection: some View {
-        Section("Friends") {
-            if friends.isEmpty {
-                Text("No friends yet — beers taste better shared. 🍻")
-                    .foregroundStyle(.secondary)
-            } else {
-                ForEach(friends) { friend in
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(friend.displayName)
-                                .font(.headline)
-                            Text("@\(friend.username)")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        Text("\(friend.beerCount) 🍺")
-                            .font(.subheadline.monospacedDigit())
-                            .foregroundStyle(.secondary)
-                    }
-                    .contextMenu {
-                        Button {
-                            removeTarget = friend
-                            showRemoveDialog = true
-                        } label: {
-                            Label("Remove friend", systemImage: "person.badge.minus")
-                        }
-                        Button {
-                            reportTarget = friend
-                            showReportDialog = true
-                        } label: {
-                            Label("Report", systemImage: "exclamationmark.bubble")
-                        }
-                        Button(role: .destructive) {
-                            blockTarget = friend
-                            showBlockDialog = true
-                        } label: {
-                            Label("Block", systemImage: "hand.raised")
-                        }
-                    }
-                }
-            }
-        }
-    }
+    // MARK: - Invite
 
     private var inviteSection: some View {
         Section {
             ShareLink(item: "Add me on PubDates! My username is @\(profile.username) 🍺") {
-                Label("Invite a friend", systemImage: "square.and.arrow.up")
+                Label("Invite a mate", systemImage: "square.and.arrow.up")
+                    .frame(maxWidth: .infinity, minHeight: 44)
             }
+            .buttonStyle(PillButtonStyle(emphasis: .tinted))
+            .accessibilityLabel("Invite a mate")
+            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+            .listRowBackground(Color.clear)
         }
     }
 
@@ -259,7 +354,10 @@ struct FriendsView: View {
         Task {
             do {
                 try await friendService.accept(request)
-                requests.removeAll { $0.id == request.id }
+                Haptics.success()
+                withAnimation(Theme.spring) {
+                    requests.removeAll { $0.id == request.id }
+                }
                 // Refresh friends only: the server trigger deletes the request doc
                 // a moment later, so re-reading requests now would resurrect it.
                 await reloadFriends()
@@ -273,7 +371,9 @@ struct FriendsView: View {
         Task {
             do {
                 try await friendService.decline(request)
-                requests.removeAll { $0.id == request.id }
+                withAnimation(Theme.spring) {
+                    requests.removeAll { $0.id == request.id }
+                }
             } catch {
                 errorMessage = "Couldn't decline the request — try again."
             }
@@ -284,7 +384,9 @@ struct FriendsView: View {
         Task {
             do {
                 try await friendService.removeFriend(uid: friend.id)
-                friends.removeAll { $0.id == friend.id }
+                withAnimation(Theme.spring) {
+                    friends.removeAll { $0.id == friend.id }
+                }
             } catch {
                 errorMessage = "Couldn't remove @\(friend.username) — try again."
             }
@@ -296,7 +398,9 @@ struct FriendsView: View {
             do {
                 // Only writes the block doc; the server severs the friendship.
                 try await friendService.block(uid: friend.id)
-                friends.removeAll { $0.id == friend.id }
+                withAnimation(Theme.spring) {
+                    friends.removeAll { $0.id == friend.id }
+                }
             } catch {
                 errorMessage = "Couldn't block @\(friend.username) — try again."
             }

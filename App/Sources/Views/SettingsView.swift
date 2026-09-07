@@ -7,6 +7,9 @@ import SwiftUI
 /// Profile, blocked-user management, sign out, delete account (double
 /// confirmation), privacy policy link, version footer.
 ///
+/// Screen 6 of docs/design/direction.md: inset grouped list, a profile header
+/// with the big amber initial, then quiet Blocked / About / Account groups.
+///
 /// Blocked-list + unblock are NOT on the frozen `FriendServicing` protocol —
 /// they live as extra methods on the concrete `FirebaseFriendService`, reached
 /// by downcasting `appState.friendService` (see Task 10 plan note).
@@ -37,7 +40,10 @@ struct SettingsView: View {
                 accountSection
                 versionFooterSection
             }
+            .listStyle(.insetGrouped)
+            .tint(Theme.accent)
             .navigationTitle("Settings")
+            .navigationBarTitleDisplayMode(.large)
             .task { await loadBlocked() }
             .refreshable { await loadBlocked() }
             .alert("Oops", isPresented: errorBinding) {
@@ -62,58 +68,120 @@ struct SettingsView: View {
 
     // MARK: - Sections
 
+    /// Big amber initial, name, @username and one quiet stat. No section header:
+    /// the header *is* the profile.
     private var profileSection: some View {
-        Section("Profile") {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(profile.displayName)
-                    .font(.headline)
-                Text("@\(profile.username)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+        Section {
+            VStack(spacing: 12) {
+                AvatarView(name: profile.displayName, size: 72)
+                VStack(spacing: 2) {
+                    Text(profile.displayName)
+                        .font(Theme.display(28))
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.7)
+                    Text("@\(profile.username)")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                StatusPill(text: beerCountText)
             }
-            LabeledContent("Beers logged", value: "\(profile.beerCount) 🍺")
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("\(profile.displayName), @\(profile.username), \(beerCountText)")
         }
     }
 
     private var blockedSection: some View {
-        Section("Blocked users") {
+        Section("Blocked") {
             if blockedUnavailable {
                 Text("Blocked-user management isn't available right now.")
+                    .font(.subheadline)
                     .foregroundStyle(.secondary)
             } else if blockedUsers.isEmpty {
                 Text("You haven't blocked anyone. 🍻")
+                    .font(.subheadline)
                     .foregroundStyle(.secondary)
             } else {
                 ForEach(blockedUsers) { blocked in
-                    HStack {
-                        Text(blocked.username.map { "@\($0)" } ?? "Deleted user")
-                        Spacer()
-                        Button("Unblock") { unblock(blocked) }
-                            .buttonStyle(.borderless)
-                    }
+                    blockedRow(blocked)
                 }
             }
         }
     }
 
-    private var aboutSection: some View {
-        Section {
-            Link(destination: privacyPolicyURL) {
-                Label("Privacy policy", systemImage: "hand.raised.circle")
+    private func blockedRow(_ blocked: BlockedUser) -> some View {
+        // A deleted account keeps its block; the empty name falls back to the
+        // 🍺 glyph inside AvatarView.
+        HStack(spacing: 12) {
+            AvatarView(name: blocked.username ?? "", size: 36)
+            if let username = blocked.username {
+                Text("@\(username)")
+                    .font(.body)
+            } else {
+                Text("Deleted user")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
             }
+            Spacer(minLength: 12)
+            Button("Unblock") { unblock(blocked) }
+                .buttonStyle(PillButtonStyle(emphasis: .tinted))
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+                .accessibilityLabel(blocked.username.map { "Unblock @\($0)" } ?? "Unblock deleted user")
+        }
+        .padding(.vertical, 2)
+    }
+
+    private var aboutSection: some View {
+        Section("About") {
+            Link(destination: privacyPolicyURL) {
+                HStack {
+                    Label("Privacy policy", systemImage: "hand.raised.circle")
+                    Spacer(minLength: 12)
+                    Image(systemName: "arrow.up.right")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
+                }
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+            }
+            .accessibilityLabel("Privacy policy")
+            .accessibilityHint("Opens in your browser")
         }
     }
 
     private var accountSection: some View {
         Section("Account") {
-            Button("Sign out") {
+            Button {
                 Task { await appState.signOut() }
+            } label: {
+                Label("Sign out", systemImage: "rectangle.portrait.and.arrow.right")
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
             }
             .disabled(isDeleting)
-            Button("Delete account", role: .destructive) {
+            .accessibilityIdentifier("settings.signout")
+
+            Button(role: .destructive) {
                 showDeleteConfirm = true
+            } label: {
+                HStack {
+                    Label("Delete account", systemImage: "trash")
+                    if isDeleting {
+                        Spacer(minLength: 12)
+                        ProgressView()
+                    }
+                }
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
             }
             .disabled(isDeleting)
+            .accessibilityIdentifier("settings.delete")
         }
     }
 
@@ -121,9 +189,16 @@ struct SettingsView: View {
         Section {
         } footer: {
             Text(Self.versionString)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity)
                 .multilineTextAlignment(.center)
+                .padding(.top, 8)
         }
+    }
+
+    private var beerCountText: String {
+        "\(profile.beerCount) beer\(profile.beerCount == 1 ? "" : "s") logged"
     }
 
     private static var versionString: String {

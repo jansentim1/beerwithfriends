@@ -66,10 +66,13 @@ private struct MainTabView: View {
     @EnvironmentObject private var appState: AppState
     let profile: UserProfile
 
+    private enum Tab: Hashable { case beers, friends, settings }
+    @State private var selectedTab: Tab = .beers
+
     var body: some View {
         // Non-nil exactly while phase == .ready (see AppState).
         if let beerService = appState.beerService, let friendService = appState.friendService {
-            TabView {
+            TabView(selection: $selectedTab) {
                 HomeView(
                     profile: profile,
                     beerService: beerService,
@@ -80,12 +83,20 @@ private struct MainTabView: View {
                     }
                 )
                 .tabItem { Label("Beers", systemImage: "mug.fill") }
+                .tag(Tab.beers)
 
                 FriendsView(profile: profile, friendService: friendService)
                     .tabItem { Label("Friends", systemImage: "person.2.fill") }
+                    .tag(Tab.friends)
 
                 SettingsView(profile: profile)
                     .tabItem { Label("Settings", systemImage: "gearshape.fill") }
+                    .tag(Tab.settings)
+            }
+            .tint(Theme.accent)
+            // Home's empty state offers "Add a mate"; it posts this to switch tabs.
+            .onReceive(NotificationCenter.default.publisher(for: .pubDatesSwitchToFriends)) { _ in
+                selectedTab = .friends
             }
         } else {
             ProgressView() // unreachable in practice; keeps the wiring total

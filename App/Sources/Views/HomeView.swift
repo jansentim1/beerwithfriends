@@ -7,9 +7,15 @@ import SwiftUI
 /// The main screen: one big log button, a camera shortcut, and the live feed.
 /// Consumes ONLY BeerKit (`HomeViewModel`, protocols) — never Firebase types;
 /// the screenshot reporter closure is injected pre-wired by RootView.
+///
+/// Layout follows docs/design/direction.md: large title "PubDates" collapsing on
+/// scroll, the amber hero + round camera button directly under it (both inside
+/// the scroll view, so the title collapses natively), then the last 24 hours of
+/// beers as plain rows.
 struct HomeView: View {
     @StateObject private var viewModel: HomeViewModel
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private let profile: UserProfile
     private let friendService: any FriendServicing
@@ -43,11 +49,45 @@ struct HomeView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 12) {
-                logButtons
-                feedList
+            List {
+                Section {
+                    heroRow
+                        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 20, trailing: 16))
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
+                }
+
+                if viewModel.feed.isEmpty {
+                    Section {
+                        emptyState
+                            .listRowInsets(EdgeInsets(top: 24, leading: 24, bottom: 24, trailing: 24))
+                            .listRowSeparator(.hidden)
+                            .listRowBackground(Color.clear)
+                    }
+                } else {
+                    Section {
+                        ForEach(viewModel.feed) { beer in
+                            feedRow(beer)
+                        }
+                    } header: {
+                        Eyebrow(text: "Last 24 hours")
+                            .textCase(nil)
+                            .padding(.vertical, 2)
+                    }
+                }
             }
+            .listStyle(.plain)
+            .listSectionSeparator(.hidden)
+            // Pull-to-refresh works on the empty state too: the hero row keeps
+            // the list scrollable even with no beers.
+            .refreshable {
+                feedEpoch += 1
+            }
+            // Signature interaction: a new row springs in at the top. Reduce
+            // Motion downgrades it to a crossfade.
+            .animation(reduceMotion ? Theme.quick : Theme.spring, value: viewModel.feed.map(\.id))
             .navigationTitle("PubDates")
+            .navigationBarTitleDisplayMode(.large)
             .alert("Oops", isPresented: errorBinding) {
                 Button("OK", role: .cancel) {}
             } message: {
@@ -117,82 +157,106 @@ struct HomeView: View {
         }
     }
 
-    // MARK: - Log buttons
+    // MARK: - Hero
 
-    private var logButtons: some View {
+    /// One button owns the screen: full-width amber log button with the camera
+    /// shortcut to its right. Both are disabled while a photo uploads.
+    private var heroRow: some View {
         HStack(spacing: 12) {
             Button {
+                Haptics.success()
                 Task { await viewModel.logBeer(photoJPEG: nil) }
             } label: {
-                Text("🍺 I'm drinking a beer")
-                    .font(.title3.bold())
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
+                Text("🍺 I'm having a beer")
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(HeroButtonStyle(isBusy: viewModel.isUploadingPhoto))
+            .accessibilityLabel("I'm having a beer")
+            .accessibilityHint("Tells your mates you cracked one open")
             .accessibilityIdentifier("home.log")
 
             Button {
+                Haptics.light()
                 showCamera = true
             } label: {
                 Image(systemName: "camera.fill")
-                    .font(.title3)
-                    .padding(.vertical, 16)
-                    .padding(.horizontal, 4)
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(RoundIconButtonStyle())
             .accessibilityLabel("Log a beer with a photo")
             .accessibilityIdentifier("home.camera")
         }
         .disabled(viewModel.isUploadingPhoto)
-        .padding(.horizontal)
+    }
+
+    // MARK: - Empty state
+
+    private var emptyState: some View {
+        VStack(spacing: 10) {
+            Text("No beers yet")
+                .font(.title3.weight(.semibold))
+            Text("Tap the button when you crack one open — your mates will hear it.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+
+            Button {
+                Haptics.light()
+                NotificationCenter.default.post(name: .pubDatesSwitchToFriends, object: nil)
+            } label: {
+                Text("Add a mate")
+            }
+            .buttonStyle(PillButtonStyle(emphasis: .tinted))
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
+            .accessibilityLabel("Add a mate")
+            .accessibilityHint("Opens the Friends tab")
+            .accessibilityIdentifier("home.addMate")
+            .padding(.top, 6)
+        }
+        .frame(maxWidth: .infinity)
     }
 
     // MARK: - Feed
 
-    @ViewBuilder
-    private var feedList: some View {
-        if viewModel.feed.isEmpty {
-            // Inside a List so pull-to-refresh works on the empty state too.
-            List {
-                ContentUnavailableView(
-                    "No beers yet",
-                    systemImage: "mug",
-                    description: Text("Log one above, or add friends to see theirs.")
-                )
-                .listRowSeparator(.hidden)
-                .listRowBackground(Color.clear)
-            }
-            .listStyle(.plain)
-            .refreshable {
-                feedEpoch += 1
-            }
-        } else {
-            List(viewModel.feed) { beer in
-                feedRow(beer)
-            }
-            .listStyle(.plain)
-            .refreshable {
-                feedEpoch += 1
-            }
-        }
-    }
-
     private func feedRow(_ beer: BeerLog) -> some View {
         let isMine = beer.ownerUid == profile.id
         return HStack(spacing: 12) {
+            AvatarView(name: isMine ? profile.displayName : beer.ownerName, size: 52)
+
             VStack(alignment: .leading, spacing: 2) {
+                // "You" stays a standalone static text — the UI test looks for it.
                 Text(isMine ? "You" : beer.ownerName)
                     .font(.headline)
+                    .lineLimit(1)
                 Text(beer.createdAt, style: .relative)
-                    .font(.caption)
+                    .font(.subheadline)
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
-            Spacer()
+
+            Spacer(minLength: 8)
+
             photoChip(for: beer)
             cheersButton(for: beer, isMine: isMine)
         }
-        .padding(.vertical, 4)
+        .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
+        .listRowSeparator(.hidden)
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+            if !isMine {
+                Button(role: .destructive) {
+                    blockTarget = beer
+                    showBlockDialog = true
+                } label: {
+                    Label("Block", systemImage: "hand.raised")
+                }
+                Button {
+                    reportTarget = beer
+                    showReportDialog = true
+                } label: {
+                    Label("Report", systemImage: "exclamationmark.bubble")
+                }
+                .tint(Theme.accent)
+            }
+        }
         .contextMenu {
             if !isMine {
                 Button {
@@ -218,37 +282,43 @@ struct HomeView: View {
             Button {
                 openPhoto(beer)
             } label: {
-                Text("📸 view once")
-                    .font(.caption.bold())
+                Text("📸 View once")
             }
-            .buttonStyle(.borderedProminent)
-            .buttonBorderShape(.capsule)
+            .buttonStyle(PillButtonStyle(emphasis: .filled))
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
+            .accessibilityLabel("View photo once")
+            .accessibilityHint("You can only look at this photo one time")
         case .seen:
-            Text("Seen")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(.quaternary, in: Capsule())
+            StatusPill(text: "Seen")
+                .accessibilityLabel("Photo already seen")
         case .none, .expired:
             EmptyView()
         }
     }
 
     private func cheersButton(for beer: BeerLog, isMine: Bool) -> some View {
-        Button {
+        let alreadyCheersed = viewModel.cheersedBeerIds.contains(beer.id)
+        let isDisabled = isMine || alreadyCheersed
+        return Button {
+            Haptics.light()
             Task { await viewModel.cheers(beer) }
         } label: {
             HStack(spacing: 4) {
                 Text("🍻")
                 Text("\(beer.cheersCount)")
-                    .font(.subheadline.monospacedDigit())
+                    .monospacedDigit()
             }
         }
-        .buttonStyle(.bordered)
-        .buttonBorderShape(.capsule)
-        .disabled(isMine || viewModel.cheersedBeerIds.contains(beer.id))
-        .accessibilityLabel("Cheers, \(beer.cheersCount) so far")
+        .buttonStyle(PillButtonStyle(emphasis: isDisabled ? .quiet : .tinted))
+        .disabled(isDisabled)
+        .frame(minHeight: 44)
+        .contentShape(Rectangle())
+        .accessibilityLabel(
+            isDisabled
+                ? "Cheersed, \(beer.cheersCount) so far"
+                : "Cheers, \(beer.cheersCount) so far"
+        )
     }
 
     // MARK: - Actions
@@ -312,4 +382,10 @@ private struct PhotoViewerItem: Identifiable {
     let id: String // beerId
     let url: URL
     let ownerName: String
+}
+
+extension Notification.Name {
+    /// Posted by the Home empty state's "Add a mate" button; the app shell
+    /// observes it and selects the Friends tab (wiring lands with the shell).
+    static let pubDatesSwitchToFriends = Notification.Name("pubDatesSwitchToFriends")
 }
