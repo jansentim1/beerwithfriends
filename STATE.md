@@ -6,6 +6,7 @@
 - 2026-09-07: build 1 (Pints With Mates, com.timjansen.BeerWithFriends) uploaded to TestFlight via ios-testflight, IN_BETA_TESTING, Tim is internal tester. Signing: manual cert+profile from the ASC API (secrets DIST_*).
 - 2026-09-07: Firebase Auth initialized (Identity Platform, free tier) + Apple provider enabled via API.
 - 2026-09-07: app renamed to **PubDates** (display name, UI strings, docs, notify title). Bundle id, Xcode target/scheme, Firebase project and provisioning profile name unchanged on purpose.
+- 2026-09-07: build 2 (optimistic logging, resilient feed, push token fetch, offline-safe sign-out, profile retry, camera guard) uploaded to TestFlight.
 - Needs Tim: rename the App Store Connect record to PubDates (App Information, Name) so the title is reserved and matches the next build. APNs key (RUNBOOK step 3.1, upload the .p8 to tim-server and give me the Key ID). Then step 5 (external testers).
 - Next code work: fix review findings 1-5 + CameraView crash (see session 2026-09-04 review), then item 6-10.
 - Mac note (historical): the Mac's Command Line Tools are corrupted (see README). No longer on the critical path; nothing requires a Mac.
