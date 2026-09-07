@@ -21,6 +21,7 @@ targets:
         CURRENT_PROJECT_VERSION: "1"
         TARGETED_DEVICE_FAMILY: "1"   # iPhone only
         INFOPLIST_KEY_CFBundleDisplayName: "Pints With Mates"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         # Manual distribution signing, scoped to this target only (command-line
         # overrides would also hit the Firebase SwiftPM targets, which reject profiles).
         # The simulator compile passes CODE_SIGNING_ALLOWED=NO so these are inert there.
