@@ -74,7 +74,7 @@ jobs:
             -project BeerWithFriends.xcodeproj -scheme BeerWithFriends \
             -destination "id=${{ steps.sim.outputs.udid }}" \
             -skipPackagePluginValidation -skipMacroValidation \
-            CODE_SIGNING_ALLOWED=NO 2>&1 | tee build.log | grep -E ' error: |BUILD' || true
+            CODE_SIGNING_REQUIRED=NO 2>&1 | tee build.log | grep -E ' error: |BUILD' || true
           grep -q '\*\* TEST BUILD SUCCEEDED \*\*' build.log
 
       - name: UI walkthrough (light)
@@ -88,7 +88,7 @@ jobs:
             -project BeerWithFriends.xcodeproj -scheme BeerWithFriends \
             -destination "id=${{ steps.sim.outputs.udid }}" \
             -resultBundlePath results-light.xcresult \
-            CODE_SIGNING_ALLOWED=NO 2>&1 | tee test-light.log | grep -E 'Test Case|error:|failed|passed' || true
+            CODE_SIGNING_REQUIRED=NO 2>&1 | tee test-light.log | grep -E 'Test Case|error:|failed|passed' || true
           grep -q 'TEST EXECUTE SUCCEEDED\|\*\* TEST SUCCEEDED \*\*' test-light.log
 
       - name: UI walkthrough (dark)
@@ -103,7 +103,7 @@ jobs:
             -project BeerWithFriends.xcodeproj -scheme BeerWithFriends \
             -destination "id=${{ steps.sim.outputs.udid }}" \
             -resultBundlePath results-dark.xcresult \
-            CODE_SIGNING_ALLOWED=NO 2>&1 | tee test-dark.log | grep -E 'Test Case|error:|failed|passed' || true
+            CODE_SIGNING_REQUIRED=NO 2>&1 | tee test-dark.log | grep -E 'Test Case|error:|failed|passed' || true
           grep -q 'TEST EXECUTE SUCCEEDED\|\*\* TEST SUCCEEDED \*\*' test-dark.log
 
       - name: Collect

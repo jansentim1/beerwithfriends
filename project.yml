@@ -30,6 +30,10 @@ targets:
         CODE_SIGN_IDENTITY: "Apple Distribution"
         # Must match the Name inside the DIST_PROFILE_B64 profile (created before the rename to PubDates).
         PROVISIONING_PROFILE_SPECIFIER: "Pints With Mates App Store"
+        # Simulator: ad-hoc sign so keychain (Firebase Auth) works in UI tests.
+        "CODE_SIGN_IDENTITY[sdk=iphonesimulator*]": "-"
+        "CODE_SIGN_STYLE[sdk=iphonesimulator*]": Automatic
+        "PROVISIONING_PROFILE_SPECIFIER[sdk=iphonesimulator*]": ""
     entitlements:
       path: App/BeerWithFriends.entitlements
       properties:
