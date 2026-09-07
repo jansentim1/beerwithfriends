@@ -41,7 +41,7 @@ struct SettingsView: View {
                 versionFooterSection
             }
             .listStyle(.insetGrouped)
-            .tint(Theme.accent)
+            .tint(Theme.accentInk)  // tint colours words and glyphs; fills use Theme.accent
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.large)
             .task { await loadBlocked() }
@@ -76,7 +76,7 @@ struct SettingsView: View {
                 AvatarView(name: profile.displayName, size: 72)
                 VStack(spacing: 2) {
                     Text(profile.displayName)
-                        .font(Theme.display(28))
+                        .font(Theme.displayTitle2)
                         .multilineTextAlignment(.center)
                         .lineLimit(2)
                         .minimumScaleFactor(0.7)
@@ -140,7 +140,7 @@ struct SettingsView: View {
         Section("About") {
             Link(destination: privacyPolicyURL) {
                 HStack {
-                    Label("Privacy policy", systemImage: "hand.raised.circle")
+                    Label("Privacy policy", systemImage: "lock.shield")
                     Spacer(minLength: 12)
                     Image(systemName: "arrow.up.right")
                         .font(.footnote.weight(.semibold))

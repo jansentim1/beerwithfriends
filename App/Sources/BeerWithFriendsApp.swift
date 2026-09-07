@@ -14,6 +14,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     ) -> Bool {
         FirebaseApp.configure()
         EmulatorConfig.applyIfRequested()
+        Theme.installNavigationBarAppearance()
         return true
     }
 
@@ -86,7 +87,7 @@ private struct MainTabView: View {
                 .tag(Tab.beers)
 
                 FriendsView(profile: profile, friendService: friendService)
-                    .tabItem { Label("Friends", systemImage: "person.2.fill") }
+                    .tabItem { Label("Mates", systemImage: "person.2.fill") }
                     .tag(Tab.friends)
 
                 SettingsView(profile: profile)

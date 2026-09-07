@@ -56,12 +56,12 @@ struct FriendsView: View {
                 Text(errorMessage ?? "")
             }
             .confirmationDialog(
-                "Remove \(removeTarget?.displayName ?? "this friend")?",
+                "Remove \(removeTarget?.displayName ?? "this mate")?",
                 isPresented: $showRemoveDialog,
                 titleVisibility: .visible,
                 presenting: removeTarget
             ) { friend in
-                Button("Remove friend", role: .destructive) { remove(friend) }
+                Button("Remove mate", role: .destructive) { remove(friend) }
                 Button("Cancel", role: .cancel) {}
             } message: { _ in
                 Text("You'll stop seeing each other's beers. You can add each other again later.")
@@ -75,7 +75,7 @@ struct FriendsView: View {
                 Button("Block @\(friend.username)", role: .destructive) { block(friend) }
                 Button("Cancel", role: .cancel) {}
             } message: { _ in
-                Text("Blocking ends your friendship and hides your beers from each other. They won't be notified.")
+                Text("Blocking drops them as a mate and hides your beers from each other. They won't be notified.")
             }
             .confirmationDialog(
                 "Report @\(reportTarget?.username ?? "")",
@@ -114,6 +114,8 @@ struct FriendsView: View {
         }
     }
 
+    /// A bare field in the grouped cell — no nested box. The magnifying glass
+    /// sits in front of it the way a `Label` icon would.
     private var searchField: some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
@@ -130,17 +132,12 @@ struct FriendsView: View {
                 .accessibilityLabel("Mate's exact username")
                 .accessibilityIdentifier("friends.search")
         }
-        .padding(.horizontal, 12)
         .frame(minHeight: 44)
-        .background(
-            Color(.tertiarySystemFill),
-            in: RoundedRectangle(cornerRadius: Theme.chipRadius, style: .continuous)
-        )
     }
 
     private var addButton: some View {
         // The custom pill style can't read `isEnabled`, so the disabled look is
-        // applied here rather than in Theme.
+        // chosen here: the quiet emphasis, never amber at half strength.
         let canAdd = !isWorking && !searchText.isEmpty
         return Button {
             addFriend()
@@ -151,14 +148,13 @@ struct FriendsView: View {
                     if isWorking {
                         ProgressView()
                             .controlSize(.small)
-                            .tint(Theme.onAccent)
+                            .tint(Color.secondary)  // spinner only shows while quiet
                     }
                 }
                 .frame(minHeight: 44)
         }
-        .buttonStyle(PillButtonStyle(emphasis: .filled))
+        .buttonStyle(PillButtonStyle(emphasis: canAdd ? .filled : .quiet))
         .disabled(!canAdd)
-        .opacity(canAdd ? 1 : 0.45)
         .animation(Theme.quick, value: canAdd)
         .accessibilityLabel("Send mate request")
         .accessibilityIdentifier("friends.add")
@@ -264,7 +260,7 @@ struct FriendsView: View {
                 removeTarget = friend
                 showRemoveDialog = true
             } label: {
-                Label("Remove friend", systemImage: "person.badge.minus")
+                Label("Remove mate", systemImage: "person.badge.minus")
             }
             Button {
                 reportTarget = friend
@@ -306,7 +302,7 @@ struct FriendsView: View {
             requests = loadedRequests
             friends = loadedFriends
         } catch {
-            errorMessage = "Couldn't load your friends — pull to retry."
+            errorMessage = "Couldn't load your mates — pull to retry."
         }
     }
 
@@ -314,7 +310,7 @@ struct FriendsView: View {
         do {
             friends = try await friendService.friends()
         } catch {
-            errorMessage = "Couldn't load your friends — pull to retry."
+            errorMessage = "Couldn't load your mates — pull to retry."
         }
     }
 
@@ -338,7 +334,7 @@ struct FriendsView: View {
                     return
                 }
                 if friends.contains(where: { $0.id == found.id }) {
-                    searchStatus = "You're already friends with @\(found.username)."
+                    searchStatus = "You're already mates with @\(found.username)."
                     return
                 }
                 try await friendService.sendRequest(to: found.id)

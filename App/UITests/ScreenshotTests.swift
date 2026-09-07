@@ -46,7 +46,7 @@ final class ScreenshotTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["You"].waitForExistence(timeout: 10), "logged beer row missing")
         snap("04-home-beer")
 
-        app.tabBars.buttons["Friends"].tap()
+        app.tabBars.buttons["Mates"].tap()
         XCTAssertTrue(app.navigationBars.element.waitForExistence(timeout: 5))
         snap("05-friends")
 

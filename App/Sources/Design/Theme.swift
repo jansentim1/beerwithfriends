@@ -16,6 +16,14 @@ enum Theme {
     })
     /// Ink on top of the accent (the button label): always dark, it reads in both schemes.
     static let onAccent = Color(red: 0.16, green: 0.09, blue: 0.0)
+    /// Amber as TEXT or glyph. The fill accent is only 2.3:1 on white, so text uses a
+    /// darker amber in light mode (≈ #A35A00, ≥ 4.5:1 on white and on the wash) and the
+    /// bright accent in dark mode. Use `accent` for fills, `accentInk` for words.
+    static let accentInk = Color(UIColor { trait in
+        trait.userInterfaceStyle == .dark
+            ? UIColor(red: 1.00, green: 0.655, blue: 0.20, alpha: 1)
+            : UIColor(red: 0.64, green: 0.353, blue: 0.00, alpha: 1)
+    })
     /// Soft amber wash for avatar circles and the sealed chip's background in quiet states.
     static let accentSoft = Color(UIColor { trait in
         trait.userInterfaceStyle == .dark
@@ -33,10 +41,31 @@ enum Theme {
 
     // MARK: Type
 
-    static func display(_ size: CGFloat = 34, weight: Font.Weight = .bold) -> Font {
-        .system(size: size, weight: weight, design: .rounded)
-    }
+    /// Rounded display faces on text styles, so they follow Dynamic Type.
+    static let displayLarge: Font = .system(.largeTitle, design: .rounded, weight: .bold)
+    static let displayTitle: Font = .system(.title, design: .rounded, weight: .bold)
+    static let displayTitle2: Font = .system(.title2, design: .rounded, weight: .bold)
     static let heroLabel: Font = .system(.title3, design: .rounded, weight: .bold)
+    /// Pour sweep timing for the hero button (ease-out-quint-ish).
+    static let pour: Animation = .timingCurve(0.22, 1, 0.36, 1, duration: 0.35)
+
+    /// UIKit: rounded bold font for navigation bar large titles (set once at launch).
+    static func roundedUIFont(textStyle: UIFont.TextStyle, weight: UIFont.Weight = .bold) -> UIFont {
+        let base = UIFont.preferredFont(forTextStyle: textStyle)
+        let descriptor = base.fontDescriptor.withDesign(.rounded) ?? base.fontDescriptor
+        return UIFont(descriptor: descriptor.addingAttributes([.traits: [UIFontDescriptor.TraitKey.weight: weight]]), size: base.pointSize)
+    }
+
+    /// Call from the AppDelegate: large titles and inline titles in SF Rounded.
+    static func installNavigationBarAppearance() {
+        let appearance = UINavigationBarAppearance()
+        appearance.configureWithDefaultBackground()
+        appearance.largeTitleTextAttributes = [.font: roundedUIFont(textStyle: .largeTitle)]
+        appearance.titleTextAttributes = [.font: roundedUIFont(textStyle: .headline, weight: .semibold)]
+        UINavigationBar.appearance().standardAppearance = appearance
+        UINavigationBar.appearance().scrollEdgeAppearance = appearance
+        UINavigationBar.appearance().compactAppearance = appearance
+    }
 
     // MARK: Motion
 
@@ -54,11 +83,16 @@ enum Haptics {
 
 // MARK: - Button styles
 
-/// The hero action: full-width, amber, rounded, presses down slightly. `isBusy` shows a
-/// bottom-to-top "pour" sweep (Reduce Motion: crossfade) while a photo uploads.
+/// The hero action: full-width, amber, rounded, presses down slightly.
+/// Signature interaction: bump `pour` on every tap and the button "fills like a
+/// pint" (a bottom-to-top highlight sweep, 350 ms; Reduce Motion: a brief flash).
+/// `isBusy` keeps a steady highlight while a photo uploads.
 struct HeroButtonStyle: ButtonStyle {
+    var pour = 0
     var isBusy = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var sweep: CGFloat = 0      // 0 → 1 fill height fraction
+    @State private var sweepOpacity: Double = 0
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
@@ -66,19 +100,31 @@ struct HeroButtonStyle: ButtonStyle {
             .foregroundStyle(Theme.onAccent)
             .frame(maxWidth: .infinity, minHeight: 64)
             .background {
-                ZStack(alignment: .bottom) {
-                    RoundedRectangle(cornerRadius: Theme.heroRadius, style: .continuous)
-                        .fill(Theme.accent)
-                    if isBusy {
-                        RoundedRectangle(cornerRadius: Theme.heroRadius, style: .continuous)
-                            .fill(.white.opacity(0.25))
-                            .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
+                RoundedRectangle(cornerRadius: Theme.heroRadius, style: .continuous)
+                    .fill(Theme.accent)
+                    .overlay {
+                        GeometryReader { proxy in
+                            RoundedRectangle(cornerRadius: Theme.heroRadius, style: .continuous)
+                                .fill(.white.opacity(0.28))
+                                .mask(alignment: .bottom) {
+                                    Rectangle().frame(height: proxy.size.height * (reduceMotion ? 1 : sweep))
+                                }
+                                .opacity(isBusy ? 1 : sweepOpacity)
+                        }
                     }
-                }
+                    .clipShape(RoundedRectangle(cornerRadius: Theme.heroRadius, style: .continuous))
             }
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
             .animation(Theme.quick, value: configuration.isPressed)
-            .animation(Theme.spring, value: isBusy)
+            .animation(Theme.quick, value: isBusy)
+            .onChange(of: pour) { _, _ in runPour() }
+    }
+
+    private func runPour() {
+        sweep = 0
+        sweepOpacity = 1
+        withAnimation(reduceMotion ? Theme.quick : Theme.pour) { sweep = 1 }
+        withAnimation(.easeOut(duration: 0.25).delay(reduceMotion ? 0.15 : 0.35)) { sweepOpacity = 0 }
     }
 }
 
@@ -88,7 +134,7 @@ struct RoundIconButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: size * 0.36, weight: .semibold))
-            .foregroundStyle(Theme.accent)
+            .foregroundStyle(Theme.accentInk)
             .frame(width: size, height: size)
             .background(Theme.accentSoft, in: Circle())
             .scaleEffect(configuration.isPressed ? 0.94 : 1)
@@ -114,7 +160,7 @@ struct PillButtonStyle: ButtonStyle {
     private var foreground: Color {
         switch emphasis {
         case .filled: return Theme.onAccent
-        case .tinted: return Theme.accent
+        case .tinted: return Theme.accentInk
         case .quiet: return .secondary
         }
     }
@@ -137,7 +183,7 @@ struct AvatarView: View {
     var body: some View {
         Text(initials)
             .font(.system(size: size * 0.4, weight: .bold, design: .rounded))
-            .foregroundStyle(Theme.accent)
+            .foregroundStyle(Theme.accentInk)
             .frame(width: size, height: size)
             .background(Theme.accentSoft, in: Circle())
             .accessibilityHidden(true)

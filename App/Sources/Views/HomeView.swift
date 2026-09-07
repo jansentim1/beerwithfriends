@@ -16,6 +16,7 @@ struct HomeView: View {
     @StateObject private var viewModel: HomeViewModel
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private let profile: UserProfile
     private let friendService: any FriendServicing
@@ -32,6 +33,9 @@ struct HomeView: View {
     @State private var blockTarget: BeerLog?
     @State private var showBlockDialog = false
     @State private var infoMessage: String?
+    /// Signature interaction: every plain tap of the hero button bumps this, and
+    /// `HeroButtonStyle` pours a fresh amber sweep on the change.
+    @State private var pourCount = 0
 
     static let reportReasons = ["Not a beer 🚨", "Inappropriate photo", "Harassment", "Other"]
 
@@ -49,43 +53,46 @@ struct HomeView: View {
 
     var body: some View {
         NavigationStack {
-            List {
-                Section {
-                    heroRow
-                        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 20, trailing: 16))
-                        .listRowSeparator(.hidden)
-                        .listRowBackground(Color.clear)
-                }
-
-                if viewModel.feed.isEmpty {
+            // The reader only measures the viewport, so the empty state can claim
+            // half of it and sit in the middle of what's left under the hero.
+            GeometryReader { proxy in
+                List {
                     Section {
-                        emptyState
-                            .listRowInsets(EdgeInsets(top: 24, leading: 24, bottom: 24, trailing: 24))
+                        heroRow
+                            .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 20, trailing: 16))
                             .listRowSeparator(.hidden)
                             .listRowBackground(Color.clear)
                     }
-                } else {
-                    Section {
-                        ForEach(viewModel.feed) { beer in
-                            feedRow(beer)
+
+                    if viewModel.feed.isEmpty {
+                        Section {
+                            emptyState
+                                .frame(minHeight: max(0, proxy.size.height * 0.5))
+                                .listRowInsets(EdgeInsets(top: 24, leading: 24, bottom: 24, trailing: 24))
+                                .listRowSeparator(.hidden)
+                                .listRowBackground(Color.clear)
                         }
-                    } header: {
-                        Eyebrow(text: "Last 24 hours")
-                            .textCase(nil)
-                            .padding(.vertical, 2)
+                    } else {
+                        // No eyebrow above the feed: the relative time on every row
+                        // already says these are the last 24 hours.
+                        Section {
+                            ForEach(viewModel.feed) { beer in
+                                feedRow(beer)
+                            }
+                        }
                     }
                 }
+                .listStyle(.plain)
+                .listSectionSeparator(.hidden)
+                // Pull-to-refresh works on the empty state too: the hero row keeps
+                // the list scrollable even with no beers.
+                .refreshable {
+                    feedEpoch += 1
+                }
+                // Signature interaction: a new row springs in at the top. Reduce
+                // Motion downgrades it to a crossfade.
+                .animation(reduceMotion ? Theme.quick : Theme.spring, value: viewModel.feed.map(\.id))
             }
-            .listStyle(.plain)
-            .listSectionSeparator(.hidden)
-            // Pull-to-refresh works on the empty state too: the hero row keeps
-            // the list scrollable even with no beers.
-            .refreshable {
-                feedEpoch += 1
-            }
-            // Signature interaction: a new row springs in at the top. Reduce
-            // Motion downgrades it to a crossfade.
-            .animation(reduceMotion ? Theme.quick : Theme.spring, value: viewModel.feed.map(\.id))
             .navigationTitle("PubDates")
             .navigationBarTitleDisplayMode(.large)
             .alert("Oops", isPresented: errorBinding) {
@@ -165,11 +172,12 @@ struct HomeView: View {
         HStack(spacing: 12) {
             Button {
                 Haptics.success()
+                pourCount += 1
                 Task { await viewModel.logBeer(photoJPEG: nil) }
             } label: {
                 Text("🍺 I'm having a beer")
             }
-            .buttonStyle(HeroButtonStyle(isBusy: viewModel.isUploadingPhoto))
+            .buttonStyle(HeroButtonStyle(pour: pourCount, isBusy: viewModel.isUploadingPhoto))
             .accessibilityLabel("I'm having a beer")
             .accessibilityHint("Tells your mates you cracked one open")
             .accessibilityIdentifier("home.log")
@@ -191,9 +199,9 @@ struct HomeView: View {
 
     private var emptyState: some View {
         VStack(spacing: 10) {
-            Text("No beers yet")
-                .font(.title3.weight(.semibold))
-            Text("Tap the button when you crack one open — your mates will hear it.")
+            Text("Nobody to hear you yet")
+                .font(Theme.displayTitle2)
+            Text("Add a mate and they get a push the moment you tap.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -219,24 +227,35 @@ struct HomeView: View {
 
     private func feedRow(_ beer: BeerLog) -> some View {
         let isMine = beer.ownerUid == profile.id
-        return HStack(spacing: 12) {
-            AvatarView(name: isMine ? profile.displayName : beer.ownerName, size: 52)
+        let isAccessibilitySize = dynamicTypeSize.isAccessibilitySize
+        // At accessibility sizes the chip and the cheers control drop under the
+        // name instead of squeezing it into an ellipsis.
+        let layout = isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+            : AnyLayout(HStackLayout(alignment: .center, spacing: 12))
 
-            VStack(alignment: .leading, spacing: 2) {
-                // "You" stays a standalone static text — the UI test looks for it.
-                Text(isMine ? "You" : beer.ownerName)
-                    .font(.headline)
-                    .lineLimit(1)
-                Text(beer.createdAt, style: .relative)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+        return HStack(alignment: isAccessibilitySize ? .top : .center, spacing: 12) {
+            AvatarView(name: isMine ? profile.displayName : beer.ownerName, size: 56)
+
+            layout {
+                VStack(alignment: .leading, spacing: 2) {
+                    // "You" stays a standalone static text — the UI test looks for it.
+                    Text(isMine ? "You" : beer.ownerName)
+                        .font(.headline)
+                        .lineLimit(isAccessibilitySize ? nil : 1)
+                    Text(beer.createdAt, style: .relative)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(isAccessibilitySize ? nil : 1)
+                }
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                HStack(spacing: 8) {
+                    photoChip(for: beer)
+                    reactionControl(for: beer, isMine: isMine)
+                }
             }
-
-            Spacer(minLength: 8)
-
-            photoChip(for: beer)
-            cheersButton(for: beer, isMine: isMine)
         }
         .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
         .listRowSeparator(.hidden)
@@ -297,9 +316,23 @@ struct HomeView: View {
         }
     }
 
-    private func cheersButton(for beer: BeerLog, isMine: Bool) -> some View {
-        let alreadyCheersed = viewModel.cheersedBeerIds.contains(beer.id)
-        let isDisabled = isMine || alreadyCheersed
+    /// Your own row carries no cheers button — you can't cheers yourself, and a
+    /// permanently disabled control is noise. It shows the tally only once there
+    /// is one to show.
+    @ViewBuilder
+    private func reactionControl(for beer: BeerLog, isMine: Bool) -> some View {
+        if isMine {
+            if beer.cheersCount > 0 {
+                StatusPill(text: "🍻 \(beer.cheersCount)")
+                    .accessibilityLabel("\(beer.cheersCount) cheers")
+            }
+        } else {
+            cheersButton(for: beer)
+        }
+    }
+
+    private func cheersButton(for beer: BeerLog) -> some View {
+        let isDisabled = viewModel.cheersedBeerIds.contains(beer.id)
         return Button {
             Haptics.light()
             Task { await viewModel.cheers(beer) }

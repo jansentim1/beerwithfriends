@@ -43,22 +43,21 @@ struct OnboardingView: View {
 private struct SignInStep: View {
     @EnvironmentObject private var appState: AppState
     @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var currentNonce: String?
     @State private var isSigningIn = false
-    @State private var didAppear = false
-    /// Theme's display font is a fixed size, so scale it with the reading size
-    /// by hand — the wordmark still has to answer to Dynamic Type.
+    /// The wordmark is the mark: bigger than any text style, but @ScaledMetric
+    /// keeps it answering to Dynamic Type.
     @ScaledMetric(relativeTo: .largeTitle) private var wordmarkSize: CGFloat = 44
 
     var body: some View {
-        // Hero above, thumb-height action below: the scrolling half shrinks as the
-        // reading size grows, so the Apple button never walks off the screen.
+        // Hero in the upper third, thumb-height action below: the scrolling half
+        // shrinks as the reading size grows, so the Apple button never walks off.
         VStack(spacing: 0) {
             GeometryReader { proxy in
                 ScrollView {
                     VStack(spacing: 20) {
                         Spacer(minLength: 0)
+                            .frame(maxHeight: proxy.size.height * 0.18)
                         hero
                         Spacer(minLength: 0)
                     }
@@ -73,15 +72,11 @@ private struct SignInStep: View {
     }
 
     private var hero: some View {
+        // The wordmark is the mark; the emoji is the voice and lives in the copy
+        // and on the buttons, not above the name.
         VStack(spacing: 16) {
-            Text("🍺")
-                .font(.system(size: 64))
-                // Reduce Motion: no pop, just the final size. Never animates
-                // opacity, so a screenshot taken mid-launch is still complete.
-                .scaleEffect(didAppear ? 1 : 0.92)
-                .accessibilityHidden(true)
             Text("PubDates")
-                .font(Theme.display(wordmarkSize))
+                .font(.system(size: wordmarkSize, weight: .heavy, design: .rounded))
                 .foregroundStyle(.primary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.5)
@@ -91,14 +86,6 @@ private struct SignInStep: View {
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-        }
-        .onAppear {
-            guard !didAppear else { return }
-            if reduceMotion {
-                didAppear = true
-            } else {
-                withAnimation(Theme.spring) { didAppear = true }
-            }
         }
     }
 
@@ -114,9 +101,11 @@ private struct SignInStep: View {
                 handle(result)
             }
             .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
-            .frame(height: 52)
+            // Same height and radius as HeroButtonStyle: one geometry for both
+            // primary buttons.
+            .frame(height: 56)
             .frame(maxWidth: .infinity)
-            .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: Theme.heroRadius, style: .continuous))
             .disabled(isSigningIn)
             .opacity(isSigningIn ? 0.6 : 1)
             .accessibilityIdentifier("signin.apple")
@@ -188,7 +177,6 @@ private func sha256Hex(_ input: String) -> String {
 private struct ProfileUnavailableStep: View {
     @EnvironmentObject private var appState: AppState
     @State private var isRetrying = false
-    @ScaledMetric(relativeTo: .title2) private var titleSize: CGFloat = 28
 
     var body: some View {
         VStack(spacing: 0) {
@@ -198,12 +186,12 @@ private struct ProfileUnavailableStep: View {
                         Spacer(minLength: 0)
                         Image(systemName: "wifi.slash")
                             .font(.system(size: 34, weight: .semibold))
-                            .foregroundStyle(Theme.accent)
+                            .foregroundStyle(Theme.accentInk)
                             .frame(width: 88, height: 88)
                             .background(Theme.accentSoft, in: Circle())
                             .accessibilityHidden(true)
                         Text("Couldn't load your profile")
-                            .font(Theme.display(titleSize))
+                            .font(Theme.displayTitle)
                             .multilineTextAlignment(.center)
                             .fixedSize(horizontal: false, vertical: true)
                             .accessibilityAddTraits(.isHeader)
@@ -245,7 +233,7 @@ private struct ProfileUnavailableStep: View {
                     Task { await appState.signOut() }
                 }
                 .font(.subheadline)
-                .tint(Theme.accent)
+                .tint(Theme.accentInk)
                 .frame(maxWidth: .infinity, minHeight: 44)
             }
             .padding(.horizontal, 20)
@@ -262,7 +250,6 @@ private struct UsernamePickerStep: View {
     @State private var displayName = ""
     @State private var availability: Availability = .idle
     @State private var isClaiming = false
-    @ScaledMetric(relativeTo: .largeTitle) private var titleSize: CGFloat = 34
 
     private enum Availability: Equatable {
         case idle          // empty field
@@ -282,7 +269,7 @@ private struct UsernamePickerStep: View {
             VStack(alignment: .leading, spacing: 24) {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Pick your username")
-                        .font(Theme.display(titleSize))
+                        .font(Theme.displayLarge)
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityAddTraits(.isHeader)
                     Text("Friends add you by exact username — make it one you can shout across a bar.")
@@ -336,7 +323,7 @@ private struct UsernamePickerStep: View {
                 HStack(alignment: .firstTextBaseline, spacing: 10) {
                     Image(systemName: "bell.badge.fill")
                         .font(.footnote)
-                        .foregroundStyle(Theme.accent)
+                        .foregroundStyle(Theme.accentInk)
                         .accessibilityHidden(true)
                     Text("Next: we'll ask permission to send notifications. That's the whole app — you hear the moment a mate cracks one open, they hear when you do.")
                         .font(.footnote)
@@ -349,7 +336,7 @@ private struct UsernamePickerStep: View {
                     Task { await appState.signOut() }
                 }
                 .font(.subheadline)
-                .tint(Theme.accent)
+                .tint(Theme.accentInk)
                 .frame(maxWidth: .infinity, minHeight: 44)
                 .padding(.top, 4)
             }
