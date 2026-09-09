@@ -125,6 +125,10 @@ final class FirebaseBeerService: BeerServicing, @unchecked Sendable {
               let createdAt = data["createdAt"] as? Timestamp,
               let expiresAt = data["expiresAt"] as? Timestamp
         else { return nil }
+        // Server-maintained mirror of `beers/{id}/replies/{uid}` (uid → kind).
+        // Unknown kinds (a newer client, a future kind) are dropped, not guessed.
+        let replies = (data["replies"] as? [String: String] ?? [:])
+            .compactMapValues { ReplyKind(rawValue: $0) }
         return BeerLog(
             id: document.documentID,
             ownerUid: ownerUid,
@@ -133,7 +137,8 @@ final class FirebaseBeerService: BeerServicing, @unchecked Sendable {
             expiresAt: expiresAt.dateValue(),
             hasPhoto: data["hasPhoto"] as? Bool ?? false,
             cheersCount: data["cheersCount"] as? Int ?? 0,
-            place: data["place"] as? String
+            place: data["place"] as? String,
+            replies: replies
         )
     }
 
@@ -151,6 +156,30 @@ final class FirebaseBeerService: BeerServicing, @unchecked Sendable {
             if nsError.domain == FirestoreErrorDomain,
                nsError.code == FirestoreErrorCode.permissionDenied.rawValue {
                 // Cheers docs are create-only: a rejected write means it exists.
+                throw CheersError.alreadyCheersed
+            }
+            throw error
+        }
+    }
+
+    // MARK: - Quick replies
+
+    /// Schema pinned by rules: `beers/{beerId}/replies/{me}` = exactly
+    /// `{uid, kind, at}`, create-only and never on your own beer. The server
+    /// (onReplyCreated) mirrors it into `beers/{id}.replies` and pushes the owner.
+    func reply(beerId: String, kind: ReplyKind) async throws {
+        do {
+            try await db.document("beers/\(beerId)/replies/\(uid)").setData([
+                "uid": uid,
+                "kind": kind.rawValue,
+                "at": Timestamp(date: Date()),
+            ])
+        } catch {
+            let nsError = error as NSError
+            if nsError.domain == FirestoreErrorDomain,
+               nsError.code == FirestoreErrorCode.permissionDenied.rawValue {
+                // Reply docs are create-only: a rejected write means it exists.
+                // (Same signal as cheers, so the view model reuses the case.)
                 throw CheersError.alreadyCheersed
             }
             throw error

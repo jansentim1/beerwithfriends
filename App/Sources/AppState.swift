@@ -159,6 +159,9 @@ final class AppState: ObservableObject {
         guard let uid else {
             beerService = nil
             friendService = nil
+            // Nothing may write as the previous user: queued actions stay queued
+            // until someone signs in again.
+            ReactionInbox.shared.setHandler(nil)
             pushRegistrar.setUser(uid: nil)
             phase = .signedOut
             return
@@ -189,8 +192,22 @@ final class AppState: ObservableObject {
     }
 
     private func becomeReady(_ profile: UserProfile) {
-        beerService = FirebaseBeerService(uid: profile.id, ownerName: profile.displayName)
+        let service = FirebaseBeerService(uid: profile.id, ownerName: profile.displayName)
+        beerService = service
         friendService = FirebaseFriendService(me: profile)
+        // Quick replies tapped on a notification (possibly before this user was
+        // even signed in) are written now, best effort: a failed one is not worth
+        // an alert on a screen the user may never have opened.
+        ReactionInbox.shared.setHandler { items in
+            for item in items {
+                switch item.action {
+                case .cheers:
+                    try? await service.cheers(beerId: item.beerId)
+                case .reply(let kind):
+                    try? await service.reply(beerId: item.beerId, kind: kind)
+                }
+            }
+        }
         phase = .ready(profile)
         // Ask for notification permission only once the user is fully onboarded,
         // then keep users/{uid}/private/push.token fresh. (Skipped in emulator

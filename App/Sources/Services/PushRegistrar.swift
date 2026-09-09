@@ -31,6 +31,10 @@ final class PushRegistrar: NSObject, MessagingDelegate, @unchecked Sendable {
         guard !alreadyStarted else { return }
 
         Messaging.messaging().delegate = self
+        // Before asking for permission: the quick-reply buttons on a beer push.
+        // Registered up front so the very first notification already carries them
+        // (iOS matches `aps.category == "BEER"`, which the server sends).
+        registerBeerCategory()
         // APNs registration does not need the user's permission (only showing
         // alerts does), so register right away: the device token then exists even
         // when permission is granted later in Settings.
@@ -42,6 +46,24 @@ final class PushRegistrar: NSObject, MessagingDelegate, @unchecked Sendable {
         ) { [weak self] granted, error in
             self?.record(status: granted ? "granted" : "denied", error: error)
         }
+    }
+
+    /// The "BEER" category: three background actions on a mate's beer push.
+    /// Identifiers are the wire contract with the AppDelegate's `didReceive`
+    /// handler ("CHEERS" plus the `ReplyKind` raw values, upper-cased).
+    /// Empty options = the action runs without bringing the app forward; iOS
+    /// gives us ~30 s, and the Firestore write is queued offline anyway.
+    private func registerBeerCategory() {
+        let cheers = UNNotificationAction(identifier: "CHEERS", title: "Cheers 🍻", options: [])
+        let onMyWay = UNNotificationAction(identifier: "ONMYWAY", title: "On my way 🏃", options: [])
+        let jealous = UNNotificationAction(identifier: "JEALOUS", title: "Jealous 😩", options: [])
+        let category = UNNotificationCategory(
+            identifier: "BEER",
+            actions: [cheers, onMyWay, jealous],
+            intentIdentifiers: [],
+            options: []
+        )
+        UNUserNotificationCenter.current().setNotificationCategories([category])
     }
 
     /// Best-effort removal of the stored token for the CURRENT user. Must be

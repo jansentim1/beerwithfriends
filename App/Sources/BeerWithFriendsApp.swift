@@ -3,11 +3,12 @@ import FirebaseCore
 import FirebaseMessaging
 import SwiftUI
 import UIKit
+import UserNotifications
 
 // COMPILE-PARKED (Task 9): no Xcode on this machine — written against
 // Firebase iOS SDK 11 + BeerKit protocol signatures, not yet compiled.
 
-final class AppDelegate: NSObject, UIApplicationDelegate {
+final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
     func application(
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
@@ -15,6 +16,9 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         FirebaseApp.configure()
         EmulatorConfig.applyIfRequested()
         Theme.installNavigationBarAppearance()
+        // Set here, not on permission grant: a notification action tapped on a
+        // cold launch is delivered to the delegate right after this returns.
+        UNUserNotificationCenter.current().delegate = self
         return true
     }
 
@@ -32,6 +36,42 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         didFailToRegisterForRemoteNotificationsWithError error: Error
     ) {
         PushRegistrar.shared.apnsRegistrationFailed(error)
+    }
+
+    // MARK: - UNUserNotificationCenterDelegate
+
+    /// A mate's beer is the whole point of the app: show it even in the
+    /// foreground (iOS suppresses pushes by default while the app is active).
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        completionHandler([.banner, .sound])
+    }
+
+    /// Quick replies from the notification itself. The write needs a signed-in
+    /// `BeerServicing`, which may not exist yet (cold launch), so the action is
+    /// queued on ReactionInbox and AppState drains it. Completing immediately is
+    /// safe: iOS grants a background action ~30 s and Firestore queues the write
+    /// offline, so nothing is lost by not waiting for the round-trip here.
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        let beerId = response.notification.request.content.userInfo["beerId"] as? String
+        let action: ReactionAction?
+        switch response.actionIdentifier {
+        case "CHEERS": action = .cheers
+        case "ONMYWAY": action = .reply(.onMyWay)
+        case "JEALOUS": action = .reply(.jealous)
+        default: action = nil // plain tap (opens the app) or dismiss: nothing to write
+        }
+        if let beerId, let action {
+            ReactionInbox.shared.enqueue(ReactionInbox.Item(beerId: beerId, action: action))
+        }
+        completionHandler()
     }
 }
 

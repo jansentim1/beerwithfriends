@@ -260,6 +260,7 @@ struct HomeView: View {
 
                 HStack(spacing: 8) {
                     photoChip(for: beer)
+                    replyPills(for: beer)
                     reactionControl(for: beer, isMine: isMine)
                 }
             }
@@ -285,6 +286,11 @@ struct HomeView: View {
         }
         .contextMenu {
             if !isMine {
+                // Quick replies first: the everyday actions, above the reporting
+                // ones (long-press is the only place they live on a row — the row
+                // itself stays a two-control affair).
+                replyButton(for: beer, kind: .onMyWay)
+                replyButton(for: beer, kind: .jealous)
                 Button {
                     reportTarget = beer
                     showReportDialog = true
@@ -346,6 +352,41 @@ struct HomeView: View {
                 .accessibilityLabel("Photo already seen")
         case .none, .expired:
             EmptyView()
+        }
+    }
+
+    /// One quick reply per mate per beer, from the row's long-press menu. Already
+    /// replied (this launch or an earlier one — the server mirrors replies onto
+    /// the beer) disables both items rather than hiding them.
+    private func replyButton(for beer: BeerLog, kind: ReplyKind) -> some View {
+        Button {
+            Haptics.light()
+            Task { await viewModel.reply(beer, kind: kind, myUid: profile.id) }
+        } label: {
+            Text("\(kind.label) \(kind.emoji)")
+        }
+        .disabled(beer.replies[profile.id] != nil)
+        .accessibilityIdentifier("home.reply.\(kind.rawValue)")
+    }
+
+    /// Who's on the way and who's sulking. Shown on every row, your own included:
+    /// the owner is exactly who wants to know a mate is heading over.
+    @ViewBuilder
+    private func replyPills(for beer: BeerLog) -> some View {
+        ForEach(ReplyKind.allCases, id: \.self) { kind in
+            let count = beer.replyCount(kind)
+            if count > 0 {
+                StatusPill(text: "\(kind.emoji) \(count)")
+                    .accessibilityLabel(Self.replyLabel(kind, count: count))
+            }
+        }
+    }
+
+    /// VoiceOver reads the tally, not the emoji ("2 on their way", "1 jealous").
+    private static func replyLabel(_ kind: ReplyKind, count: Int) -> String {
+        switch kind {
+        case .onMyWay: return "\(count) on their way"
+        case .jealous: return "\(count) jealous"
         }
     }
 
