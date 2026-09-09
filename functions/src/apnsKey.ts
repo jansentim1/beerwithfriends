@@ -8,6 +8,13 @@ let cached: string | undefined;
 
 export async function loadApnsKey(): Promise<string> {
   if (cached) return cached;
+  // Preferred: deployed as a function env var from functions/.env.<project>
+  // (gitignored). Needs no IAM grant, unlike Secret Manager access.
+  const fromEnv = process.env.APNS_KEY_B64;
+  if (fromEnv) {
+    cached = Buffer.from(fromEnv, "base64").toString("utf8");
+    return cached;
+  }
   const auth = new GoogleAuth({ scopes: ["https://www.googleapis.com/auth/cloud-platform"] });
   const client = await auth.getClient();
   const res = await client.request<{ payload: { data: string } }>({

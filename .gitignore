@@ -13,3 +13,4 @@ App/Resources/GoogleService-Info.plist
 .claude/agents/impeccable-*
 PRODUCT.md.bak
 .impeccable/
+functions/.env*
