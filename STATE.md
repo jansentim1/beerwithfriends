@@ -16,6 +16,7 @@
 - 2026-09-09: Apple beta review approved builds 8 and 11; public link https://testflight.apple.com/join/1QfbyRt9 live with build 11. Tim can invite mates.
 - 2026-09-09: place feature shipped (build 12): opt-in Settings toggle, LocationPlaceProvider (POI/city, 3 s), rules allow optional place ≤60, push title 'at <place>'. Submitted for beta review.
 - Needs Tim: try build 12 with the toggle on; invite mates; report device feedback.
-- Next: quick replies to a beer push; rig seed (mate + photo beer). run tools/reset-prod.sh himself (classifier blocks Claude from wiping prod). APNs key. rename the App Store Connect record to PubDates (App Information, Name) so the title is reserved and matches the next build. APNs key (RUNBOOK step 3.1, upload the .p8 to tim-server and give me the Key ID). Then step 5 (external testers).
+- 2026-09-09 eve: quick replies shipped (build 13): BEER notification category with Cheers/On my way/Jealous actions, beers/{id}/replies rules, onReplyCreated mirror + push, ReactionInbox, context-menu replies, reply pills. First external tester joined via the link.
+- Next: rig seed (mate + photo beer) so photo viewer/chips are covered; watch tester feedback. run tools/reset-prod.sh himself (classifier blocks Claude from wiping prod). APNs key. rename the App Store Connect record to PubDates (App Information, Name) so the title is reserved and matches the next build. APNs key (RUNBOOK step 3.1, upload the .p8 to tim-server and give me the Key ID). Then step 5 (external testers).
 - Next code work: fix review findings 1-5 + CameraView crash (see session 2026-09-04 review), then item 6-10.
 - Mac note (historical): the Mac's Command Line Tools are corrupted (see README). No longer on the critical path; nothing requires a Mac.
