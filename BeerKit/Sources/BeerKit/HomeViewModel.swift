@@ -166,6 +166,22 @@ public final class HomeViewModel: ObservableObject {
         }
     }
 
+    // MARK: - Quick replies
+
+    /// Optimistic like cheers; the server echoes the reply into `beer.replies`.
+    public func reply(_ beer: BeerLog, kind: ReplyKind, myUid: String) async {
+        guard beer.replies[myUid] == nil else { return }
+        if let i = feed.firstIndex(where: { $0.id == beer.id }) { feed[i].replies[myUid] = kind }
+        do {
+            try await service.reply(beerId: beer.id, kind: kind)
+        } catch CheersError.alreadyCheersed {
+            // Already replied earlier (create-only): keep whatever the server has.
+        } catch {
+            if let i = feed.firstIndex(where: { $0.id == beer.id }) { feed[i].replies[myUid] = nil }
+            errorMessage = "Couldn't send your reply — try again."
+        }
+    }
+
     // MARK: - View-once photo
 
     public func openPhoto(_ beer: BeerLog) async -> URL? {

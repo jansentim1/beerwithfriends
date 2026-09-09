@@ -8,7 +8,7 @@ import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
 import { getMessaging } from "firebase-admin/messaging";
 import { getPhotoOnceCore, PhotoError, PhotoErrorCode } from "./photo";
-import { fanoutBeerCreated, notifyCheers, Pusher } from "./pushes";
+import { fanoutBeerCreated, notifyCheers, notifyReply, Pusher, ReplyKind } from "./pushes";
 import { sendApns, deadTokens } from "./apns";
 import { loadApnsKey } from "./apnsKey";
 import { mirrorFriendship, severOnBlock, cleanupExpiredCore, deleteAccountCore, PhotoDeleter } from "./lifecycle";
@@ -89,6 +89,17 @@ export const onCheersCreated = onDocumentCreated("beers/{beerId}/cheers/{uid}", 
   await beerRef.update({ cheersCount: FieldValue.increment(1) });
   const beer = await beerRef.get();
   if (beer.exists) await notifyCheers(db, push, beer.get("ownerUid"), event.params.uid);
+});
+
+export const onReplyCreated = onDocumentCreated("beers/{beerId}/replies/{uid}", async (event) => {
+  const db = getFirestore();
+  const kind = event.data?.get("kind") as ReplyKind | undefined;
+  if (!kind) return;
+  const beerRef = db.doc(`beers/${event.params.beerId}`);
+  // Mirror into the beer doc (admin-only field) so the feed shows reply pills.
+  await beerRef.update({ [`replies.${event.params.uid}`]: kind });
+  const beer = await beerRef.get();
+  if (beer.exists) await notifyReply(db, push, beer.get("ownerUid"), event.params.uid, kind);
 });
 
 const storagePhotoDeleter: PhotoDeleter = async (path) => {

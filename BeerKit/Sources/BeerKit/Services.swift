@@ -23,6 +23,8 @@ public protocol BeerServicing: Sendable {
     /// `for await` cancellation alone does not cancel an underlying Firestore registration.
     func observeFeed() -> AsyncThrowingStream<[BeerLog], Error>
     func cheers(beerId: String) async throws
+    /// Quick reply on a mate's beer (create-once per user, like cheers).
+    func reply(beerId: String, kind: ReplyKind) async throws
     func fetchPhotoOnce(beerId: String) async throws -> URL
     func viewedBeerIds() async throws -> Set<String>
     /// Which of `beerIds` the current user has already cheersed (survives relaunch).

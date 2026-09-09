@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Timestamp } from "firebase-admin/firestore";
 import { initTestDb, seedUser, seedFriends, clearDb } from "./helpers";
-import { fanoutBeerCreated, notifyCheers, Pusher, PushTarget } from "../../src/pushes";
+import { fanoutBeerCreated, notifyCheers, notifyReply, Pusher, PushTarget } from "../../src/pushes";
 
 const db = initTestDb();
 type Sent = { tokens: string[]; targets: PushTarget[]; title: string; body: string };
@@ -54,5 +54,18 @@ describe("notifyCheers", () => {
     await notifyCheers(db, push, "owner", "friend");
     expect(sent[0].tokens).toEqual(["tok-owner"]);
     expect(sent[0].title).toContain("joost");
+  });
+});
+
+describe("notifyReply", () => {
+  it("pushes the reply copy to the beer owner", async () => {
+    await notifyReply(db, push, "owner", "friend", "onmyway");
+    expect(sent).toHaveLength(1);
+    expect(sent[0].tokens).toEqual(["tok-owner"]);
+    expect(sent[0].title).toBe("joost is on the way 🏃");
+  });
+  it("ignores unknown kinds", async () => {
+    await notifyReply(db, push, "owner", "friend", "wave" as never);
+    expect(sent).toHaveLength(0);
   });
 });

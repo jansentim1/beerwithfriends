@@ -28,7 +28,10 @@ export function buildApnsJwt(privateKeyPem: string, keyId: string, teamId: strin
 }
 
 export function buildApnsPayload(title: string, body: string, data: Record<string, string>) {
-  return { aps: { alert: { title, body }, sound: "default" }, ...data };
+  // A beer push (has beerId) gets the BEER category → Cheers / On my way / Jealous buttons.
+  const aps: Record<string, unknown> = { alert: { title, body }, sound: "default" };
+  if (data.beerId) aps.category = "BEER";
+  return { aps, ...data };
 }
 
 export type ApnsResult = { token: string; status: number; reason?: string };

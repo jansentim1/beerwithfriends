@@ -97,6 +97,16 @@ describe("firestore rules: beers", () => {
     await assertFails(setDoc(doc(me, "beers/b3"), validBeer("someone-else")));
   });
 
+  it("replies: a mate replies once with a known kind, never on own beer", async () => {
+    // b1 is seeded by admin with owner "owner" and friend "friend".
+    const friend = fs("friend");
+    await assertSucceeds(setDoc(doc(friend, "beers/b1/replies/friend"), { uid: "friend", kind: "onmyway", at: Timestamp.now() }));
+    await assertFails(setDoc(doc(friend, "beers/b1/replies/friend"), { uid: "friend", kind: "jealous", at: Timestamp.now() })); // create-only
+    await assertFails(setDoc(doc(fs("stranger"), "beers/b1/replies/stranger"), { uid: "stranger", kind: "onmyway", at: Timestamp.now() }));
+    await assertFails(setDoc(doc(fs("owner"), "beers/b1/replies/owner"), { uid: "owner", kind: "onmyway", at: Timestamp.now() }));
+    await assertFails(setDoc(doc(fs("friend"), "beers/b1/replies/friend"), { uid: "friend", kind: "wave", at: Timestamp.now() }));
+  });
+
   it("beer create: optional place is a short string, never coordinates", async () => {
     const me = fs("owner");
     await assertSucceeds(setDoc(doc(me, "beers/bp1"), { ...validBeer("owner"), place: "Café De Zon" }));

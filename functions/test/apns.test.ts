@@ -17,9 +17,12 @@ describe("apns", () => {
     expect(sig.length).toBe(64); // raw r||s, not DER
     expect(verifier.verify({ key: publicKey, dsaEncoding: "ieee-p1363" }, sig)).toBe(true);
   });
-  it("payload carries alert, sound and data", () => {
+  it("payload carries alert, sound and data; beer pushes get the BEER category", () => {
     expect(buildApnsPayload("T", "B", { beerId: "x" })).toEqual({
-      aps: { alert: { title: "T", body: "B" }, sound: "default" }, beerId: "x",
+      aps: { alert: { title: "T", body: "B" }, sound: "default", category: "BEER" }, beerId: "x",
+    });
+    expect(buildApnsPayload("T", "B", {})).toEqual({
+      aps: { alert: { title: "T", body: "B" }, sound: "default" },
     });
   });
   it("dead tokens are 410 or BadDeviceToken", () => {

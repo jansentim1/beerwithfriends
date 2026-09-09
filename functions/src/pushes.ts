@@ -42,3 +42,19 @@ export async function notifyCheers(db: Firestore, push: Pusher, beerOwnerUid: st
   if (!target) return;
   await push([target], `${cheerser.get("usernameLower")} cheersed you 🍻`, "Proost!", {});
 }
+
+export type ReplyKind = "onmyway" | "jealous";
+export const replyCopy: Record<ReplyKind, { title: (name: string) => string; body: string }> = {
+  onmyway: { title: (name) => `${name} is on the way 🏃`, body: "Order one for them?" },
+  jealous: { title: (name) => `${name} is jealous 😩`, body: "Enjoy it for both of you." },
+};
+
+export async function notifyReply(db: Firestore, push: Pusher, beerOwnerUid: string, replierUid: string, kind: ReplyKind) {
+  const copy = replyCopy[kind];
+  if (!copy) return;
+  const [target, replier] = await Promise.all([
+    targetFor(db, beerOwnerUid), db.doc(`users/${replierUid}`).get(),
+  ]);
+  if (!target) return;
+  await push([target], copy.title(replier.get("usernameLower")), copy.body, {});
+}

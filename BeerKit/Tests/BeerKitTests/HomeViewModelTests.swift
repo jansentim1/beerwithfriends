@@ -44,6 +44,12 @@ final class FakeBeerService: BeerServicing, @unchecked Sendable {
         if let cheersError { throw cheersError }
         cheersed.append(beerId)
     }
+    var replies: [(String, ReplyKind)] = []
+    var replyError: Error?
+    func reply(beerId: String, kind: ReplyKind) async throws {
+        if let replyError { throw replyError }
+        replies.append((beerId, kind))
+    }
     func fetchPhotoOnce(beerId: String) async throws -> URL { try photoResult.get() }
     func viewedBeerIds() async throws -> Set<String> {
         if viewedDelayNs > 0 { try? await Task.sleep(nanoseconds: viewedDelayNs) }
@@ -67,6 +73,11 @@ func startAndWaitForSubscription(_ vm: HomeViewModel, _ svc: FakeBeerService) as
     let running = Task { await vm.start() }
     while svc.observeCount == before || svc.feedContinuation == nil { await Task.yield() }
     return running
+}
+
+@MainActor
+func waitForFeed(_ vm: HomeViewModel) async {
+    for _ in 0..<200 where vm.feed.isEmpty { await Task.yield() }
 }
 
 @Suite struct HomeViewModelTests {
@@ -243,7 +254,7 @@ func startAndWaitForSubscription(_ vm: HomeViewModel, _ svc: FakeBeerService) as
         let vm = HomeViewModel(service: svc, now: now)
         let running = await startAndWaitForSubscription(vm, svc)
         svc.feedContinuation?.yield([makeBeer("b1", createdAt: 400)])
-        await Task.yield(); await Task.yield()
+        await waitForFeed(vm)
         await vm.cheers(vm.feed[0])
         #expect(vm.cheersedBeerIds == ["b1"])
         #expect(vm.feed[0].cheersCount == 0)           // optimistic +1 undone
@@ -277,6 +288,34 @@ final class FakePlaces: PlaceProviding, @unchecked Sendable {
     func currentPlace() async -> String? {
         if delayNs > 0 { try? await Task.sleep(nanoseconds: delayNs) }
         return place
+    }
+}
+
+@Suite struct ReplyTests {
+    @Test @MainActor func replyIsOptimisticAndOncePerUser() async {
+        let svc = FakeBeerService()
+        let vm = HomeViewModel(service: svc, now: { Date(timeIntervalSince1970: 500) })
+        let running = await startAndWaitForSubscription(vm, svc)
+        svc.feedContinuation?.yield([makeBeer("b1", createdAt: 400)])
+        await waitForFeed(vm)
+        await vm.reply(vm.feed[0], kind: .onMyWay, myUid: "me")
+        await vm.reply(vm.feed[0], kind: .jealous, myUid: "me")     // second reply ignored
+        #expect(vm.feed[0].replies["me"] == .onMyWay)
+        #expect(svc.replies.map(\.1) == [.onMyWay])
+        #expect(vm.feed[0].replyCount(.onMyWay) == 1)
+        running.cancel(); await running.value
+    }
+    @Test @MainActor func replyFailureRollsBack() async {
+        let svc = FakeBeerService()
+        svc.replyError = PhotoFetchError.notFound
+        let vm = HomeViewModel(service: svc, now: { Date(timeIntervalSince1970: 500) })
+        let running = await startAndWaitForSubscription(vm, svc)
+        svc.feedContinuation?.yield([makeBeer("b1", createdAt: 400)])
+        await waitForFeed(vm)
+        await vm.reply(vm.feed[0], kind: .jealous, myUid: "me")
+        #expect(vm.feed[0].replies.isEmpty)
+        #expect(vm.errorMessage != nil)
+        running.cancel(); await running.value
     }
 }
 
