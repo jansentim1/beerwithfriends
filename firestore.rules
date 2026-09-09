@@ -75,7 +75,12 @@ service cloud.firestore {
       allow read: if signedIn() && (resource.data.ownerUid == me()
         || isFriendOf(resource.data.ownerUid));
       allow create: if signedIn()
-        && request.resource.data.keys().hasOnly(['ownerUid','ownerName','createdAt','expiresAt','hasPhoto','photoPath','cheersCount'])
+        && request.resource.data.keys().hasOnly(['ownerUid','ownerName','createdAt','expiresAt','hasPhoto','photoPath','cheersCount','place'])
+        // Optional opt-in place name (bar or city), never coordinates.
+        && (!('place' in request.resource.data)
+          || (request.resource.data.place is string
+            && request.resource.data.place.size() >= 1
+            && request.resource.data.place.size() <= 60))
         && request.resource.data.ownerUid == me()
         && request.resource.data.ownerName is string
         && request.resource.data.ownerName.size() >= 1

@@ -22,6 +22,7 @@ Declare these as **collected, linked to the user, not used for tracking**:
 | Contact Info | Name (display name) | App functionality |
 | User Content | Photos, Other user content (beer logs) | App functionality |
 | Identifiers | User ID | App functionality |
+| Location | Coarse location (place name only, opt-in) | App functionality |
 | Contacts | none | |
 | Usage Data | none | |
 | Diagnostics | none (no crash SDK) | |
@@ -58,10 +59,10 @@ project before submission.
 
 ## Permissions strings (Info.plist)
 
-- `NSCameraUsageDescription` is set in `project.yml`.
+- `NSCameraUsageDescription` and `NSLocationWhenInUseUsageDescription` are set in `project.yml`.
 - Notifications: permission is requested only after onboarding finishes, with an in-app
   explanation on the username screen first.
-- No photo library, microphone, location or contacts access. Do not add any.
+- No photo library, microphone or contacts access. Location only when-in-use and only after the user opts in.
 
 ## Screenshots needed
 

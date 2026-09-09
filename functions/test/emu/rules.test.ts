@@ -97,6 +97,15 @@ describe("firestore rules: beers", () => {
     await assertFails(setDoc(doc(me, "beers/b3"), validBeer("someone-else")));
   });
 
+  it("beer create: optional place is a short string, never coordinates", async () => {
+    const me = fs("owner");
+    await assertSucceeds(setDoc(doc(me, "beers/bp1"), { ...validBeer("owner"), place: "Café De Zon" }));
+    await assertFails(setDoc(doc(me, "beers/bp2"), { ...validBeer("owner"), place: "x".repeat(61) }));
+    await assertFails(setDoc(doc(me, "beers/bp3"), { ...validBeer("owner"), place: "" }));
+    await assertFails(setDoc(doc(me, "beers/bp4"), { ...validBeer("owner"), place: { lat: 52.3, lng: 4.9 } }));
+    await assertFails(setDoc(doc(me, "beers/bp5"), { ...validBeer("owner"), lat: 52.3 }));
+  });
+
   it("beer create rejects immortal or malformed lifetimes", async () => {
     const me = fs("owner");
     // expiresAt beyond the 25h cap

@@ -17,10 +17,11 @@ scrolled past.
 | View and screenshot receipts | So the photo owner can see who viewed their photo and whether a screenshot was taken. Deleted with the beer. | Firestore under `beers/{beerId}` |
 | Friend list, friend requests, blocks | To decide whose beers you see and who can see yours. | Firestore |
 | Push notification token | To send "X is having a beer" and "Y cheersed you" notifications. Stored in a private subcollection only you and the server can read. Removed on sign-out. | Firestore `users/{uid}/private/push` |
+| Place name on a beer (optional) | Off by default. If you switch on "Share where I'm drinking", the name of the bar or the city is attached to a beer you log, so mates see where you are. Your exact location is used once on your phone to find that name and is never stored or sent. | Firestore `beers/{beerId}.place`, deleted with the beer |
 | Reports you file | Trust and safety review. Only the reporter's id, the reported user or beer, and the reason are stored. | Firestore `reports` |
 
-We do not collect your email, contacts, location, photo library, analytics, or advertising
-identifiers. The camera is the only photo source, and only when you tap the camera button.
+We do not collect your email, contacts, photo library, analytics, or advertising
+identifiers. Location is only used, on your phone, to name a place when you opt in. The camera is the only photo source, and only when you tap the camera button.
 
 ## What we do not do
 

@@ -31,6 +31,10 @@ describe("fanoutBeerCreated", () => {
     expect(sent[0].title).toContain("Tim is drinking a beer");
     expect(sent[0].body).toContain("📸");
   });
+  it("place goes into the title", async () => {
+    await fanoutBeerCreated(db, push, "b1", { ...beer, place: "Café De Zon" });
+    expect(sent[0].title).toBe("Tim is drinking a beer at Café De Zon 🍺");
+  });
   it("no photo → plain copy", async () => {
     await fanoutBeerCreated(db, push, "b1", { ...beer, hasPhoto: false });
     expect(sent[0].body).not.toContain("📸");

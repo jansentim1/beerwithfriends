@@ -20,12 +20,15 @@ public struct BeerLog: Codable, Equatable, Identifiable, Sendable {
     public var expiresAt: Date
     public var hasPhoto: Bool
     public var cheersCount: Int
+    /// Optional, opt-in: the bar or city the beer was logged at (never coordinates).
+    public var place: String?
     public init(id: String, ownerUid: String, ownerName: String, createdAt: Date,
-                expiresAt: Date, hasPhoto: Bool, cheersCount: Int = 0) {
+                expiresAt: Date, hasPhoto: Bool, cheersCount: Int = 0, place: String? = nil) {
         self.id = id; self.ownerUid = ownerUid; self.ownerName = ownerName
         self.createdAt = createdAt; self.expiresAt = expiresAt
-        self.hasPhoto = hasPhoto; self.cheersCount = cheersCount
+        self.hasPhoto = hasPhoto; self.cheersCount = cheersCount; self.place = place
     }
+    public static let placeMaxLength = 60
     public static func expiry(from createdAt: Date) -> Date { createdAt.addingTimeInterval(24 * 3600) }
 }
 

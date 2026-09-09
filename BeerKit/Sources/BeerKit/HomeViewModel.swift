@@ -13,6 +13,7 @@ public final class HomeViewModel: ObservableObject {
     @Published public var errorMessage: String?
 
     private let service: any BeerServicing
+    private let placeProvider: (any PlaceProviding)?
     private let now: () -> Date
     private let retryDelay: (Int) -> Duration
     private var observation: Task<Void, Never>?
@@ -25,10 +26,12 @@ public final class HomeViewModel: ObservableObject {
 
     public init(
         service: any BeerServicing,
+        placeProvider: (any PlaceProviding)? = nil,
         now: @escaping () -> Date = { Date() },
         retryDelay: @escaping (Int) -> Duration = { attempt in .seconds(min(2 << attempt, 30)) }
     ) {
         self.service = service
+        self.placeProvider = placeProvider
         self.now = now
         self.retryDelay = retryDelay
     }
@@ -116,9 +119,15 @@ public final class HomeViewModel: ObservableObject {
         }
         defer { if photoJPEG != nil { isUploadingPhoto = false } }
 
-        let beer = service.newBeerLog(hasPhoto: photoJPEG != nil)
+        var beer = service.newBeerLog(hasPhoto: photoJPEG != nil)
         pendingIds.insert(beer.id)
         upsert(beer)
+        // Opt-in place lookup runs AFTER the row is visible; beers are immutable
+        // server-side, so the place must be known before the write.
+        if let placeProvider, let place = await placeProvider.currentPlace() {
+            beer.place = String(place.prefix(BeerLog.placeMaxLength))
+            upsert(beer)
+        }
         do {
             try await service.logBeer(beer, photoJPEG: photoJPEG)
             pendingIds.remove(beer.id)

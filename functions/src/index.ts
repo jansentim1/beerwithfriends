@@ -80,7 +80,7 @@ export const onBeerCreated = onDocumentCreated("beers/{beerId}", async (event) =
   const beer = event.data?.data();
   if (!beer) return;
   await fanoutBeerCreated(getFirestore(), push, event.params.beerId,
-    beer as { ownerUid: string; ownerName: string; hasPhoto: boolean });
+    beer as { ownerUid: string; ownerName: string; hasPhoto: boolean; place?: string });
 });
 
 export const onCheersCreated = onDocumentCreated("beers/{beerId}/cheers/{uid}", async (event) => {

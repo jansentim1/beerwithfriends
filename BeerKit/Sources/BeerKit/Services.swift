@@ -48,3 +48,10 @@ public protocol FriendServicing: Sendable {
     func block(uid: String) async throws
     func report(beerId: String?, uid: String, reason: String) async throws
 }
+
+/// Opt-in location: resolves the current spot to a short human name ("Café De Zon",
+/// "Amsterdam"), or nil when disabled, denied, or not found in time. Must never
+/// take longer than a few seconds; the beer is logged either way.
+public protocol PlaceProviding: Sendable {
+    func currentPlace() async -> String?
+}

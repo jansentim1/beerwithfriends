@@ -271,6 +271,43 @@ func startAndWaitForSubscription(_ vm: HomeViewModel, _ svc: FakeBeerService) as
     }
 }
 
+final class FakePlaces: PlaceProviding, @unchecked Sendable {
+    var place: String?
+    var delayNs: UInt64 = 0
+    func currentPlace() async -> String? {
+        if delayNs > 0 { try? await Task.sleep(nanoseconds: delayNs) }
+        return place
+    }
+}
+
+@Suite struct PlaceTests {
+    @Test @MainActor func rowShowsBeforePlaceResolvesThenCarriesIt() async {
+        let svc = FakeBeerService()
+        let places = FakePlaces(); places.place = "Café De Zon"; places.delayNs = 100_000_000
+        let vm = HomeViewModel(service: svc, placeProvider: places, now: { Date(timeIntervalSince1970: 500) })
+        let logging = Task { await vm.logBeer(photoJPEG: nil) }
+        try? await Task.sleep(nanoseconds: 20_000_000)
+        #expect(vm.feed.first?.id == "new1")          // visible before the lookup finishes
+        #expect(vm.feed.first?.place == nil)
+        await logging.value
+        #expect(vm.feed.first?.place == "Café De Zon")
+        #expect(svc.logged.first?.0.place == "Café De Zon")   // persisted with the place
+    }
+    @Test @MainActor func noProviderOrNilPlaceLogsWithoutPlace() async {
+        let svc = FakeBeerService()
+        let vm = HomeViewModel(service: svc, placeProvider: FakePlaces(), now: { Date(timeIntervalSince1970: 500) })
+        await vm.logBeer(photoJPEG: nil)
+        #expect(svc.logged.first?.0.place == nil)
+    }
+    @Test @MainActor func placeIsTruncatedToLimit() async {
+        let svc = FakeBeerService()
+        let places = FakePlaces(); places.place = String(repeating: "x", count: 100)
+        let vm = HomeViewModel(service: svc, placeProvider: places, now: { Date(timeIntervalSince1970: 500) })
+        await vm.logBeer(photoJPEG: nil)
+        #expect(svc.logged.first?.0.place?.count == BeerLog.placeMaxLength)
+    }
+}
+
 @Suite struct TimeoutTests {
     @Test func returnsValueWhenFast() async {
         let v = await Timeout.run(seconds: 1) { 42 }
