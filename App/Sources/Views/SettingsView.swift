@@ -23,6 +23,9 @@ struct SettingsView: View {
     @State private var showDeleteConfirm = false
     @State private var showDeleteFinalConfirm = false
     @State private var errorMessage: String?
+    /// Opt-in place naming. The same key `LocationPlaceProvider` reads before it
+    /// ever touches Core Location, so this switch alone decides.
+    @AppStorage("sharePlace") private var sharePlace = false
 
     // Placeholder until Task 11/12 publish the real policy URL.
     private let privacyPolicyURL = URL(string: "https://example.com/beerwithme/privacy")!
@@ -36,6 +39,7 @@ struct SettingsView: View {
             List {
                 profileSection
                 blockedSection
+                privacySection
                 aboutSection
                 accountSection
                 versionFooterSection
@@ -134,6 +138,27 @@ struct SettingsView: View {
                 .accessibilityLabel(blocked.username.map { "Unblock @\($0)" } ?? "Unblock deleted user")
         }
         .padding(.vertical, 2)
+    }
+
+    /// One switch, plainly worded: what leaves the phone is a bar name or a city,
+    /// and only to your mates.
+    private var privacySection: some View {
+        Section {
+            Toggle("Share where I'm drinking", isOn: $sharePlace)
+                // The list tints words with `accentInk`; a switch is a fill.
+                .tint(Theme.accent)
+                .frame(minHeight: 44)
+                .accessibilityIdentifier("settings.sharePlace")
+                .onChange(of: sharePlace) { _, isOn in
+                    // Ask here, where the sentence below explains why — not at
+                    // tap time on the log button.
+                    if isOn { LocationPlaceProvider.shared.requestPermissionIfNeeded() }
+                }
+        } header: {
+            Text("Privacy")
+        } footer: {
+            Text("Only the name of the bar or the city goes with your beer, never your exact location. Mates only.")
+        }
     }
 
     private var aboutSection: some View {

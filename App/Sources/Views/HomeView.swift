@@ -48,7 +48,13 @@ struct HomeView: View {
         self.profile = profile
         self.friendService = friendService
         self.screenshotReporter = screenshotReporter
-        _viewModel = StateObject(wrappedValue: HomeViewModel(service: beerService))
+        // The place provider is wired here, not in the app shell: it is a phone
+        // capability (Core Location), not an injected service, and it no-ops
+        // unless the user turned "Share where I'm drinking" on in Settings.
+        _viewModel = StateObject(wrappedValue: HomeViewModel(
+            service: beerService,
+            placeProvider: LocationPlaceProvider.shared
+        ))
     }
 
     var body: some View {
@@ -247,10 +253,7 @@ struct HomeView: View {
                     Text(isMine ? "You" : beer.ownerName)
                         .font(.headline)
                         .lineLimit(isAccessibilitySize ? nil : 1)
-                    Text(beer.createdAt, style: .relative)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(isAccessibilitySize ? nil : 1)
+                    metadataLine(for: beer, isAccessibilitySize: isAccessibilitySize)
                 }
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -296,6 +299,32 @@ struct HomeView: View {
                 }
             }
         }
+    }
+
+    /// Relative time, with the opt-in place after it when the beer carries one:
+    /// "2 min · 📍 Café De Zon". One secondary line; the place is the part that
+    /// truncates, since the time is what every row promises.
+    @ViewBuilder
+    private func metadataLine(for beer: BeerLog, isAccessibilitySize: Bool) -> some View {
+        let time = Text(beer.createdAt, style: .relative)
+        let place: String? = beer.place.flatMap { $0.isEmpty ? nil : $0 }
+        Group {
+            if let place {
+                (time + Text(" · 📍 \(place)"))
+                    .truncationMode(.tail)
+                    // Concatenated Text is a single accessibility element, so the
+                    // label has to carry both halves — the pin glyph would
+                    // otherwise be read out as "pin".
+                    .accessibilityLabel(
+                        "\(beer.createdAt.formatted(.relative(presentation: .named))), at \(place)"
+                    )
+            } else {
+                time
+            }
+        }
+        .font(.subheadline)
+        .foregroundStyle(.secondary)
+        .lineLimit(isAccessibilitySize ? nil : 1)
     }
 
     @ViewBuilder

@@ -45,6 +45,9 @@ targets:
       path: App/Info.plist
       properties:
         NSCameraUsageDescription: "Take a live photo of your beer to share with friends."
+        # Opt-in only (Settings → Privacy → "Share where I'm drinking"); resolved to
+        # a bar or city name and never stored as coordinates.
+        NSLocationWhenInUseUsageDescription: "Only used to name the bar or city on a beer you log, when you turn that on."
         # Name shown in system dialogs ("PubDates would like to access the camera").
         CFBundleName: PubDates
         # Without a launch screen iOS letterboxes the app in a compatibility window.

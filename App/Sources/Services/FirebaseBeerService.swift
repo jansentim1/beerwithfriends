@@ -45,7 +45,7 @@ final class FirebaseBeerService: BeerServicing, @unchecked Sendable {
             _ = try await Storage.storage().reference(withPath: photoPath)
                 .putDataAsync(photoJPEG, metadata: metadata)
         }
-        try await db.document("beers/\(beer.id)").setData([
+        var data: [String: Any] = [
             "ownerUid": uid,
             "ownerName": String(ownerName.prefix(60)),
             "createdAt": FieldValue.serverTimestamp(),
@@ -53,7 +53,11 @@ final class FirebaseBeerService: BeerServicing, @unchecked Sendable {
             "hasPhoto": beer.hasPhoto,
             "photoPath": photoPath,
             "cheersCount": 0,
-        ])
+        ]
+        if let place = beer.place, !place.isEmpty {
+            data["place"] = String(place.prefix(BeerLog.placeMaxLength))
+        }
+        try await db.document("beers/\(beer.id)").setData(data)
         // Off the tap path and best effort: a failed counter bump must not fail
         // (or slow down) the logged beer.
         let db = self.db
@@ -128,7 +132,8 @@ final class FirebaseBeerService: BeerServicing, @unchecked Sendable {
             createdAt: createdAt.dateValue(),
             expiresAt: expiresAt.dateValue(),
             hasPhoto: data["hasPhoto"] as? Bool ?? false,
-            cheersCount: data["cheersCount"] as? Int ?? 0
+            cheersCount: data["cheersCount"] as? Int ?? 0,
+            place: data["place"] as? String
         )
     }
 
