@@ -49,6 +49,15 @@ jobs:
           done
           tail -5 emulators.log
 
+      - name: Seed the emulators
+        env:
+          FIRESTORE_EMULATOR_HOST: 127.0.0.1:8085
+          FIREBASE_AUTH_EMULATOR_HOST: 127.0.0.1:9099
+          FIREBASE_STORAGE_EMULATOR_HOST: 127.0.0.1:9199
+        run: |
+          npm ci --prefix functions --silent
+          node tools/rig/seed.mjs
+
       - name: Pick a simulator
         id: sim
         run: |
@@ -68,6 +77,8 @@ jobs:
           xcrun simctl bootstatus "$UDID" -b
           # No permission alerts in the walkthrough.
           xcrun simctl privacy "$UDID" grant camera com.timjansen.BeerWithFriends || true
+          xcrun simctl privacy "$UDID" grant location com.timjansen.BeerWithFriends || true
+          xcrun simctl location "$UDID" set 52.37,4.90 || true
 
       - name: Build for testing
         run: |

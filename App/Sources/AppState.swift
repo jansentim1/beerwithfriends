@@ -63,7 +63,14 @@ final class AppState: ObservableObject {
     func signInForUITests() async {
         guard EmulatorConfig.isEnabled else { return }
         do {
-            _ = try await Auth.auth().signInAnonymously()
+            // `-UITestAccount tim` → the seeded tim@test.local (see tools/rig/seed.mjs);
+            // otherwise a fresh anonymous user (onboarding screenshots).
+            let args = ProcessInfo.processInfo.arguments
+            if let i = args.firstIndex(of: "-UITestAccount"), i + 1 < args.count {
+                _ = try await Auth.auth().signIn(withEmail: "\(args[i + 1])@test.local", password: "pubdates1")
+            } else {
+                _ = try await Auth.auth().signInAnonymously()
+            }
         } catch {
             errorMessage = "Emulator sign-in failed: \(error.localizedDescription)"
         }

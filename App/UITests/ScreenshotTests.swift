@@ -12,7 +12,41 @@ final class ScreenshotTests: XCTestCase {
         continueAfterFailure = false
         app = XCUIApplication()
         app.launchArguments += ["-UseEmulators", "-UITestLogWithoutPhoto"]
+        if name.contains("Populated") { app.launchArguments += ["-UITestAccount", "tim"] }
         app.launch()
+    }
+
+    /// Seeded account (tools/rig/seed.mjs): a mate with a photo drink and a
+    /// place, groups with counts. Covers the screens the fresh-account
+    /// walkthrough cannot: populated feed, map pins, groups, detail, username sheet.
+    func testPopulated() throws {
+        let testSignIn = app.buttons["signin.test"]
+        XCTAssertTrue(testSignIn.waitForExistence(timeout: 10))
+        testSignIn.tap()
+        let log = app.buttons["home.log"]
+        XCTAssertTrue(log.waitForExistence(timeout: 20), "home did not appear for the seeded account")
+        XCTAssertTrue(app.staticTexts["joost"].waitForExistence(timeout: 15), "mate's drinks missing")
+        snap("08-home-populated")
+
+        app.tabBars.buttons["Map"].tap()
+        XCTAssertTrue(app.navigationBars.element.waitForExistence(timeout: 5))
+        sleep(3) // map tiles + pin framing
+        snap("08b-map-pins")
+
+        app.tabBars.buttons["Groups"].tap()
+        XCTAssertTrue(app.staticTexts["De Kroeg"].waitForExistence(timeout: 10), "groups missing")
+        snap("08c-groups-populated")
+        app.staticTexts["De Kroeg"].firstMatch.tap()
+        sleep(2)
+        snap("08d-group-detail")
+        if app.buttons["Close"].exists { app.buttons["Close"].tap() } else { app.swipeDown() }
+
+        app.tabBars.buttons["Settings"].tap()
+        let username = app.buttons["settings.changeUsername"]
+        XCTAssertTrue(username.waitForExistence(timeout: 5))
+        username.tap()
+        sleep(1)
+        snap("08e-username-sheet")
     }
 
     override func tearDown() {
