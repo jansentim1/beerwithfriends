@@ -127,12 +127,13 @@ private struct MainTabView: View {
     @EnvironmentObject private var appState: AppState
     let profile: UserProfile
 
-    private enum Tab: Hashable { case beers, friends, map, settings }
+    private enum Tab: Hashable { case beers, friends, map, groups, settings }
     @State private var selectedTab: Tab = .beers
 
     var body: some View {
         // Non-nil exactly while phase == .ready (see AppState).
-        if let beerService = appState.beerService, let friendService = appState.friendService {
+        if let beerService = appState.beerService, let friendService = appState.friendService,
+           let groupService = appState.groupService {
             TabView(selection: $selectedTab) {
                 HomeView(
                     profile: profile,
@@ -154,6 +155,10 @@ private struct MainTabView: View {
                     .tabItem { Label("Map", systemImage: "map.fill") }
                     .tag(Tab.map)
 
+                GroupsView(profile: profile, groupService: groupService)
+                    .tabItem { Label("Groups", systemImage: "trophy.fill") }
+                    .tag(Tab.groups)
+
                 SettingsView(profile: profile)
                     .tabItem { Label("Settings", systemImage: "gearshape.fill") }
                     .tag(Tab.settings)
@@ -163,8 +168,22 @@ private struct MainTabView: View {
             .onReceive(NotificationCenter.default.publisher(for: .pubDatesSwitchToFriends)) { _ in
                 selectedTab = .friends
             }
+            // A `/join/<code>` link: the code is already in AppState, this brings
+            // the Groups tab forward so GroupsView can consume it.
+            .onReceive(NotificationCenter.default.publisher(for: .pubDatesSwitchToGroups)) { _ in
+                selectedTab = .groups
+            }
         } else {
             ProgressView() // unreachable in practice; keeps the wiring total
         }
     }
+}
+
+extension Notification.Name {
+    /// Posted by the app shell when a `https://beerwithme-prod.web.app/join/<code>`
+    /// link opens the app; MainTabView selects the Groups tab and GroupsView
+    /// drains `AppState.pendingGroupCode`.
+    /// (`.pubDatesSwitchToFriends` lives in HomeView.swift, next to the button
+    /// that posts it.)
+    static let pubDatesSwitchToGroups = Notification.Name("pubDatesSwitchToGroups")
 }

@@ -62,6 +62,10 @@ final class ScreenshotTests: XCTestCase {
         XCTAssertTrue(app.navigationBars.element.waitForExistence(timeout: 5))
         snap("05b-map")
 
+        app.tabBars.buttons["Groups"].tap()
+        XCTAssertTrue(app.navigationBars.element.waitForExistence(timeout: 5))
+        snap("05c-groups")
+
         app.tabBars.buttons["Settings"].tap()
         XCTAssertTrue(app.navigationBars.element.waitForExistence(timeout: 5))
         snap("06-settings")
