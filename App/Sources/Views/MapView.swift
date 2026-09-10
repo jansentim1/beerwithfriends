@@ -50,7 +50,7 @@ struct MapView: View {
         // scene-phase restart does.
         .task(id: isOnScreen) {
             guard isOnScreen else { return }
-            await syncLocationAuthorization()
+            syncLocationAuthorization()
             await observeFeed()
         }
         .onAppear { isOnScreen = true }
