@@ -207,6 +207,7 @@ struct HomeView: View {
                 )
                 cameraCell
                     .padding(.bottom, 4)
+                    .layoutPriority(1)   // the row scrolls; the camera keeps its width
             }
 
             Text("Tap a glass to log it")

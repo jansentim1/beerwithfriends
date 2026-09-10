@@ -123,7 +123,6 @@ struct DrinkPickerView<Accessory: View>: View {
             .padding(.trailing, 12)
         }
         .scrollTargetBehavior(.viewAligned)
-        .scrollClipDisabled()
         .scrollIndicators(.hidden)
         .opacity(isBusy ? 0.5 : 1)
         .animation(Theme.quick, value: isBusy)
