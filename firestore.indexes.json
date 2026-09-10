@@ -4,16 +4,42 @@
       "collectionGroup": "beers",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "hasPhoto", "order": "ASCENDING" },
-        { "fieldPath": "allViewedAt", "order": "ASCENDING" }
+        {
+          "fieldPath": "hasPhoto",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "allViewedAt",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "beers",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "ownerUid", "order": "ASCENDING" },
-        { "fieldPath": "expiresAt", "order": "ASCENDING" }
+        {
+          "fieldPath": "ownerUid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "expiresAt",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "beers",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "ownerUid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "ASCENDING"
+        }
       ]
     }
   ],
@@ -21,17 +47,32 @@
     {
       "collectionGroup": "incoming",
       "fieldPath": "fromUid",
-      "indexes": [{ "queryScope": "COLLECTION_GROUP", "order": "ASCENDING" }]
+      "indexes": [
+        {
+          "queryScope": "COLLECTION_GROUP",
+          "order": "ASCENDING"
+        }
+      ]
     },
     {
       "collectionGroup": "cheers",
       "fieldPath": "uid",
-      "indexes": [{ "queryScope": "COLLECTION_GROUP", "order": "ASCENDING" }]
+      "indexes": [
+        {
+          "queryScope": "COLLECTION_GROUP",
+          "order": "ASCENDING"
+        }
+      ]
     },
     {
       "collectionGroup": "views",
       "fieldPath": "uid",
-      "indexes": [{ "queryScope": "COLLECTION_GROUP", "order": "ASCENDING" }]
+      "indexes": [
+        {
+          "queryScope": "COLLECTION_GROUP",
+          "order": "ASCENDING"
+        }
+      ]
     }
   ]
 }

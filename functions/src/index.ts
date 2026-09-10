@@ -81,8 +81,13 @@ export const onBeerCreated = onDocumentCreated("beers/{beerId}", async (event) =
   if (!beer) return;
   const createdAt = (beer.createdAt as { toDate?: () => Date } | undefined)?.toDate?.() ?? new Date();
   // Anti-spam: one drink per person per minute; extras are deleted, no pushes.
-  const ok = await enforceDrinkCooldown(getFirestore(), event.params.beerId, beer.ownerUid, createdAt);
-  if (!ok) { console.warn(`cooldown: dropped beers/${event.params.beerId} from ${beer.ownerUid}`); return; }
+  // Fail OPEN: a broken check must never silence pushes for everyone.
+  try {
+    const ok = await enforceDrinkCooldown(getFirestore(), event.params.beerId, beer.ownerUid, createdAt);
+    if (!ok) { console.warn(`cooldown: dropped beers/${event.params.beerId} from ${beer.ownerUid}`); return; }
+  } catch (e) {
+    console.error("cooldown check failed, continuing with fanout", e);
+  }
   await fanoutBeerCreated(getFirestore(), push, event.params.beerId,
     beer as { ownerUid: string; ownerName: string; hasPhoto: boolean; place?: string });
 });
