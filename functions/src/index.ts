@@ -11,6 +11,7 @@ import { getPhotoOnceCore, PhotoError, PhotoErrorCode } from "./photo";
 import { fanoutBeerCreated, notifyCheers, notifyReply, Pusher, ReplyKind } from "./pushes";
 import { sendApns, deadTokens } from "./apns";
 import { loadApnsKey } from "./apnsKey";
+import { createGroupCore, joinGroupCore, leaveGroupCore, countDrinkForGroups, GroupError } from "./groups";
 import { mirrorFriendship, severOnBlock, cleanupExpiredCore, deleteAccountCore, changeUsernameCore, enforceDrinkCooldown, UsernameError, PhotoDeleter } from "./lifecycle";
 
 // Colocated with Firestore + Storage (europe-west4); see .firebaserc / tools/deploy.sh.
@@ -88,6 +89,8 @@ export const onBeerCreated = onDocumentCreated("beers/{beerId}", async (event) =
   } catch (e) {
     console.error("cooldown check failed, continuing with fanout", e);
   }
+  // Leaderboard: count the drink for every group the owner is in (never blocks pushes).
+  countDrinkForGroups(getFirestore(), beer.ownerUid, createdAt).catch((e) => console.error("group count failed", e));
   await fanoutBeerCreated(getFirestore(), push, event.params.beerId,
     beer as { ownerUid: string; ownerName: string; hasPhoto: boolean; place?: string });
 });
@@ -115,6 +118,36 @@ export const changeUsername = onCall(async (req) => {
     }
     throw e;
   }
+});
+
+const groupErrorStatus: Record<string, FunctionsErrorCode> = {
+  INVALID_NAME: "invalid-argument", NOT_FOUND: "not-found", FULL: "resource-exhausted",
+  ALREADY_MEMBER: "already-exists", NOT_MEMBER: "failed-precondition", NO_PROFILE: "failed-precondition",
+};
+function groupCall<T>(fn: () => Promise<T>): Promise<T> {
+  return fn().catch((e) => {
+    if (e instanceof GroupError) throw new HttpsError(groupErrorStatus[e.code], e.code, { code: e.code });
+    throw e;
+  });
+}
+
+export const createGroup = onCall(async (req) => {
+  if (!req.auth) throw new HttpsError("unauthenticated", "Sign in required");
+  if (typeof req.data?.name !== "string") throw new HttpsError("invalid-argument", "name required");
+  return groupCall(() => createGroupCore(getFirestore(), req.auth!.uid, req.data.name));
+});
+
+export const joinGroup = onCall(async (req) => {
+  if (!req.auth) throw new HttpsError("unauthenticated", "Sign in required");
+  if (typeof req.data?.code !== "string") throw new HttpsError("invalid-argument", "code required");
+  return groupCall(() => joinGroupCore(getFirestore(), req.auth!.uid, req.data.code));
+});
+
+export const leaveGroup = onCall(async (req) => {
+  if (!req.auth) throw new HttpsError("unauthenticated", "Sign in required");
+  if (typeof req.data?.groupId !== "string") throw new HttpsError("invalid-argument", "groupId required");
+  await groupCall(() => leaveGroupCore(getFirestore(), req.auth!.uid, req.data.groupId));
+  return { ok: true };
 });
 
 export const onReplyCreated = onDocumentCreated("beers/{beerId}/replies/{uid}", async (event) => {

@@ -3,9 +3,18 @@
     "apps": [],
     "details": [
       {
-        "appIDs": ["G4S9QDYP4H.com.timjansen.BeerWithFriends"],
+        "appIDs": [
+          "G4S9QDYP4H.com.timjansen.BeerWithFriends"
+        ],
         "components": [
-          { "/": "/add/*", "comment": "Add a mate by username" }
+          {
+            "/": "/add/*",
+            "comment": "Add a mate by username"
+          },
+          {
+            "/": "/join/*",
+            "comment": "Join a group by code"
+          }
         ]
       }
     ]

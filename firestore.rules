@@ -33,6 +33,12 @@ service cloud.firestore {
       match /private/{doc} {
         allow read, write: if signedIn() && me() == uid;
       }
+
+      // My groups (server-written mirror of groups/*/members/{me}).
+      match /groups/{groupId} {
+        allow read: if signedIn() && me() == uid;
+        allow write: if false;
+      }
     }
 
     match /usernames/{name} {
@@ -67,6 +73,18 @@ service cloud.firestore {
       allow create: if signedIn() && me() == uid
         && exists(/databases/$(db)/documents/friendRequests/$(uid)/incoming/$(friendUid));
       allow delete: if signedIn() && (me() == uid || me() == friendUid);
+    }
+
+    // Groups: readable by anyone signed in (the leaderboard is app-wide); all
+    // writes go through the createGroup/joinGroup/leaveGroup callables and the
+    // onBeerCreated counter, so clients never write here.
+    match /groups/{groupId} {
+      allow read: if signedIn();
+      allow write: if false;
+      match /members/{uid} {
+        allow read: if signedIn();
+        allow write: if false;
+      }
     }
 
     match /beers/{beerId} {

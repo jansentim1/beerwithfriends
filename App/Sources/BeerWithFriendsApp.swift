@@ -88,7 +88,10 @@ struct BeerWithFriendsApp: App {
                 // pubdates://add/<username> — hand the name to FriendsView and
                 // bring that tab forward.
                 .onOpenURL { url in
-                    if let name = MateLink.username(fromDeepLink: url) {
+                    if let code = MateLink.groupCode(fromDeepLink: url) {
+                        appState.pendingGroupCode = code
+                        NotificationCenter.default.post(name: .pubDatesSwitchToGroups, object: nil)
+                    } else if let name = MateLink.username(fromDeepLink: url) {
                         // Sticky: FriendsView consumes it on appear, so a cold launch
                         // (tab not built yet) or a launch into onboarding still works.
                         appState.pendingMateUsername = name

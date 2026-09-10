@@ -33,6 +33,10 @@ final class AppState: ObservableObject {
     /// Non-nil exactly while `phase == .ready`.
     private(set) var beerService: (any BeerServicing)?
     private(set) var friendService: (any FriendServicing)?
+    private(set) var groupService: (any GroupServicing)?
+    /// Group code from a `https://beerwithme-prod.web.app/join/<code>` link, waiting
+    /// for the Groups screen to consume it.
+    @Published var pendingGroupCode: String?
 
     private let pushRegistrar = PushRegistrar.shared
     private var authListener: AuthStateDidChangeListenerHandle?
@@ -180,6 +184,7 @@ final class AppState: ObservableObject {
         guard let uid else {
             beerService = nil
             friendService = nil
+            groupService = nil
             // Nothing may write as the previous user: queued actions stay queued
             // until someone signs in again.
             ReactionInbox.shared.setHandler(nil)
@@ -216,6 +221,7 @@ final class AppState: ObservableObject {
         let service = FirebaseBeerService(uid: profile.id, ownerName: profile.displayName)
         beerService = service
         friendService = FirebaseFriendService(me: profile)
+        groupService = FirebaseGroupService(uid: profile.id)
         // Quick replies tapped on a notification (possibly before this user was
         // even signed in) are written now, best effort: a failed one is not worth
         // an alert on a screen the user may never have opened.

@@ -24,6 +24,21 @@ enum MateLink {
         "https://\(webHost)/\(host)/\(username)"
     }
 
+    /// The group code in a `/join/<code>` link (6 chars, A-Z 2-9), or nil.
+    static func groupCode(fromDeepLink url: URL) -> String? {
+        let components = url.pathComponents.filter { $0 != "/" }
+        let isWeb = url.scheme?.lowercased() == "https" && url.host?.lowercased() == webHost
+        let isScheme = url.scheme?.lowercased() == scheme && url.host?.lowercased() == "join"
+        let code: String?
+        if isWeb, components.count >= 2, components[0] == "join" { code = components[1] }
+        else if isScheme { code = components.first }
+        else { code = nil }
+        guard let code = code?.uppercased(), code.count == 6,
+              code.allSatisfy({ "ABCDEFGHJKLMNPQRSTUVWXYZ23456789".contains($0) }) else { return nil }
+        return code
+    }
+    static func joinLink(for code: String) -> String { "https://\(webHost)/join/\(code)" }
+
     /// The username in a mate link, normalized — or nil for anything else.
     /// Deliberately strict: a scanned code is untrusted input.
     static func username(fromDeepLink url: URL) -> String? {
