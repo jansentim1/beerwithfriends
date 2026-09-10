@@ -24,13 +24,24 @@ public struct BeerLog: Codable, Equatable, Identifiable, Sendable {
     public var place: String?
     /// Quick replies by uid, maintained server-side from `beers/{id}/replies/{uid}`.
     public var replies: [String: ReplyKind]
+    /// What is in the glass. Old docs without the field decode as `.pils`.
+    public var drink: DrinkKind
+    /// The bar's or city's coordinate (never the device fix); only with `place`.
+    public var placeCoordinate: Coordinate?
     public init(id: String, ownerUid: String, ownerName: String, createdAt: Date,
                 expiresAt: Date, hasPhoto: Bool, cheersCount: Int = 0, place: String? = nil,
-                replies: [String: ReplyKind] = [:]) {
+                replies: [String: ReplyKind] = [:], drink: DrinkKind = .pils,
+                placeCoordinate: Coordinate? = nil) {
         self.id = id; self.ownerUid = ownerUid; self.ownerName = ownerName
         self.createdAt = createdAt; self.expiresAt = expiresAt
         self.hasPhoto = hasPhoto; self.cheersCount = cheersCount; self.place = place
-        self.replies = replies
+        self.replies = replies; self.drink = drink; self.placeCoordinate = placeCoordinate
+    }
+    /// 1.0 when just poured, 0.0 at expiry: the glass drains over the 24 hours.
+    public func fillLevel(now: Date) -> Double {
+        let total = expiresAt.timeIntervalSince(createdAt)
+        guard total > 0 else { return 0 }
+        return min(1, max(0, expiresAt.timeIntervalSince(now) / total))
     }
     public func replyCount(_ kind: ReplyKind) -> Int { replies.values.filter { $0 == kind }.count }
     public static let placeMaxLength = 60
@@ -64,6 +75,56 @@ public enum ReplyKind: String, Codable, CaseIterable, Sendable {
         switch self {
         case .onMyWay: return "🏃"
         case .jealous: return "😩"
+        }
+    }
+}
+
+/// Latitude/longitude rounded to ~100 m; a place's coordinate, never a person's.
+public struct Coordinate: Codable, Equatable, Sendable {
+    public var latitude: Double
+    public var longitude: Double
+    public init(latitude: Double, longitude: Double) {
+        self.latitude = (latitude * 1000).rounded() / 1000
+        self.longitude = (longitude * 1000).rounded() / 1000
+    }
+}
+
+/// What is in the glass. Raw values are the wire format (rules-pinned).
+public enum DrinkKind: String, Codable, CaseIterable, Sendable {
+    case pils, special, wine, bubbles, cocktail, whisky, soft
+
+    public var label: String {
+        switch self {
+        case .pils: return "Pils"
+        case .special: return "Special beer"
+        case .wine: return "Wine"
+        case .bubbles: return "Bubbles"
+        case .cocktail: return "Cocktail"
+        case .whisky: return "Whisky"
+        case .soft: return "Soft drink"
+        }
+    }
+    public var emoji: String {
+        switch self {
+        case .pils: return "🍺"
+        case .special: return "🍻"
+        case .wine: return "🍷"
+        case .bubbles: return "🥂"
+        case .cocktail: return "🍸"
+        case .whisky: return "🥃"
+        case .soft: return "🥤"
+        }
+    }
+    /// "Tim is having a pils 🍺" / "Tim is having a glass of wine 🍷"
+    public var pushPhrase: String {
+        switch self {
+        case .pils: return "a pils"
+        case .special: return "a special beer"
+        case .wine: return "a glass of wine"
+        case .bubbles: return "bubbles"
+        case .cocktail: return "a cocktail"
+        case .whisky: return "a whisky"
+        case .soft: return "a soft drink"
         }
     }
 }

@@ -75,12 +75,18 @@ service cloud.firestore {
       allow read: if signedIn() && (resource.data.ownerUid == me()
         || isFriendOf(resource.data.ownerUid));
       allow create: if signedIn()
-        && request.resource.data.keys().hasOnly(['ownerUid','ownerName','createdAt','expiresAt','hasPhoto','photoPath','cheersCount','place'])
-        // Optional opt-in place name (bar or city), never coordinates.
+        && request.resource.data.keys().hasOnly(['ownerUid','ownerName','createdAt','expiresAt','hasPhoto','photoPath','cheersCount','place','placeCoordinate','drink'])
+        // Optional opt-in place name (bar or city).
         && (!('place' in request.resource.data)
           || (request.resource.data.place is string
             && request.resource.data.place.size() >= 1
             && request.resource.data.place.size() <= 60))
+        // Optional coordinate of that place (the bar's, never the person's); only with a place.
+        && (!('placeCoordinate' in request.resource.data)
+          || ('place' in request.resource.data && request.resource.data.placeCoordinate is latlng))
+        // What is in the glass; missing means pils.
+        && (!('drink' in request.resource.data)
+          || request.resource.data.drink in ['pils','special','wine','bubbles','cocktail','whisky','soft'])
         && request.resource.data.ownerUid == me()
         && request.resource.data.ownerName is string
         && request.resource.data.ownerName.size() >= 1

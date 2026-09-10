@@ -2,7 +2,7 @@ import Foundation
 
 public enum PhotoFetchError: Error, Equatable { case alreadyViewed, expired, notFriends, notFound }
 
-public enum UsernameClaimError: Error, Equatable { case taken }
+public enum UsernameClaimError: Error, Equatable { case taken, tooSoon }
 
 /// Server rejected the cheers because it already exists (rules: cheers docs are
 /// create-only). The UI keeps the beer marked as cheersed.
@@ -15,7 +15,7 @@ public enum AccountDeletionError: Error, Equatable { case retryDelete }
 public protocol BeerServicing: Sendable {
     /// Instant, local: a fresh id + timestamps for an optimistic feed row. Nothing is
     /// written until `logBeer(_:photoJPEG:)`.
-    func newBeerLog(hasPhoto: Bool) -> BeerLog
+    func newBeerLog(hasPhoto: Bool, drink: DrinkKind) -> BeerLog
     /// Persists `beer` (uploading `photoJPEG` first when present). Returns once the
     /// server accepted the write; the caller has already shown the row.
     func logBeer(_ beer: BeerLog, photoJPEG: Data?) async throws
@@ -35,6 +35,9 @@ public protocol AuthServicing: Sendable {
     var currentUid: String? { get }
     func signInWithApple(idToken: String, nonce: String) async throws -> String  // returns uid
     func claimUsername(_ username: String, displayName: String) async throws -> UserProfile
+    /// Renames an existing account (server callable; once per day). Throws
+    /// `UsernameClaimError.taken` when the name is in use, `.tooSoon` when rate-limited.
+    func changeUsername(to username: String) async throws -> UserProfile
     func deleteAccount() async throws
     func signOut() throws
 }
@@ -54,6 +57,13 @@ public protocol FriendServicing: Sendable {
 /// Opt-in location: resolves the current spot to a short human name ("Café De Zon",
 /// "Amsterdam"), or nil when disabled, denied, or not found in time. Must never
 /// take longer than a few seconds; the beer is logged either way.
+public struct PlaceResult: Equatable, Sendable {
+    public var name: String
+    public var coordinate: Coordinate?
+    public init(name: String, coordinate: Coordinate? = nil) { self.name = name; self.coordinate = coordinate }
+}
+
 public protocol PlaceProviding: Sendable {
-    func currentPlace() async -> String?
+    /// The named place (bar or city) and its coordinate, or nil.
+    func currentPlace() async -> PlaceResult?
 }

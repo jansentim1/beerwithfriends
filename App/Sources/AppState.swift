@@ -93,6 +93,27 @@ final class AppState: ObservableObject {
         }
     }
 
+    /// Settings → Change username. On success the whole session re-keys to the
+    /// new profile (services are recreated, views get a fresh id).
+    func changeUsername(_ rawUsername: String) async -> Bool {
+        guard let username = Username.normalize(rawUsername) else {
+            errorMessage = "Usernames are 3–15 characters: a–z, 0–9, _ — and start with a letter."
+            return false
+        }
+        do {
+            let profile = try await authService.changeUsername(to: username)
+            becomeReady(profile)
+            return true
+        } catch UsernameClaimError.taken {
+            errorMessage = "@\(username) is already taken — pick another."
+        } catch UsernameClaimError.tooSoon {
+            errorMessage = "You can change your username once a day."
+        } catch {
+            errorMessage = "Couldn't change your username — try again."
+        }
+        return false
+    }
+
     /// Live availability check for the onboarding username picker (Task 10).
     /// `friendService` doesn't exist yet while `phase == .needsUsername`, so
     /// this reads the reservation doc directly (rules: any signed-in get).

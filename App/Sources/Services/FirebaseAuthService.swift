@@ -54,6 +54,33 @@ final class FirebaseAuthService: AuthServicing, @unchecked Sendable {
                            beerCount: 0, createdAt: Date())
     }
 
+    /// `changeUsername` callable: server moves the reservation atomically.
+    func changeUsername(to username: String) async throws -> UserProfile {
+        guard let uid = Auth.auth().currentUser?.uid else { throw ServiceError.notSignedIn }
+        do {
+            let result = try await EmulatorConfig.functions(region: "europe-west4")
+                .httpsCallable("changeUsername").call(["username": username])
+            let name = (result.data as? [String: Any])?["username"] as? String ?? username
+            let snap = try await Firestore.firestore().document("users/\(uid)").getDocument()
+            return UserProfile(
+                id: uid,
+                username: name,
+                displayName: snap.get("displayName") as? String ?? name,
+                beerCount: snap.get("beerCount") as? Int ?? 0,
+                createdAt: (snap.get("createdAt") as? Timestamp)?.dateValue() ?? Date()
+            )
+        } catch {
+            let nsError = error as NSError
+            if nsError.domain == FunctionsErrorDomain,
+               let details = nsError.userInfo[FunctionsErrorDetailsKey] as? [String: Any],
+               let code = details["code"] as? String {
+                if code == "TAKEN" { throw UsernameClaimError.taken }
+                if code == "TOO_SOON" { throw UsernameClaimError.tooSoon }
+            }
+            throw error
+        }
+    }
+
     /// The `deleteAccount` callable (Task 7) erases Firestore data + photos,
     /// then deletes the auth user (idempotent retry server-side).
     func deleteAccount() async throws {

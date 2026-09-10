@@ -28,12 +28,15 @@ describe("fanoutBeerCreated", () => {
     await fanoutBeerCreated(db, push, "b1", beer);
     expect(sent).toHaveLength(1);
     expect(sent[0].tokens).toEqual(["tok-friend"]);
-    expect(sent[0].title).toContain("Tim is drinking a beer");
+    expect(sent[0].title).toBe("Tim is having a pils 🍺");
     expect(sent[0].body).toContain("📸");
   });
   it("place goes into the title", async () => {
     await fanoutBeerCreated(db, push, "b1", { ...beer, place: "Café De Zon" });
-    expect(sent[0].title).toBe("Tim is drinking a beer at Café De Zon 🍺");
+    expect(sent[0].title).toBe("Tim is having a pils 🍺 at Café De Zon");
+    sent = [];
+    await fanoutBeerCreated(db, push, "b2", { ...beer, drink: "wine" });
+    expect(sent[0].title).toBe("Tim is having a glass of wine 🍷");
   });
   it("no photo → plain copy", async () => {
     await fanoutBeerCreated(db, push, "b1", { ...beer, hasPhoto: false });

@@ -98,3 +98,31 @@ export async function deleteAccountCore(db: Firestore, deletePhoto: PhotoDeleter
   // with the FCM token) goes too.
   await db.recursiveDelete(db.doc(`users/${uid}`));
 }
+
+export class UsernameError extends Error {
+  constructor(public code: "INVALID" | "TAKEN" | "TOO_SOON" | "NO_PROFILE") { super(code); }
+}
+
+const USERNAME_RE = /^[a-z][a-z0-9_]{2,14}$/;
+export const USERNAME_CHANGE_COOLDOWN_MS = 24 * 3600_000;
+
+/** Atomically moves a user's reservation to a new (normalized) username. */
+export async function changeUsernameCore(db: Firestore, uid: string, raw: string, now = new Date()) {
+  const username = raw.trim().toLowerCase();
+  if (!USERNAME_RE.test(username)) throw new UsernameError("INVALID");
+  await db.runTransaction(async (tx) => {
+    const userRef = db.doc(`users/${uid}`);
+    const user = await tx.get(userRef);
+    if (!user.exists) throw new UsernameError("NO_PROFILE");
+    const current = user.get("usernameLower") as string;
+    if (current === username) return;
+    const changedAt = user.get("usernameChangedAt")?.toDate?.() as Date | undefined;
+    if (changedAt && now.getTime() - changedAt.getTime() < USERNAME_CHANGE_COOLDOWN_MS) throw new UsernameError("TOO_SOON");
+    const target = await tx.get(db.doc(`usernames/${username}`));
+    if (target.exists) throw new UsernameError("TAKEN");
+    tx.delete(db.doc(`usernames/${current}`));
+    tx.set(db.doc(`usernames/${username}`), { uid });
+    tx.update(userRef, { usernameLower: username, usernameChangedAt: Timestamp.fromDate(now) });
+  });
+  return username;
+}

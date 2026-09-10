@@ -20,11 +20,11 @@ final class FakeBeerService: BeerServicing, @unchecked Sendable {
     var feedContinuation: AsyncThrowingStream<[BeerLog], Error>.Continuation?
     var nextId = 0
 
-    func newBeerLog(hasPhoto: Bool) -> BeerLog {
+    func newBeerLog(hasPhoto: Bool, drink: DrinkKind) -> BeerLog {
         nextId += 1
         let now = Date(timeIntervalSince1970: 500 + Double(nextId))
         return BeerLog(id: "new\(nextId)", ownerUid: "me", ownerName: "Me", createdAt: now,
-                       expiresAt: BeerLog.expiry(from: now), hasPhoto: hasPhoto)
+                       expiresAt: BeerLog.expiry(from: now), hasPhoto: hasPhoto, drink: drink)
     }
     func logBeer(_ beer: BeerLog, photoJPEG: Data?) async throws {
         logged.append((beer, photoJPEG))
@@ -284,10 +284,11 @@ func waitForFeed(_ vm: HomeViewModel) async {
 
 final class FakePlaces: PlaceProviding, @unchecked Sendable {
     var place: String?
+    var coordinate: Coordinate?
     var delayNs: UInt64 = 0
-    func currentPlace() async -> String? {
+    func currentPlace() async -> PlaceResult? {
         if delayNs > 0 { try? await Task.sleep(nanoseconds: delayNs) }
-        return place
+        return place.map { PlaceResult(name: $0, coordinate: coordinate) }
     }
 }
 
@@ -316,6 +317,34 @@ final class FakePlaces: PlaceProviding, @unchecked Sendable {
         #expect(vm.feed[0].replies.isEmpty)
         #expect(vm.errorMessage != nil)
         running.cancel(); await running.value
+    }
+}
+
+@Suite struct DrinkTests {
+    @Test @MainActor func logCarriesTheChosenDrink() async {
+        let svc = FakeBeerService()
+        let vm = HomeViewModel(service: svc, now: { Date(timeIntervalSince1970: 500) })
+        await vm.logBeer(photoJPEG: nil, drink: .wine)
+        #expect(svc.logged.first?.0.drink == .wine)
+        #expect(vm.feed.first?.drink == .wine)
+    }
+    @Test func glassDrainsOverLifetime() {
+        let t0 = Date(timeIntervalSince1970: 0)
+        let beer = BeerLog(id: "b", ownerUid: "u", ownerName: "n", createdAt: t0, expiresAt: BeerLog.expiry(from: t0), hasPhoto: false)
+        #expect(beer.fillLevel(now: t0) == 1)
+        #expect(abs(beer.fillLevel(now: t0.addingTimeInterval(12 * 3600)) - 0.5) < 0.001)
+        #expect(beer.fillLevel(now: t0.addingTimeInterval(30 * 3600)) == 0)
+    }
+    @Test func coordinateRoundsToAHundredMetres() {
+        let c = Coordinate(latitude: 52.3702157, longitude: 4.8951679)
+        #expect(c.latitude == 52.37 && c.longitude == 4.895)
+    }
+    @Test @MainActor func placeCoordinateIsStoredWithThePlace() async {
+        let svc = FakeBeerService()
+        let places = FakePlaces(); places.place = "Café De Zon"; places.coordinate = Coordinate(latitude: 52.37, longitude: 4.895)
+        let vm = HomeViewModel(service: svc, placeProvider: places, now: { Date(timeIntervalSince1970: 500) })
+        await vm.logBeer(photoJPEG: nil)
+        #expect(svc.logged.first?.0.placeCoordinate == Coordinate(latitude: 52.37, longitude: 4.895))
     }
 }
 

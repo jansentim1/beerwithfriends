@@ -112,20 +112,21 @@ public final class HomeViewModel: ObservableObject {
 
     /// Optimistic: the row is in the feed before any network round-trip. Only a
     /// photo upload blocks the button (a second photo mid-upload makes no sense).
-    public func logBeer(photoJPEG: Data?) async {
+    public func logBeer(photoJPEG: Data?, drink: DrinkKind = .pils) async {
         if photoJPEG != nil {
             guard !isUploadingPhoto else { return }
             isUploadingPhoto = true
         }
         defer { if photoJPEG != nil { isUploadingPhoto = false } }
 
-        var beer = service.newBeerLog(hasPhoto: photoJPEG != nil)
+        var beer = service.newBeerLog(hasPhoto: photoJPEG != nil, drink: drink)
         pendingIds.insert(beer.id)
         upsert(beer)
         // Opt-in place lookup runs AFTER the row is visible; beers are immutable
         // server-side, so the place must be known before the write.
         if let placeProvider, let place = await placeProvider.currentPlace() {
-            beer.place = String(place.prefix(BeerLog.placeMaxLength))
+            beer.place = String(place.name.prefix(BeerLog.placeMaxLength))
+            beer.placeCoordinate = place.coordinate
             upsert(beer)
         }
         do {

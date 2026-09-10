@@ -11,7 +11,7 @@ import { getPhotoOnceCore, PhotoError, PhotoErrorCode } from "./photo";
 import { fanoutBeerCreated, notifyCheers, notifyReply, Pusher, ReplyKind } from "./pushes";
 import { sendApns, deadTokens } from "./apns";
 import { loadApnsKey } from "./apnsKey";
-import { mirrorFriendship, severOnBlock, cleanupExpiredCore, deleteAccountCore, PhotoDeleter } from "./lifecycle";
+import { mirrorFriendship, severOnBlock, cleanupExpiredCore, deleteAccountCore, changeUsernameCore, UsernameError, PhotoDeleter } from "./lifecycle";
 
 // Colocated with Firestore + Storage (europe-west4); see .firebaserc / tools/deploy.sh.
 setGlobalOptions({ region: "europe-west4" });
@@ -89,6 +89,23 @@ export const onCheersCreated = onDocumentCreated("beers/{beerId}/cheers/{uid}", 
   await beerRef.update({ cheersCount: FieldValue.increment(1) });
   const beer = await beerRef.get();
   if (beer.exists) await notifyCheers(db, push, beer.get("ownerUid"), event.params.uid);
+});
+
+export const changeUsername = onCall(async (req) => {
+  if (!req.auth) throw new HttpsError("unauthenticated", "Sign in required");
+  const raw = req.data?.username;
+  if (typeof raw !== "string") throw new HttpsError("invalid-argument", "username required");
+  try {
+    return { username: await changeUsernameCore(getFirestore(), req.auth.uid, raw) };
+  } catch (e) {
+    if (e instanceof UsernameError) {
+      const status: Record<string, FunctionsErrorCode> = {
+        INVALID: "invalid-argument", TAKEN: "already-exists", TOO_SOON: "resource-exhausted", NO_PROFILE: "failed-precondition",
+      };
+      throw new HttpsError(status[e.code], e.code, { code: e.code });
+    }
+    throw e;
+  }
 });
 
 export const onReplyCreated = onDocumentCreated("beers/{beerId}/replies/{uid}", async (event) => {

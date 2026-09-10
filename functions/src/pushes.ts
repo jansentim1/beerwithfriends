@@ -12,7 +12,12 @@ async function targetFor(db: Firestore, uid: string): Promise<PushTarget | undef
   return { uid, apns, fcm };
 }
 
-type BeerDoc = { ownerUid: string; ownerName: string; hasPhoto: boolean; place?: string };
+type BeerDoc = { ownerUid: string; ownerName: string; hasPhoto: boolean; place?: string; drink?: string };
+
+const drinkPhrase: Record<string, string> = {
+  pils: "a pils 🍺", special: "a special beer 🍻", wine: "a glass of wine 🍷", bubbles: "bubbles 🥂",
+  cocktail: "a cocktail 🍸", whisky: "a whisky 🥃", soft: "a soft drink 🥤",
+};
 
 export async function fanoutBeerCreated(db: Firestore, push: Pusher, beerId: string, beer: BeerDoc) {
   const friends = await db.collection(`friendships/${beer.ownerUid}/friends`).get();
@@ -29,9 +34,10 @@ export async function fanoutBeerCreated(db: Firestore, push: Pusher, beerId: str
   }
   if (targets.length === 0) return;
   const body = beer.hasPhoto ? "They added a photo 📸 — you get one look!" : "Cheers back? 🍻";
+  const what = drinkPhrase[beer.drink ?? "pils"] ?? drinkPhrase.pils;
   const title = beer.place
-    ? `${beer.ownerName} is drinking a beer at ${beer.place} 🍺`
-    : `${beer.ownerName} is drinking a beer 🍺`;
+    ? `${beer.ownerName} is having ${what} at ${beer.place}`
+    : `${beer.ownerName} is having ${what}`;
   await push(targets, title, body, { beerId });
 }
 

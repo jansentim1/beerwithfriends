@@ -24,10 +24,11 @@ final class FirebaseBeerService: BeerServicing, @unchecked Sendable {
 
     // MARK: - Log a beer
 
-    func newBeerLog(hasPhoto: Bool) -> BeerLog {
+    func newBeerLog(hasPhoto: Bool, drink: DrinkKind) -> BeerLog {
         let now = Date()
         return BeerLog(id: UUID().uuidString.lowercased(), ownerUid: uid, ownerName: ownerName,
-                       createdAt: now, expiresAt: BeerLog.expiry(from: now), hasPhoto: hasPhoto)
+                       createdAt: now, expiresAt: BeerLog.expiry(from: now), hasPhoto: hasPhoto,
+                       drink: drink)
     }
 
     /// Photo (if any) is uploaded to `photos/{beerId}.jpg` BEFORE the doc is
@@ -54,8 +55,12 @@ final class FirebaseBeerService: BeerServicing, @unchecked Sendable {
             "photoPath": photoPath,
             "cheersCount": 0,
         ]
+        data["drink"] = beer.drink.rawValue
         if let place = beer.place, !place.isEmpty {
             data["place"] = String(place.prefix(BeerLog.placeMaxLength))
+            if let c = beer.placeCoordinate {
+                data["placeCoordinate"] = GeoPoint(latitude: c.latitude, longitude: c.longitude)
+            }
         }
         try await db.document("beers/\(beer.id)").setData(data)
         // Off the tap path and best effort: a failed counter bump must not fail
@@ -138,7 +143,9 @@ final class FirebaseBeerService: BeerServicing, @unchecked Sendable {
             hasPhoto: data["hasPhoto"] as? Bool ?? false,
             cheersCount: data["cheersCount"] as? Int ?? 0,
             place: data["place"] as? String,
-            replies: replies
+            replies: replies,
+            drink: (data["drink"] as? String).flatMap(DrinkKind.init(rawValue:)) ?? .pils,
+            placeCoordinate: (data["placeCoordinate"] as? GeoPoint).map { Coordinate(latitude: $0.latitude, longitude: $0.longitude) }
         )
     }
 

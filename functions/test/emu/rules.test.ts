@@ -8,6 +8,7 @@ import {
   collection, getDocs, query, where, serverTimestamp, Timestamp,
 } from "firebase/firestore";
 import { ref, getBytes, uploadBytes, deleteObject } from "firebase/storage";
+import { GeoPoint } from "firebase/firestore";
 
 // Paths are relative to the vitest working dir (functions/).
 const firestoreRules = readFileSync("../firestore.rules", "utf8");
@@ -105,6 +106,15 @@ describe("firestore rules: beers", () => {
     await assertFails(setDoc(doc(fs("stranger"), "beers/b1/replies/stranger"), { uid: "stranger", kind: "onmyway", at: Timestamp.now() }));
     await assertFails(setDoc(doc(fs("owner"), "beers/b1/replies/owner"), { uid: "owner", kind: "onmyway", at: Timestamp.now() }));
     await assertFails(setDoc(doc(fs("friend"), "beers/b1/replies/friend"), { uid: "friend", kind: "wave", at: Timestamp.now() }));
+  });
+
+  it("beer create: drink enum and place coordinate (only with a place)", async () => {
+    const me = fs("owner");
+    await assertSucceeds(setDoc(doc(me, "beers/bd1"), { ...validBeer("owner"), drink: "wine" }));
+    await assertFails(setDoc(doc(me, "beers/bd2"), { ...validBeer("owner"), drink: "absinthe" }));
+    await assertSucceeds(setDoc(doc(me, "beers/bd3"), { ...validBeer("owner"), place: "Café De Zon", placeCoordinate: new GeoPoint(52.37, 4.895) }));
+    await assertFails(setDoc(doc(me, "beers/bd4"), { ...validBeer("owner"), placeCoordinate: new GeoPoint(52.37, 4.895) })); // no place
+    await assertFails(setDoc(doc(me, "beers/bd5"), { ...validBeer("owner"), place: "x", placeCoordinate: { lat: 1, lng: 2 } }));
   });
 
   it("beer create: optional place is a short string, never coordinates", async () => {

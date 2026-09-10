@@ -1,3 +1,4 @@
+import { changeUsernameCore, UsernameError } from "../../src/lifecycle";
 import { describe, it, expect, beforeEach } from "vitest";
 import { Timestamp } from "firebase-admin/firestore";
 import { initTestDb, seedUser, seedFriends, clearDb } from "./helpers";
@@ -130,5 +131,25 @@ describe("deleteAccountCore", () => {
     await deleteAccountCore(db, deletePhoto, "u1");
     await deleteAccountCore(db, deletePhoto, "u1"); // must not throw
     expect((await db.doc("users/u1").get()).exists).toBe(false);
+  });
+});
+
+describe("changeUsernameCore", () => {
+  it("moves the reservation and updates the profile", async () => {
+    await seedUser(db, "u1", "tim");
+    const name = await changeUsernameCore(db, "u1", " TimJ ");
+    expect(name).toBe("timj");
+    expect((await db.doc("usernames/tim").get()).exists).toBe(false);
+    expect((await db.doc("usernames/timj").get()).get("uid")).toBe("u1");
+    expect((await db.doc("users/u1").get()).get("usernameLower")).toBe("timj");
+  });
+  it("rejects taken, invalid and too-soon", async () => {
+    await seedUser(db, "u1", "tim");
+    await seedUser(db, "u2", "joost");
+    await expect(changeUsernameCore(db, "u1", "joost")).rejects.toMatchObject({ code: "TAKEN" });
+    await expect(changeUsernameCore(db, "u1", "1abc")).rejects.toMatchObject({ code: "INVALID" });
+    await changeUsernameCore(db, "u1", "timmy");
+    await expect(changeUsernameCore(db, "u1", "timmo")).rejects.toMatchObject({ code: "TOO_SOON" });
+    expect(new UsernameError("TAKEN").code).toBe("TAKEN");
   });
 });
