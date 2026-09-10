@@ -39,6 +39,8 @@ targets:
       properties:
         com.apple.developer.applesignin: [Default]
         aps-environment: production
+        # Universal links: https://beerwithme-prod.web.app/add/<username> opens the app.
+        com.apple.developer.associated-domains: ["applinks:beerwithme-prod.web.app"]
     scheme:
       testTargets: [PubDatesUITests]
     info:

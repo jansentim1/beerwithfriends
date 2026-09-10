@@ -25,5 +25,28 @@
     "ui": {
       "enabled": false
     }
+  },
+  "hosting": {
+    "public": "site",
+    "ignore": [
+      "**/.*/**"
+    ],
+    "rewrites": [
+      {
+        "source": "/add/**",
+        "destination": "/add.html"
+      }
+    ],
+    "headers": [
+      {
+        "source": "/.well-known/apple-app-site-association",
+        "headers": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ]
+      }
+    ]
   }
 }

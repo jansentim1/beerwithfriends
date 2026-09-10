@@ -316,7 +316,9 @@ struct FriendsView: View {
 
     private var inviteSection: some View {
         Section {
-            ShareLink(item: "Add me on PubDates! My username is @\(profile.username) 🍺") {
+            ShareLink(item: URL(string: MateLink.link(for: profile.username))!,
+                      subject: Text("Add me on PubDates"),
+                      message: Text("Add me on PubDates 🍺 Tap the link: it opens the app and adds me (or gets you the app first).")) {
                 Label("Invite a mate", systemImage: "square.and.arrow.up")
                     .frame(maxWidth: .infinity, minHeight: 44)
             }

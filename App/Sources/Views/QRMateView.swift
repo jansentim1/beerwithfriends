@@ -9,25 +9,35 @@ import UIKit
 
 // MARK: - Deep link
 
-/// The `pubdates://add/<username>` mate link: one shape, minted and parsed in
-/// one place so the QR code, the ShareLink and the app shell can never drift.
+/// The mate link, minted and parsed in one place so the QR code, the ShareLink
+/// and the app shell can never drift. Two shapes are accepted:
+///   https://beerwithme-prod.web.app/add/<username>   (universal link: opens the
+///       app when installed, a web page with the TestFlight link otherwise)
+///   pubdates://add/<username>                          (custom scheme, legacy QR)
 enum MateLink {
     static let scheme = "pubdates"
     static let host = "add"
+    static let webHost = "beerwithme-prod.web.app"
 
     /// The text encoded in the QR and shared by the ShareLink.
     static func link(for username: String) -> String {
-        "\(scheme)://\(host)/\(username)"
+        "https://\(webHost)/\(host)/\(username)"
     }
 
     /// The username in a mate link, normalized — or nil for anything else.
     /// Deliberately strict: a scanned code is untrusted input.
     static func username(fromDeepLink url: URL) -> String? {
-        guard url.scheme?.lowercased() == scheme,
-              url.host?.lowercased() == host,
-              let first = url.pathComponents.first(where: { $0 != "/" })
-        else { return nil }
-        return Username.normalize(first)
+        let components = url.pathComponents.filter { $0 != "/" }
+        switch url.scheme?.lowercased() {
+        case scheme:
+            guard url.host?.lowercased() == host, let first = components.first else { return nil }
+            return Username.normalize(first)
+        case "https":
+            guard url.host?.lowercased() == webHost, components.count >= 2, components[0] == host else { return nil }
+            return Username.normalize(components[1])
+        default:
+            return nil
+        }
     }
 }
 
