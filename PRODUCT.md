@@ -39,13 +39,18 @@ chat. One button.
 
 ## Capabilities and Constraints
 
-- Screens: Onboarding (sign in, username), Home (log button, feed), Camera (live capture,
-  review), Photo viewer (view once), Friends (requests, list, search, invite), Settings
-  (profile, blocked users, sign out, delete account).
+- Screens: Onboarding (sign in, username), Home (drink picker, feed), Camera (live capture,
+  review), Photo viewer (view once), Mates (requests, list, search, QR, invite), Map (mates'
+  drinks at the bar's position, opt-in), Settings (profile, change username, privacy toggle,
+  blocked users, sign out, delete account).
+- Drinks: seven kinds (pils, special, wine, bubbles, cocktail, whisky, soft) drawn as vector
+  glasses that fill on tap and drain over the 24 h lifetime.
 - Feed rows: owner, relative time, photo chip (sealed / seen / none), cheers pill.
 - Photos: camera only, JPEG ≤ 1080 px, 24 h, view once per friend, screenshot receipts.
-- Terminology: "beer" (never "drink"), "cheers" (🍻) is the reaction, "view once" is the
-  photo state.
+- Terminology: "beer" is the brand noun (app name, Beers tab, "I'm having a beer" copy);
+  "drink" is the logged thing when the kind matters (pils, wine, cocktail... "log a drink",
+  "N drinks logged", "Report this drink"). "cheers" (🍻) is the reaction; "view once" is the
+  photo state; "mates" are friends.
 - Hard constraints: no analytics, no tracking, no ads. Everything must work with one thumb.
 - Undecided: App Store name confirmed as PubDates for the display name; the App Store
   Connect record still says "Pints With Mates" (Tim to confirm the rename).
