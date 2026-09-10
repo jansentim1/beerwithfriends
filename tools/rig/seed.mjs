@@ -4,7 +4,7 @@
 //   FIRESTORE_EMULATOR_HOST=127.0.0.1:8085 FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099 \
 //   FIREBASE_STORAGE_EMULATOR_HOST=127.0.0.1:9199 node tools/rig/seed.mjs
 import { createRequire } from "node:module";
-const require = createRequire(import.meta.url + "/../../functions/package.json");
+const require = createRequire(import.meta.url + "/../../../functions/package.json");
 const { initializeApp } = require("firebase-admin/app");
 const { getAuth } = require("firebase-admin/auth");
 const { getFirestore, Timestamp, GeoPoint } = require("firebase-admin/firestore");
