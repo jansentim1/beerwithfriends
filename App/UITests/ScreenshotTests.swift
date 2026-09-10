@@ -11,7 +11,7 @@ final class ScreenshotTests: XCTestCase {
     override func setUp() {
         continueAfterFailure = false
         app = XCUIApplication()
-        app.launchArguments += ["-UseEmulators"]
+        app.launchArguments += ["-UseEmulators", "-UITestLogWithoutPhoto"]
         app.launch()
     }
 
@@ -42,16 +42,15 @@ final class ScreenshotTests: XCTestCase {
         XCTAssertTrue(log.waitForExistence(timeout: 20), "home screen did not appear")
         snap("03-home-empty")
 
-        // Camera BEFORE logging: after a log the picker (camera included) is locked
-        // for a minute against spamming.
-        app.buttons["home.camera"].tap()
-        sleep(2) // camera permission / unavailable state on the simulator
+        // Tapping a glass pours it and opens the camera (a photo is mandatory).
+        // With -UITestLogWithoutPhoto, Cancel logs the drink anyway (simulator has
+        // no camera).
+        log.tap()
+        sleep(2) // pour + camera permission / unavailable state on the simulator
         snap("07-camera")
         let cancel = app.buttons["Cancel"]
-        if cancel.waitForExistence(timeout: 3) { cancel.tap() }
-        XCTAssertTrue(log.waitForExistence(timeout: 5), "home did not come back after the camera")
-
-        log.tap()
+        XCTAssertTrue(cancel.waitForExistence(timeout: 5), "camera did not open after the pour")
+        cancel.tap()
         XCTAssertTrue(app.staticTexts["You"].waitForExistence(timeout: 10), "logged beer row missing")
         snap("04-home-beer")
 

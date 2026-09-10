@@ -4,14 +4,15 @@ import SwiftUI
 // COMPILE-PARKED (Task 10): no Xcode on this machine — written against
 // iOS 17 SDK APIs under Swift 6 concurrency, not yet compiled.
 
-/// The main screen: the drink picker, a camera shortcut, and the live feed.
+/// The main screen: the drink picker — a tap pours the glass and goes straight
+/// to the camera — and the live feed.
 /// Consumes ONLY BeerKit (`HomeViewModel`, protocols) — never Firebase types;
 /// the screenshot reporter closure is injected pre-wired by RootView.
 ///
 /// Layout follows docs/design/direction.md: large title "PubDates" collapsing on
-/// scroll, then the hero — a row of drawn glasses, one tap each, with the round
-/// camera button as the row's last cell (all inside the scroll view, so the
-/// title collapses natively), then the last 24 hours of drinks as plain rows.
+/// scroll, then the hero — a row of drawn glasses, one tap each (all inside the
+/// scroll view, so the title collapses natively), then the last 24 hours of
+/// drinks as plain rows.
 /// Every row carries the glass that was picked, draining as the 24 hours run out.
 struct HomeView: View {
     @StateObject private var viewModel: HomeViewModel
@@ -23,6 +24,9 @@ struct HomeView: View {
     private let friendService: any FriendServicing
     private let screenshotReporter: @Sendable (String) async -> Void
 
+    /// True while the camera owns the screen. It is opened by a glass tap, never
+    /// on its own: a drink without a photo is not a drink (Tim: "ik wil eigenlijk
+    /// dat je altijd een foto moet toevoegen").
     @State private var showCamera = false
     @State private var photoViewer: PhotoViewerItem?
     /// Bumped to restart the feed stream (scene re-activation, pull-to-refresh):
@@ -34,10 +38,15 @@ struct HomeView: View {
     @State private var blockTarget: BeerLog?
     @State private var showBlockDialog = false
     @State private var infoMessage: String?
-    /// The glass tapped this session; the camera falls back to `lastDrink`.
+    /// The glass tapped this session (marks the favourite tile in the picker).
     @State private var selectedDrink: DrinkKind?
-    /// Shared with `DrinkPickerView` (same key): what to pour a photo beer into.
-    @AppStorage("lastDrink") private var lastDrink = DrinkKind.pils.rawValue
+    /// The glass that has been poured and is waiting for its photo. Set on the
+    /// tap, consumed by `onCapture` — so a drink still sitting here when the
+    /// camera closes is a cancelled shot, and nothing gets logged.
+    @State private var pendingDrink: DrinkKind?
+    /// Bumped when the flow a tap started is over (photo taken, or cancelled):
+    /// the picker drops its local pour and the feed owns the glass again.
+    @State private var pourReset = 0
     /// Anchor for the feed's minute tick. Stable across re-renders, unlike a
     /// fresh `.now` in the body, so the schedule never restarts.
     @State private var glassClock = Date()
@@ -46,8 +55,6 @@ struct HomeView: View {
     @State private var lockedNudge = false
     /// Latest nudge wins — an older one must not switch the caption back early.
     @State private var lockedNudgeToken = 0
-    /// Bumped to shake the camera cell when a locked tap lands on it.
-    @State private var cameraShake = 0
 
     static let reportReasons = ["Not a drink 🚨", "Inappropriate photo", "Harassment", "Other"]
 
@@ -139,9 +146,16 @@ struct HomeView: View {
                 feedEpoch += 1
             }
         }
-        .fullScreenCover(isPresented: $showCamera) {
+        // The second half of a glass tap: the shot is what logs the drink. The
+        // camera dismisses itself on both "Use photo" and Cancel, so `onDismiss`
+        // is where a cancelled round is undone.
+        .fullScreenCover(isPresented: $showCamera, onDismiss: cameraDismissed) {
             CameraView { data in
-                let drink = selectedDrink ?? DrinkKind(rawValue: lastDrink) ?? .pils
+                // Consuming `pendingDrink` here is also how `cameraDismissed()`
+                // tells a used camera from a cancelled one.
+                let drink = pendingDrink ?? .pils
+                pendingDrink = nil
+                pourReset += 1 // the logged row takes the glass from here
                 Task { await viewModel.logBeer(photoJPEG: data, drink: drink, myUid: profile.id) }
             }
             .ignoresSafeArea()
@@ -196,43 +210,35 @@ struct HomeView: View {
 
     // MARK: - Hero
 
-    /// The glasses own the screen: pick what you are drinking and it is logged on
-    /// the tap that fills the glass (Tim: "je moet selecteren wat voor drankje").
+    /// The glasses own the screen: pick what you are drinking (Tim: "je moet
+    /// selecteren wat voor drankje") and the tap pours that glass, then hands the
+    /// screen to the camera — every drink carries a photo (Tim: "pour the glass en
+    /// dan gaat hij gelijk naar camera modus"), so the tap itself logs nothing.
     /// The glass you picked STAYS full and drains with the drink, and for the
-    /// minute after it every glass is locked: a tap shakes instead of logging
+    /// minute after a log every glass is locked: a tap shakes instead of pouring
     /// ("the pour animation should not then clear, but it should also prevent
-    /// someone from spamming the button").
-    /// The camera is the LAST cell of the same scrolling row — a photo is just
-    /// another way to log this round, not a second, competing control — and one
-    /// footnote sits under the row. Everything is disabled while a photo uploads.
+    /// someone from spamming the button"). One footnote sits under the row, and
+    /// everything is disabled while a photo uploads.
     private func heroRow(now: Date) -> some View {
         // Your own newest drink: which glass stays full, and how full it still is.
         let mine = viewModel.latestOwnDrink(myUid: profile.id)
         return VStack(alignment: .leading, spacing: 8) {
-            // Camera pinned OUTSIDE the scrolling row so it is always in the first
-            // viewport; the glasses scroll beside it and the next one peeks.
-            HStack(alignment: .bottom, spacing: 8) {
-                DrinkPickerView(
-                    selected: $selectedDrink,
-                    isBusy: viewModel.isUploadingPhoto,
-                    currentDrink: mine?.drink,
-                    // Draining on the timeline tick, so the glass in the picker
-                    // and the glass on your feed row are the same drink.
-                    currentLevel: mine?.fillLevel(now: now) ?? 0,
-                    isLocked: isLocked,
-                    onPick: { kind in
-                        // The row springs in from the feed animation, as before.
-                        Task { await viewModel.logBeer(photoJPEG: nil, drink: kind, myUid: profile.id) }
-                    },
-                    onLockedTap: { flashLockedCaption() }
-                )
-                cameraCell
-                    // Same vertical chrome as a glass cell (6 inside + 4 on the
-                    // scroll view) so "Photo" shares the labels' baseline.
-                    .padding(.vertical, 6)
-                    .padding(.bottom, 4)
-                    .layoutPriority(1)   // the row scrolls; the camera keeps its width
-            }
+            DrinkPickerView(
+                selected: $selectedDrink,
+                isBusy: viewModel.isUploadingPhoto,
+                currentDrink: mine?.drink,
+                // Draining on the timeline tick, so the glass in the picker
+                // and the glass on your feed row are the same drink.
+                currentLevel: mine?.fillLevel(now: now) ?? 0,
+                isLocked: isLocked,
+                pourReset: pourReset,
+                onPick: { kind in
+                    // Remembered, not logged: the camera takes it from here.
+                    pendingDrink = kind
+                    openCameraAfterPour(kind)
+                },
+                onLockedTap: { flashLockedCaption() }
+            )
 
             // One footnote does both jobs: the invitation, and — while the lock
             // runs — the reason and the wait, counting down on the same tick.
@@ -245,35 +251,44 @@ struct HomeView: View {
         .disabled(viewModel.isUploadingPhoto)
     }
 
-    /// The camera as a glass-row cell: a 56 pt round button with its own caption,
-    /// so it lines up with the glasses' labels along the bottom of the row.
-    private var cameraCell: some View {
-        VStack(spacing: 4) {
-            Button {
-                // A photo is still a drink: the same one-minute lock applies, and
-                // the cell shakes rather than opening the camera for nothing.
-                if isLocked {
-                    Haptics.warning()
-                    cameraShake += 1
-                    flashLockedCaption()
-                    return
-                }
-                Haptics.light()
-                showCamera = true
-            } label: {
-                Image(systemName: "camera.fill")
-            }
-            .buttonStyle(RoundIconButtonStyle(size: 56))
-            .accessibilityLabel("Log a drink with a photo")
-            .accessibilityHint(isLocked ? "Locked for a minute after logging" : "Uses the last glass you picked")
-            .accessibilityIdentifier("home.camera")
+    // MARK: - Pour, then camera
 
-            Text("Photo")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
+    /// The pour gets the screen to itself before the camera takes it: the glass
+    /// fills over `Theme.pour` (350 ms, or the 180 ms `Theme.quick` under Reduce
+    /// Motion) and the cover comes up on the beat after it, so the gesture reads
+    /// as one move — pour, then shoot — rather than a sheet cutting it off.
+    private func openCameraAfterPour(_ kind: DrinkKind) {
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(reduceMotion ? 0.18 : 0.35))
+            // A second glass tapped during the pour wins; only the drink still
+            // pending gets a camera.
+            guard pendingDrink == kind, !showCamera else { return }
+            showCamera = true
         }
-        .lockedShake(trigger: cameraShake)
+    }
+
+    /// The camera closed. `onCapture` consumes `pendingDrink`, so one still
+    /// sitting here means the shot was cancelled: the glass goes back to its
+    /// resting level and nothing is logged — except under the UI-test flag below.
+    private func cameraDismissed() {
+        guard let drink = pendingDrink else { return }
+        pendingDrink = nil
+        pourReset += 1
+        if Self.logsCancelledDrinkWithoutPhoto {
+            Task { await viewModel.logBeer(photoJPEG: nil, drink: drink, myUid: profile.id) }
+        }
+    }
+
+    /// The CI simulator has no camera, so the screenshot test can never take a
+    /// photo: launched with `-UITestLogWithoutPhoto`, a cancelled camera logs the
+    /// pending drink without one. DEBUG-only and opt-in — always false in a
+    /// shipped build, where a cancelled shot logs nothing.
+    private static var logsCancelledDrinkWithoutPhoto: Bool {
+        #if DEBUG
+        ProcessInfo.processInfo.arguments.contains("-UITestLogWithoutPhoto")
+        #else
+        false
+        #endif
     }
 
     // MARK: - The one-minute lock
@@ -286,7 +301,7 @@ struct HomeView: View {
     /// The footnote under the row: the invitation, or the wait.
     private var caption: String {
         let remaining = viewModel.cooldownRemaining(myUid: profile.id)
-        guard remaining > 0 else { return "Tap a glass to log it" }
+        guard remaining > 0 else { return "Tap a glass, snap your drink" }
         // Ceil, so the last second still reads "next in 1s" rather than "0s".
         return "Enjoy that one first · next in \(Int(remaining.rounded(.up)))s"
     }

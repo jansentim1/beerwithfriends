@@ -58,7 +58,7 @@ struct DrinkGlassView: View {
 
             GlassShape(kind: kind)
                 .stroke(outline, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round))
-            // Stems, feet and the soft drink's straw: stroked only, never filled.
+            // Stems and feet: stroked only, never filled.
             GlassDecorationShape(kind: kind)
                 .stroke(outline, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round))
         }
@@ -75,10 +75,13 @@ struct DrinkGlassView: View {
 /// The hero of Home: seven glasses, "empty-ish", one tap each, in the canonical
 /// `DrinkKind` order — the row never reshuffles, so the glass you reach for is
 /// always in the same place. Tapping pours the glass full over `Theme.pour` and
-/// hands the kind to `onPick`; the glass then STAYS full and drains with the
-/// drink, because `currentDrink` / `currentLevel` follow the row that just
-/// arrived in the feed (Tim: "the pour animation should not then clear, but it
-/// should also prevent someone from spamming the button"). The last drink you
+/// hands the kind to `onPick` — which in Home opens the camera, since every drink
+/// carries a photo, so the pour is a promise rather than a log. The glass STAYS
+/// full through that and then drains with the drink, because `currentDrink` /
+/// `currentLevel` follow the row that arrives in the feed (Tim: "the pour
+/// animation should not then clear, but it should also prevent someone from
+/// spamming the button"). If the round never happens — a cancelled camera — the
+/// caller bumps `pourReset` and the glass settles back down. The last drink you
 /// picked keeps a soft amber tile.
 ///
 /// The spam half of that sentence is `isLocked`: for the minute after a drink,
@@ -86,8 +89,9 @@ struct DrinkGlassView: View {
 /// `onLockedTap` so the caller can say why in its caption.
 ///
 /// `accessory` is one extra cell appended after the glasses, inside the same
-/// scrolling row (Home puts the camera shortcut there), so the row reads as one
-/// set of choices rather than a row plus a stray button underneath.
+/// scrolling row, so an extra choice reads as part of the same set rather than a
+/// stray button underneath. Home passes none: the camera is no longer a control
+/// of its own, it is the second half of a glass tap.
 struct DrinkPickerView<Accessory: View>: View {
     @Binding var selected: DrinkKind?
     var isBusy: Bool = false
@@ -99,6 +103,10 @@ struct DrinkPickerView<Accessory: View>: View {
     var currentLevel: Double = 0
     /// True while the one-minute cooldown after the last drink is running.
     var isLocked: Bool = false
+    /// Bump this when the round a tap started is over — the photo was taken (and
+    /// the feed row owns the glass) or the camera was cancelled (and nothing was
+    /// logged) — and the local pour is dropped.
+    var pourReset: Int = 0
     let onPick: (DrinkKind) -> Void
     /// Called instead of `onPick` when a locked glass is tapped.
     var onLockedTap: () -> Void = {}
@@ -107,16 +115,17 @@ struct DrinkPickerView<Accessory: View>: View {
     /// Cell metrics: seven glasses at 62 pt on a 2 pt gap put the sixth glass
     /// half past the trailing edge on the narrowest iPhone, which is what tells
     /// you the row scrolls. Paging is view-aligned so a flick lands on a glass.
-    // Sized so that, next to a 56 pt camera cell, four glasses fit and the fifth
-    // peeks by ~20 pt: the row visibly continues.
+    // Sized so four or five glasses fit and the next one peeks by ~20 pt: the
+    // row visibly continues.
     private static var cellMinWidth: CGFloat { 66 }
     private static var cellSpacing: CGFloat { 2 }
 
     @AppStorage("lastDrink") private var lastDrink = DrinkKind.pils.rawValue
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// The glass just tapped (one at a time). A bridge only: it holds the glass
-    /// full for the instant between the tap and the optimistic feed row landing
-    /// in `currentDrink`, which then owns the level for good.
+    /// full from the tap until the round it started ends — the feed row landing in
+    /// `currentDrink`, or `pourReset` saying the drink never happened — and the
+    /// parent owns the level again from there.
     @State private var poured: DrinkKind?
     /// One shake counter per kind: bumping a cell's own count is what fires its
     /// keyframes, so a locked tap never twitches the glass next door.
@@ -151,13 +160,20 @@ struct DrinkPickerView<Accessory: View>: View {
         .onChange(of: currentDrink) { _, _ in
             poured = nil
         }
+        // Same hand-back, said explicitly by the parent — needed when the round
+        // ends without changing `currentDrink`: a cancelled camera, or a second
+        // glass of what you were already drinking.
+        .onChange(of: pourReset) { _, _ in
+            withAnimation(reduceMotion ? Theme.quick : Theme.pour) { poured = nil }
+        }
     }
 
-    /// The parent's live level wins wherever it applies: the glass you are
-    /// drinking stays full and drains, every other glass rests.
+    /// The pour wins while it stands — so tapping another of what you are already
+    /// drinking still fills the glass to the brim — then the parent's live level
+    /// takes over: the glass you are drinking drains, every other glass rests.
     private func displayLevel(for kind: DrinkKind) -> Double {
-        if kind == currentDrink { return currentLevel }
         if kind == poured { return 1 }
+        if kind == currentDrink { return currentLevel }
         return kind.restingLevel
     }
 
@@ -208,7 +224,13 @@ struct DrinkPickerView<Accessory: View>: View {
         .accessibilityLabel("I'm having \(kind.pushPhrase)")
         // No `.isSelected` trait: the tile marks the last drink, it is not a
         // selection you are sitting in.
-        .accessibilityHint(lockedHint ?? (isFavourite ? "Your last one" : "Tells your mates, with this glass on your row"))
+        // Says what happens, and a photo is not optional — the camera is next.
+        .accessibilityHint(
+            lockedHint
+                ?? (isFavourite
+                    ? "Your last one. Pours the glass, then opens the camera"
+                    : "Pours the glass, then opens the camera")
+        )
     }
 
     /// While the cooldown runs, every glass says so before you tap it.
@@ -228,8 +250,9 @@ struct DrinkPickerView<Accessory: View>: View {
         Haptics.success()
         selected = kind
         lastDrink = kind.rawValue
-        // The pour is the whole gesture: the glass fills and STAYS full, because
-        // the row this logs immediately becomes `currentDrink` at level 1.
+        // The pour is the visible half of the gesture: the glass fills and STAYS
+        // full while `onPick` runs the other half (in Home: the camera, whose
+        // photo is what logs the drink and pins the glass through `currentDrink`).
         withAnimation(reduceMotion ? Theme.quick : Theme.pour) { poured = kind }
         onPick(kind)
     }
@@ -244,6 +267,7 @@ extension DrinkPickerView where Accessory == EmptyView {
         currentDrink: DrinkKind? = nil,
         currentLevel: Double = 0,
         isLocked: Bool = false,
+        pourReset: Int = 0,
         onPick: @escaping (DrinkKind) -> Void,
         onLockedTap: @escaping () -> Void = {}
     ) {
@@ -253,6 +277,7 @@ extension DrinkPickerView where Accessory == EmptyView {
             currentDrink: currentDrink,
             currentLevel: currentLevel,
             isLocked: isLocked,
+            pourReset: pourReset,
             onPick: onPick,
             onLockedTap: onLockedTap,
             accessory: { EmptyView() }
@@ -303,7 +328,7 @@ struct LockedShakeModifier: ViewModifier {
 
 extension View {
     /// Shakes this view once every time `trigger` changes (see
-    /// `LockedShakeModifier`). Home uses it on the camera cell too.
+    /// `LockedShakeModifier`).
     func lockedShake(trigger: Int) -> some View {
         modifier(LockedShakeModifier(trigger: trigger))
     }
@@ -325,7 +350,6 @@ extension DrinkKind {
         case .bubbles: return 0.30
         case .cocktail: return 0.45
         case .whisky: return 0.25
-        case .soft: return 0.18
         }
     }
 }
@@ -338,7 +362,7 @@ private struct GlassShape: Shape {
     func path(in rect: CGRect) -> Path { DrinkGlassGeometry.bowlPath(kind, in: rect) }
 }
 
-/// Stems, feet and straws: stroked lines that never hold liquid.
+/// Stems and feet: stroked lines that never hold liquid.
 private struct GlassDecorationShape: Shape {
     let kind: DrinkKind
     func path(in rect: CGRect) -> Path { DrinkGlassGeometry.decorationPath(kind, in: rect) }
@@ -430,7 +454,6 @@ private enum DrinkGlassGeometry {
         case .bubbles: return 0.42
         case .cocktail: return 0.64
         case .whisky: return 0.62
-        case .soft: return 0.48
         }
     }
 
@@ -444,7 +467,6 @@ private enum DrinkGlassGeometry {
         case .bubbles: return (0.03, 0.57)
         case .cocktail: return (0.06, 0.52)
         case .whisky: return (0.42, 0.97)
-        case .soft: return (0.05, 0.97)
         }
     }
 
@@ -518,15 +540,6 @@ private enum DrinkGlassGeometry {
             path.addLine(to: p(0.25, 0.97, rect))
             path.addQuadCurve(to: p(0.16, 0.90, rect), control: p(0.16, 0.97, rect))
             path.closeSubpath()
-        case .soft:
-            // Tall straight glass (the straw is decoration).
-            path.move(to: p(0.20, 0.05, rect))
-            path.addLine(to: p(0.80, 0.05, rect))
-            path.addLine(to: p(0.80, 0.91, rect))
-            path.addQuadCurve(to: p(0.71, 0.97, rect), control: p(0.80, 0.97, rect))
-            path.addLine(to: p(0.29, 0.97, rect))
-            path.addQuadCurve(to: p(0.20, 0.91, rect), control: p(0.20, 0.97, rect))
-            path.closeSubpath()
         }
         return path
     }
@@ -544,11 +557,6 @@ private enum DrinkGlassGeometry {
             addStem(&path, in: rect, top: 0.56, halfWidth: 0.055, footWidth: 0.66, footY: 0.94)
         case .cocktail:
             addStem(&path, in: rect, top: 0.50, halfWidth: 0.030, footWidth: 0.44, footY: 0.94)
-        case .soft:
-            // Bendy straw: a short elbow above the rim, then down into the glass.
-            path.move(to: p(0.93, 0.04, rect))
-            path.addLine(to: p(0.64, 0.14, rect))
-            path.addLine(to: p(0.44, 0.86, rect))
         }
         return path
     }
@@ -585,7 +593,6 @@ private enum DrinkGlassPalette {
         case .bubbles: return bubbles
         case .cocktail: return cocktail
         case .whisky: return whisky
-        case .soft: return soft
         }
     }
 
@@ -600,7 +607,6 @@ private enum DrinkGlassPalette {
     /// Caramel.
     static let whisky = paired(light: (0.74, 0.44, 0.11), dark: (0.85, 0.54, 0.18))
     /// Cola brown.
-    static let soft = paired(light: (0.28, 0.15, 0.09), dark: (0.56, 0.34, 0.21))
     /// The head: cream rather than pure white, so it reads on both grounds.
     static let foam = paired(light: (0.99, 0.98, 0.94), dark: (0.94, 0.92, 0.87))
 
