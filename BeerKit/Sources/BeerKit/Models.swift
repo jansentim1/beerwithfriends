@@ -93,7 +93,7 @@ public struct Coordinate: Codable, Equatable, Sendable {
 
 /// What is in the glass. Raw values are the wire format (rules-pinned).
 public enum DrinkKind: String, Codable, CaseIterable, Sendable {
-    case pils, special, wine, bubbles, cocktail, whisky, soft
+    case pils, special, wine, bubbles, cocktail, whisky
 
     public var label: String {
         switch self {
@@ -103,7 +103,6 @@ public enum DrinkKind: String, Codable, CaseIterable, Sendable {
         case .bubbles: return "Bubbles"
         case .cocktail: return "Cocktail"
         case .whisky: return "Whisky"
-        case .soft: return "Soft drink"
         }
     }
     public var emoji: String {
@@ -114,7 +113,6 @@ public enum DrinkKind: String, Codable, CaseIterable, Sendable {
         case .bubbles: return "🥂"
         case .cocktail: return "🍸"
         case .whisky: return "🥃"
-        case .soft: return "🥤"
         }
     }
     /// "Tim is having a pils 🍺" / "Tim is having a glass of wine 🍷"
@@ -126,7 +124,6 @@ public enum DrinkKind: String, Codable, CaseIterable, Sendable {
         case .bubbles: return "bubbles"
         case .cocktail: return "a cocktail"
         case .whisky: return "a whisky"
-        case .soft: return "a soft drink"
         }
     }
 }

@@ -1,4 +1,5 @@
 # Loop state
+- HANDOVER: docs/HANDOVER_2026-09-10.md (everything open + the one big plan). Read it first.
 - Current task: 12 (handover; compile loop now lives in CI)
 - Done: 1-8, 9, 10 (all screens compiled on GitHub macOS runner, run 33852266356), 11 (report/block wired; docs/privacy-policy.md, docs/app-store-checklist.md)
 - Infra done 2026-09-04: `ios-build` workflow (unsigned simulator compile on every App/BeerKit push), `ios-testflight` workflow (manual, cloud-managed signing), iOS app registered in beerwithme-prod, GoogleService-Info.plist in App/Resources (gitignored) + GitHub secret FIREBASE_PLIST_B64. All 7 functions deployed in europe-west4 and matching source.

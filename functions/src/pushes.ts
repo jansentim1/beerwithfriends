@@ -16,7 +16,7 @@ type BeerDoc = { ownerUid: string; ownerName: string; hasPhoto: boolean; place?:
 
 const drinkPhrase: Record<string, string> = {
   pils: "a pils 🍺", special: "a special beer 🍻", wine: "a glass of wine 🍷", bubbles: "bubbles 🥂",
-  cocktail: "a cocktail 🍸", whisky: "a whisky 🥃", soft: "a soft drink 🥤",
+  cocktail: "a cocktail 🍸", whisky: "a whisky 🥃",
 };
 
 export async function fanoutBeerCreated(db: Firestore, push: Pusher, beerId: string, beer: BeerDoc) {

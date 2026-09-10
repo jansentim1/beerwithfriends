@@ -86,7 +86,7 @@ service cloud.firestore {
           || ('place' in request.resource.data && request.resource.data.placeCoordinate is latlng))
         // What is in the glass; missing means pils.
         && (!('drink' in request.resource.data)
-          || request.resource.data.drink in ['pils','special','wine','bubbles','cocktail','whisky','soft'])
+          || request.resource.data.drink in ['pils','special','wine','bubbles','cocktail','whisky'])
         && request.resource.data.ownerUid == me()
         && request.resource.data.ownerName is string
         && request.resource.data.ownerName.size() >= 1
