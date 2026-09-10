@@ -41,6 +41,13 @@ struct HomeView: View {
     /// Anchor for the feed's minute tick. Stable across re-renders, unlike a
     /// fresh `.now` in the body, so the schedule never restarts.
     @State private var glassClock = Date()
+    /// True for 1.5 s after a locked tap: the footnote goes amber so the reason
+    /// the tap did nothing is where the eye already is.
+    @State private var lockedNudge = false
+    /// Latest nudge wins — an older one must not switch the caption back early.
+    @State private var lockedNudgeToken = 0
+    /// Bumped to shake the camera cell when a locked tap lands on it.
+    @State private var cameraShake = 0
 
     static let reportReasons = ["Not a drink 🚨", "Inappropriate photo", "Harassment", "Other"]
 
@@ -69,11 +76,13 @@ struct HomeView: View {
             GeometryReader { proxy in
                 // The glasses on the rows drain over the 24 hours: one tick a
                 // minute re-renders their levels (and retires an expired photo
-                // chip) without a timer of our own.
-                TimelineView(.periodic(from: glassClock, by: 60)) { context in
+                // chip) without a timer of our own. While the one-minute lock
+                // runs, the same tick goes to 1 s so "next in Ns" counts down —
+                // and drops back to 60 s the moment it is over.
+                TimelineView(.periodic(from: glassClock, by: isLocked ? 1 : 60)) { context in
                     List {
                         Section {
-                            heroRow
+                            heroRow(now: context.date)
                                 .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 20, trailing: 16))
                                 .listRowSeparator(.hidden)
                                 .listRowBackground(Color.clear)
@@ -133,7 +142,7 @@ struct HomeView: View {
         .fullScreenCover(isPresented: $showCamera) {
             CameraView { data in
                 let drink = selectedDrink ?? DrinkKind(rawValue: lastDrink) ?? .pils
-                Task { await viewModel.logBeer(photoJPEG: data, drink: drink) }
+                Task { await viewModel.logBeer(photoJPEG: data, drink: drink, myUid: profile.id) }
             }
             .ignoresSafeArea()
         }
@@ -189,21 +198,33 @@ struct HomeView: View {
 
     /// The glasses own the screen: pick what you are drinking and it is logged on
     /// the tap that fills the glass (Tim: "je moet selecteren wat voor drankje").
+    /// The glass you picked STAYS full and drains with the drink, and for the
+    /// minute after it every glass is locked: a tap shakes instead of logging
+    /// ("the pour animation should not then clear, but it should also prevent
+    /// someone from spamming the button").
     /// The camera is the LAST cell of the same scrolling row — a photo is just
     /// another way to log this round, not a second, competing control — and one
     /// footnote sits under the row. Everything is disabled while a photo uploads.
-    private var heroRow: some View {
-        VStack(alignment: .leading, spacing: 8) {
+    private func heroRow(now: Date) -> some View {
+        // Your own newest drink: which glass stays full, and how full it still is.
+        let mine = viewModel.latestOwnDrink(myUid: profile.id)
+        return VStack(alignment: .leading, spacing: 8) {
             // Camera pinned OUTSIDE the scrolling row so it is always in the first
             // viewport; the glasses scroll beside it and the next one peeks.
             HStack(alignment: .bottom, spacing: 8) {
                 DrinkPickerView(
                     selected: $selectedDrink,
                     isBusy: viewModel.isUploadingPhoto,
+                    currentDrink: mine?.drink,
+                    // Draining on the timeline tick, so the glass in the picker
+                    // and the glass on your feed row are the same drink.
+                    currentLevel: mine?.fillLevel(now: now) ?? 0,
+                    isLocked: isLocked,
                     onPick: { kind in
                         // The row springs in from the feed animation, as before.
-                        Task { await viewModel.logBeer(photoJPEG: nil, drink: kind) }
-                    }
+                        Task { await viewModel.logBeer(photoJPEG: nil, drink: kind, myUid: profile.id) }
+                    },
+                    onLockedTap: { flashLockedCaption() }
                 )
                 cameraCell
                     // Same vertical chrome as a glass cell (6 inside + 4 on the
@@ -213,9 +234,12 @@ struct HomeView: View {
                     .layoutPriority(1)   // the row scrolls; the camera keeps its width
             }
 
-            Text("Tap a glass to log it")
+            // One footnote does both jobs: the invitation, and — while the lock
+            // runs — the reason and the wait, counting down on the same tick.
+            Text(caption)
                 .font(.footnote)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(lockedNudge ? Theme.accentInk : Color.secondary)
+                .animation(Theme.quick, value: lockedNudge)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .disabled(viewModel.isUploadingPhoto)
@@ -226,6 +250,14 @@ struct HomeView: View {
     private var cameraCell: some View {
         VStack(spacing: 4) {
             Button {
+                // A photo is still a drink: the same one-minute lock applies, and
+                // the cell shakes rather than opening the camera for nothing.
+                if isLocked {
+                    Haptics.warning()
+                    cameraShake += 1
+                    flashLockedCaption()
+                    return
+                }
                 Haptics.light()
                 showCamera = true
             } label: {
@@ -233,13 +265,41 @@ struct HomeView: View {
             }
             .buttonStyle(RoundIconButtonStyle(size: 56))
             .accessibilityLabel("Log a drink with a photo")
-            .accessibilityHint("Uses the last glass you picked")
+            .accessibilityHint(isLocked ? "Locked for a minute after logging" : "Uses the last glass you picked")
             .accessibilityIdentifier("home.camera")
 
             Text("Photo")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
+        }
+        .lockedShake(trigger: cameraShake)
+    }
+
+    // MARK: - The one-minute lock
+
+    /// True while `HomeViewModel` would refuse the next drink (60 s).
+    private var isLocked: Bool {
+        viewModel.cooldownRemaining(myUid: profile.id) > 0
+    }
+
+    /// The footnote under the row: the invitation, or the wait.
+    private var caption: String {
+        let remaining = viewModel.cooldownRemaining(myUid: profile.id)
+        guard remaining > 0 else { return "Tap a glass to log it" }
+        // Ceil, so the last second still reads "next in 1s" rather than "0s".
+        return "Enjoy that one first · next in \(Int(remaining.rounded(.up)))s"
+    }
+
+    /// A locked tap flashes the footnote amber for a beat, then lets it go quiet
+    /// again — the countdown itself stays put.
+    private func flashLockedCaption() {
+        lockedNudgeToken += 1
+        let token = lockedNudgeToken
+        lockedNudge = true
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(1.5))
+            if lockedNudgeToken == token { lockedNudge = false }
         }
     }
 

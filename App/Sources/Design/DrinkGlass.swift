@@ -74,9 +74,16 @@ struct DrinkGlassView: View {
 
 /// The hero of Home: seven glasses, "empty-ish", one tap each, in the canonical
 /// `DrinkKind` order — the row never reshuffles, so the glass you reach for is
-/// always in the same place. Tapping pours the glass full over `Theme.pour`,
-/// hands the kind to `onPick`, and eases back down so the row is ready for the
-/// next round. The last drink you picked keeps a soft amber tile.
+/// always in the same place. Tapping pours the glass full over `Theme.pour` and
+/// hands the kind to `onPick`; the glass then STAYS full and drains with the
+/// drink, because `currentDrink` / `currentLevel` follow the row that just
+/// arrived in the feed (Tim: "the pour animation should not then clear, but it
+/// should also prevent someone from spamming the button"). The last drink you
+/// picked keeps a soft amber tile.
+///
+/// The spam half of that sentence is `isLocked`: for the minute after a drink,
+/// a tap logs nothing — it fires a warning haptic, shakes the cell, and calls
+/// `onLockedTap` so the caller can say why in its caption.
 ///
 /// `accessory` is one extra cell appended after the glasses, inside the same
 /// scrolling row (Home puts the camera shortcut there), so the row reads as one
@@ -84,7 +91,17 @@ struct DrinkGlassView: View {
 struct DrinkPickerView<Accessory: View>: View {
     @Binding var selected: DrinkKind?
     var isBusy: Bool = false
+    /// What the user is drinking right now (their latest own row in the feed),
+    /// and how full that glass is — `nil` when they have nothing on the go.
+    var currentDrink: DrinkKind?
+    /// Live fill of `currentDrink`: 1.0 the moment it is logged, draining over
+    /// the 24 hours. Ignored when `currentDrink` is nil.
+    var currentLevel: Double = 0
+    /// True while the one-minute cooldown after the last drink is running.
+    var isLocked: Bool = false
     let onPick: (DrinkKind) -> Void
+    /// Called instead of `onPick` when a locked glass is tapped.
+    var onLockedTap: () -> Void = {}
     @ViewBuilder var accessory: () -> Accessory
 
     /// Cell metrics: seven glasses at 62 pt on a 2 pt gap put the sixth glass
@@ -94,13 +111,16 @@ struct DrinkPickerView<Accessory: View>: View {
     // peeks by ~20 pt: the row visibly continues.
     private static var cellMinWidth: CGFloat { 66 }
     private static var cellSpacing: CGFloat { 2 }
-    /// How long the poured glass stays full before it eases back.
-    private static var holdSeconds: Double { 0.6 }
 
     @AppStorage("lastDrink") private var lastDrink = DrinkKind.pils.rawValue
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    /// The glass currently poured full (one at a time).
+    /// The glass just tapped (one at a time). A bridge only: it holds the glass
+    /// full for the instant between the tap and the optimistic feed row landing
+    /// in `currentDrink`, which then owns the level for good.
     @State private var poured: DrinkKind?
+    /// One shake counter per kind: bumping a cell's own count is what fires its
+    /// keyframes, so a locked tap never twitches the glass next door.
+    @State private var shakes: [DrinkKind: Int] = [:]
 
     private var favourite: DrinkKind {
         selected ?? DrinkKind(rawValue: lastDrink) ?? .pils
@@ -126,11 +146,24 @@ struct DrinkPickerView<Accessory: View>: View {
         .scrollIndicators(.hidden)
         .opacity(isBusy ? 0.5 : 1)
         .animation(Theme.quick, value: isBusy)
+        // The optimistic row has landed: the parent's level owns the glass from
+        // here, so drop the local bridge rather than keep a glass pinned full.
+        .onChange(of: currentDrink) { _, _ in
+            poured = nil
+        }
+    }
+
+    /// The parent's live level wins wherever it applies: the glass you are
+    /// drinking stays full and drains, every other glass rests.
+    private func displayLevel(for kind: DrinkKind) -> Double {
+        if kind == currentDrink { return currentLevel }
+        if kind == poured { return 1 }
+        return kind.restingLevel
     }
 
     private func glass(_ kind: DrinkKind) -> some View {
         let isFavourite = kind == favourite
-        let level: Double = poured == kind ? 1 : kind.restingLevel
+        let level: Double = displayLevel(for: kind)
 
         return Button {
             pick(kind)
@@ -165,38 +198,114 @@ struct DrinkPickerView<Accessory: View>: View {
         }
         // Plain: the glass IS the button, no system tint or dimming on top of it.
         .buttonStyle(.plain)
+        // Only an upload disables the row. A locked glass stays tappable on
+        // purpose: the tap is what tells you why nothing happened.
         .disabled(isBusy)
+        .lockedShake(trigger: shakes[kind] ?? 0)
         // The pils glass keeps `home.log` — it is the identifier the screenshot
         // UI test taps, and an element carries exactly one identifier.
         .accessibilityIdentifier(kind == .pils ? "home.log" : "home.drink.\(kind.rawValue)")
         .accessibilityLabel("I'm having \(kind.pushPhrase)")
         // No `.isSelected` trait: the tile marks the last drink, it is not a
         // selection you are sitting in.
-        .accessibilityHint(isFavourite ? "Your last one" : "Tells your mates, with this glass on your row")
+        .accessibilityHint(lockedHint ?? (isFavourite ? "Your last one" : "Tells your mates, with this glass on your row"))
+    }
+
+    /// While the cooldown runs, every glass says so before you tap it.
+    private var lockedHint: String? {
+        isLocked ? "Locked for a minute after logging" : nil
     }
 
     private func pick(_ kind: DrinkKind) {
+        // Anti-spam: one drink a minute. Nothing is logged and nothing is
+        // remembered as your pick — the cell just shakes back at you.
+        if isLocked {
+            Haptics.warning()
+            shakes[kind, default: 0] += 1
+            onLockedTap()
+            return
+        }
         Haptics.success()
         selected = kind
         lastDrink = kind.rawValue
+        // The pour is the whole gesture: the glass fills and STAYS full, because
+        // the row this logs immediately becomes `currentDrink` at level 1.
         withAnimation(reduceMotion ? Theme.quick : Theme.pour) { poured = kind }
         onPick(kind)
-        // Hold the full glass for a beat, then let it settle back so the row
-        // reads as "pick another one" again.
-        Task { @MainActor in
-            try? await Task.sleep(for: .seconds(Self.holdSeconds))
-            withAnimation(reduceMotion ? Theme.quick : .easeOut(duration: 0.35)) {
-                if poured == kind { poured = nil }
-            }
-        }
     }
 }
 
 /// Convenience for the common case (no accessory cell): the previews and any
 /// caller that just wants the seven glasses.
 extension DrinkPickerView where Accessory == EmptyView {
-    init(selected: Binding<DrinkKind?>, isBusy: Bool = false, onPick: @escaping (DrinkKind) -> Void) {
-        self.init(selected: selected, isBusy: isBusy, onPick: onPick, accessory: { EmptyView() })
+    init(
+        selected: Binding<DrinkKind?>,
+        isBusy: Bool = false,
+        currentDrink: DrinkKind? = nil,
+        currentLevel: Double = 0,
+        isLocked: Bool = false,
+        onPick: @escaping (DrinkKind) -> Void,
+        onLockedTap: @escaping () -> Void = {}
+    ) {
+        self.init(
+            selected: selected,
+            isBusy: isBusy,
+            currentDrink: currentDrink,
+            currentLevel: currentLevel,
+            isLocked: isLocked,
+            onPick: onPick,
+            onLockedTap: onLockedTap,
+            accessory: { EmptyView() }
+        )
+    }
+}
+
+// MARK: - Locked feedback
+
+/// The warning notification haptic, which `Theme.Haptics` does not carry: it
+/// exists for exactly one thing in this app — a tap that was refused.
+extension Haptics {
+    static func warning() { UINotificationFeedbackGenerator().notificationOccurred(.warning) }
+}
+
+/// "No." A cell that refuses a tap shakes ±6 pt over 0.35 s, fired by bumping
+/// `trigger` (so each cell owns its own counter). Under Reduce Motion the same
+/// refusal reads as a quick blink instead of a slide — no travel, same beat.
+struct LockedShakeModifier: ViewModifier {
+    var trigger: Int
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if reduceMotion {
+            content.keyframeAnimator(initialValue: 1.0, trigger: trigger) { view, opacity in
+                view.opacity(opacity)
+            } keyframes: { _ in
+                KeyframeTrack {
+                    LinearKeyframe(0.45, duration: 0.10)
+                    LinearKeyframe(1.0, duration: 0.15)
+                }
+            }
+        } else {
+            content.keyframeAnimator(initialValue: CGFloat(0), trigger: trigger) { view, offset in
+                view.offset(x: offset)
+            } keyframes: { _ in
+                KeyframeTrack {
+                    CubicKeyframe(-6, duration: 0.09)
+                    CubicKeyframe(6, duration: 0.09)
+                    CubicKeyframe(-6, duration: 0.09)
+                    CubicKeyframe(0, duration: 0.08)
+                }
+            }
+        }
+    }
+}
+
+extension View {
+    /// Shakes this view once every time `trigger` changes (see
+    /// `LockedShakeModifier`). Home uses it on the camera cell too.
+    func lockedShake(trigger: Int) -> some View {
+        modifier(LockedShakeModifier(trigger: trigger))
     }
 }
 
@@ -516,7 +625,18 @@ private enum DrinkGlassPalette {
                     }
                 }
             }
-            DrinkPickerView(selected: .constant(nil), isBusy: false) { _ in }
+            // Free to tap, nothing on the go.
+            DrinkPickerView(selected: .constant(nil), isBusy: false, onPick: { _ in })
+            // Mid-cooldown: the wine glass stays nearly full, the rest rest.
+            DrinkPickerView(
+                selected: .constant(.wine),
+                isBusy: false,
+                currentDrink: .wine,
+                currentLevel: 0.96,
+                isLocked: true,
+                onPick: { _ in },
+                onLockedTap: {}
+            )
         }
         .padding()
     }

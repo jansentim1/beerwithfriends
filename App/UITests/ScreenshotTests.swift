@@ -42,6 +42,15 @@ final class ScreenshotTests: XCTestCase {
         XCTAssertTrue(log.waitForExistence(timeout: 20), "home screen did not appear")
         snap("03-home-empty")
 
+        // Camera BEFORE logging: after a log the picker (camera included) is locked
+        // for a minute against spamming.
+        app.buttons["home.camera"].tap()
+        sleep(2) // camera permission / unavailable state on the simulator
+        snap("07-camera")
+        let cancel = app.buttons["Cancel"]
+        if cancel.waitForExistence(timeout: 3) { cancel.tap() }
+        XCTAssertTrue(log.waitForExistence(timeout: 5), "home did not come back after the camera")
+
         log.tap()
         XCTAssertTrue(app.staticTexts["You"].waitForExistence(timeout: 10), "logged beer row missing")
         snap("04-home-beer")
@@ -57,11 +66,6 @@ final class ScreenshotTests: XCTestCase {
         app.tabBars.buttons["Settings"].tap()
         XCTAssertTrue(app.navigationBars.element.waitForExistence(timeout: 5))
         snap("06-settings")
-
-        app.tabBars.buttons["Beers"].tap()
-        app.buttons["home.camera"].tap()
-        sleep(2) // camera permission / unavailable state on the simulator
-        snap("07-camera")
     }
 
     // MARK: - Helpers
