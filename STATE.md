@@ -1,4 +1,6 @@
 # Loop state
+- 2026-09-10 late: build 18 (Groups) LIVE for mates (BETA_APPROVED). Pending build 19 on main (compiled clean, run 34520344822): feed pills never wrap + ViewThatFits row (fixes Lucas/Menno alignment screenshots), whole-unit time labels, Groups review fix round (8 items), member displayName. Ship it: `gh workflow run ios-testflight`, then attach/submit via ~/bin/asc as before.
+- OPEN: (a) seeded rig `testPopulated` fails "home did not appear for the seeded account" (run 34521275224) — the fresh-account walkthrough passes; debug the `-UITestAccount tim` email sign-in against the Auth emulator (seed creates tim@test.local / pubdates1; AppState.signInForUITests). (b) Tim to choose dark-mode: neutral grey surfaces vs light-only (Menno: "heel donker"). (c) Groups verdict pass with populated frames once (a) works. (d) Menno's original sign-up error text still unknown.
 - HANDOVER: docs/HANDOVER_2026-09-10.md (everything open + the one big plan). Read it first.
 - 2026-09-10 night: build 17 (pour→camera, universal invite links, 15-min glass, cooldown, soft drink out) and build 18 (Groups tab + leaderboard, join links) shipped; both submitted to mates. Milestone G done except the design review pass; universal-link AASA fixed (hosting ignore).
 - Current task: 12 (handover; compile loop now lives in CI)
