@@ -39,7 +39,7 @@ seed key (user-pinned direction, concept-seed not run).
 Signature interaction (amended): tapping a glass plays a haptic `.success`, the glass
 fills to the brim (liquid level 0.15-ish → 1.0, 350 ms, ease-out-quint), holds, settles
 back, and the new row springs in at the top of the feed with its full glass, which then
-drains over 24 hours. Reduce Motion: crossfade.
+empties over 15 minutes; the row stays in the feed for 24 hours. Reduce Motion: crossfade.
 
 FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review,
 the verdict, DESIGN.md, and every shipping raster carrying its provenance.

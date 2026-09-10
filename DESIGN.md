@@ -1,6 +1,6 @@
 ---
 name: PubDates
-description: A row of drawn glasses; tap one and your mates hear it; the feed drains over 24 hours.
+description: A row of drawn glasses; tap one and your mates hear it; each glass empties in 15 minutes, the row stays a day.
 colors:
   pint-amber: "#E68A00"
   pint-amber-dark: "#FFA733"
@@ -181,7 +181,7 @@ The glasses are the only place in the app with colour beyond amber, and they are
 
 **Key Characteristics:**
 - One accent (pint amber) re-tuned per scheme, split into a fill role and a text role; the drawn glasses are the only other colour, and they are content.
-- The hero is a scrolling row of seven vector glasses with a pinned round camera cell; every logged drink carries its glass, draining over 24 hours.
+- The hero is a scrolling row of seven vector glasses with a pinned round camera cell; every logged drink carries its glass, emptying in 15 minutes.
 - Flat, tonal depth: ground vs. surface, amber wash for lift, material blur over map and camera, no shadows.
 - SF Pro for reading, SF Rounded bold for everything that names or commands (large titles, empty-state headlines, the hero label, initials).
 - Large continuous corners: 20 pt hero, 16 pt card, 12 pt favourite tile, capsules and circles everywhere else.
