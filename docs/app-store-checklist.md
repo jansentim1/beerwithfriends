@@ -22,7 +22,7 @@ Declare these as **collected, linked to the user, not used for tracking**:
 | Contact Info | Name (display name) | App functionality |
 | User Content | Photos, Other user content (beer logs) | App functionality |
 | Identifiers | User ID | App functionality |
-| Location | Coarse location (place name only, opt-in) | App functionality |
+| Location | Coarse location (place name and the place's position, opt-in) | App functionality |
 | Contacts | none | |
 | Usage Data | none | |
 | Diagnostics | none (no crash SDK) | |
