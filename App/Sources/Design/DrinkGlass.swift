@@ -157,6 +157,11 @@ struct DrinkPickerView<Accessory: View>: View {
                 }
             }
             .contentShape(Rectangle())
+            // The cell leaving the viewport dims as a whole (glass + label), so
+            // the peek reads as "more this way", not as a severed word.
+            .scrollTransition(.interactive, axis: .horizontal) { content, phase in
+                content.opacity(phase.isIdentity ? 1 : 0.45)
+            }
         }
         // Plain: the glass IS the button, no system tint or dimming on top of it.
         .buttonStyle(.plain)

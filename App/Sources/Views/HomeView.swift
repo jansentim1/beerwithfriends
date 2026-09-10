@@ -206,6 +206,9 @@ struct HomeView: View {
                     }
                 )
                 cameraCell
+                    // Same vertical chrome as a glass cell (6 inside + 4 on the
+                    // scroll view) so "Photo" shares the labels' baseline.
+                    .padding(.vertical, 6)
                     .padding(.bottom, 4)
                     .layoutPriority(1)   // the row scrolls; the camera keeps its width
             }
