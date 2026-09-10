@@ -24,9 +24,11 @@ and a little bit fun.
 
 ## Positioning
 
-The disappearing, view-once beer photo enforced by the server (not just hidden) plus the
-push-and-cheers loop with zero feed scrolling. Not a stats app, not a leaderboard, not a
-chat. One button.
+The disappearing, view-once photo enforced by the server (not just hidden) plus the
+push-and-cheers loop with zero feed scrolling. Not a personal stats app, not a chat.
+Groups (2026-09-10, Tim: "battelen tegen andere groepen") add one shared number per crew,
+today's drinks, on an app-wide leaderboard; it is a battle between crews, never a
+personal score.
 
 ## Operating Context
 
@@ -77,7 +79,8 @@ chat. One button.
 1. One thumb, one tap: the log button is the product; everything else is secondary.
 2. Instant: optimistic UI everywhere; the network never blocks the ritual.
 3. Ephemeral by design: 24 h and view-once are features, the UI should make them legible.
-4. Friends, not followers: small groups, exact usernames, no discovery, no numbers to chase.
+4. Friends, not followers: small groups, exact usernames, no discovery, no personal numbers
+   to chase (the only counter is a crew's today, on the Groups leaderboard).
 5. Native first: an iPhone user should never pause at an off-spec control.
 
 ## Accessibility & Inclusion

@@ -53,7 +53,7 @@ const group = async (id, name, code, members, todayCount, totalCount) => {
   await db.doc(`groups/${id}`).set({ name, code, createdBy: members[0], createdAt: Timestamp.now(), memberCount: members.length, todayDate: day, todayCount, totalCount });
   for (const m of members) {
     const uname = m === tim ? "tim" : "joost";
-    await db.doc(`groups/${id}/members/${m}`).set({ username: uname, joinedAt: Timestamp.now() });
+    await db.doc(`groups/${id}/members/${m}`).set({ username: uname, displayName: uname === "tim" ? "Tim" : "Joost", joinedAt: Timestamp.now() });
     await db.doc(`users/${m}/groups/${id}`).set({ name, joinedAt: Timestamp.now() });
   }
 };

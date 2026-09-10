@@ -25,17 +25,17 @@ export function randomCode(length = 6, rnd: () => number = Math.random): string 
   return out;
 }
 
-async function usernameOf(db: Firestore, uid: string): Promise<string> {
+async function profileOf(db: Firestore, uid: string): Promise<{ username: string; displayName: string }> {
   const u = await db.doc(`users/${uid}`).get();
-  const name = u.get("usernameLower");
-  if (!name) throw new GroupError("NO_PROFILE");
-  return name;
+  const username = u.get("usernameLower");
+  if (!username) throw new GroupError("NO_PROFILE");
+  return { username, displayName: (u.get("displayName") as string | undefined) || username };
 }
 
 export async function createGroupCore(db: Firestore, uid: string, rawName: string, now = new Date(), rnd: () => number = Math.random) {
   const name = rawName.trim();
   if (name.length < 1 || name.length > GROUP_NAME_MAX) throw new GroupError("INVALID_NAME");
-  const username = await usernameOf(db, uid);
+  const { username, displayName } = await profileOf(db, uid);
   // A fresh code that is not in use (collision odds are tiny; loop is cheap).
   let code = randomCode(6, rnd);
   for (let i = 0; i < 5; i++) {
@@ -49,7 +49,7 @@ export async function createGroupCore(db: Firestore, uid: string, rawName: strin
     name, code, createdBy: uid, createdAt: Timestamp.fromDate(now), memberCount: 1,
     todayDate: amsterdamDay(now), todayCount: 0, totalCount: 0,
   });
-  batch.set(ref.collection("members").doc(uid), { username, joinedAt: Timestamp.fromDate(now) });
+  batch.set(ref.collection("members").doc(uid), { username, displayName, joinedAt: Timestamp.fromDate(now) });
   batch.set(db.doc(`users/${uid}/groups/${ref.id}`), { name, joinedAt: Timestamp.fromDate(now) });
   await batch.commit();
   return { id: ref.id, name, code };
@@ -60,13 +60,13 @@ export async function joinGroupCore(db: Firestore, uid: string, rawCode: string,
   const found = await db.collection("groups").where("code", "==", code).limit(1).get();
   if (found.empty) throw new GroupError("NOT_FOUND");
   const ref = found.docs[0].ref;
-  const username = await usernameOf(db, uid);
+  const { username, displayName } = await profileOf(db, uid);
   const name = await db.runTransaction(async (tx: Transaction) => {
     const [group, member] = await Promise.all([tx.get(ref), tx.get(ref.collection("members").doc(uid))]);
     if (!group.exists) throw new GroupError("NOT_FOUND");
     if (member.exists) throw new GroupError("ALREADY_MEMBER");
     if ((group.get("memberCount") ?? 0) >= GROUP_MAX_MEMBERS) throw new GroupError("FULL");
-    tx.set(ref.collection("members").doc(uid), { username, joinedAt: Timestamp.fromDate(now) });
+    tx.set(ref.collection("members").doc(uid), { username, displayName, joinedAt: Timestamp.fromDate(now) });
     tx.set(db.doc(`users/${uid}/groups/${ref.id}`), { name: group.get("name"), joinedAt: Timestamp.fromDate(now) });
     tx.update(ref, { memberCount: FieldValue.increment(1) });
     return group.get("name") as string;

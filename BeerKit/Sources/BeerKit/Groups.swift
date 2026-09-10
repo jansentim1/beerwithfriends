@@ -32,9 +32,10 @@ public struct GroupSummary: Codable, Equatable, Identifiable, Sendable {
 public struct GroupMember: Codable, Equatable, Identifiable, Sendable {
     public var id: String          // uid
     public var username: String
+    public var displayName: String
     public var joinedAt: Date
-    public init(id: String, username: String, joinedAt: Date) {
-        self.id = id; self.username = username; self.joinedAt = joinedAt
+    public init(id: String, username: String, displayName: String? = nil, joinedAt: Date) {
+        self.id = id; self.username = username; self.displayName = displayName ?? username; self.joinedAt = joinedAt
     }
 }
 

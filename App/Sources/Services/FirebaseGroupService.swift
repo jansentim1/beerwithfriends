@@ -61,6 +61,7 @@ final class FirebaseGroupService: GroupServicing, @unchecked Sendable {
         return snapshot.documents.map { doc in
             GroupMember(id: doc.documentID,
                         username: doc.get("username") as? String ?? "?",
+                        displayName: doc.get("displayName") as? String ?? (doc.get("username") as? String ?? "?"),
                         joinedAt: (doc.get("joinedAt") as? Timestamp)?.dateValue() ?? Date())
         }.sorted { $0.joinedAt < $1.joinedAt }
     }

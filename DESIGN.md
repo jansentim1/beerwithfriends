@@ -185,7 +185,7 @@ The glasses are the only place in the app with colour beyond amber, and they are
 - Flat, tonal depth: ground vs. surface, amber wash for lift, material blur over map and camera, no shadows.
 - SF Pro for reading, SF Rounded bold for everything that names or commands (large titles, empty-state headlines, the hero label, initials).
 - Large continuous corners: 20 pt hero, 16 pt card, 12 pt favourite tile, capsules and circles everywhere else.
-- Native iOS canon throughout: four-tab bar, large collapsing titles, plain list on Home, inset grouped elsewhere, sheets with detents, swipe actions and context menus.
+- Native iOS canon throughout: five-tab bar, large collapsing titles, plain list on Home, inset grouped elsewhere, sheets with detents, swipe actions and context menus.
 - Motion is a 350 ms pour on the glass level, a spring on row arrival, a once-a-minute drain tick (each glass empties in 15 minutes), and a fade on the glass leaving the row; Reduce Motion cuts every one of them to a 180 ms state change.
 
 ## Colors
@@ -252,7 +252,7 @@ Content colours: each drink is an explicit, scheme-aware liquid, lifted in dark 
 
 ## Layout
 
-Single-column iPhone layouts inside native containers. Every tab is a `NavigationStack` with a large title that collapses on scroll; the tab bar carries four items (Beers, Mates, Map, Settings) tinted Pint Amber.
+Single-column iPhone layouts inside native containers. Every tab is a `NavigationStack` with a large title that collapses on scroll; the tab bar carries five items (Beers, Mates, Map, Settings) tinted Pint Amber.
 
 - **Home** (`.plain` list, separators hidden): the hero row lives inside the list so the title collapses natively, with row insets 4 pt top, 16 pt sides, 20 pt bottom. It is a bottom-aligned `HStack` at 8 pt: the horizontal glass row, then the camera cell pinned outside the scroll so it is always in the first viewport (the glasses scroll beside it and the next one peeks). Under the row, one footnote "Tap a glass to log it" at 8 pt. The feed follows with no eyebrow: one row per drink at 10 pt vertical, 16 pt horizontal insets; 56 pt glass disc, name over time, then chip, reply pills and cheers pill on the trailing edge at 8 pt. At accessibility Dynamic Type sizes the trailing controls drop under the name into a leading-aligned column. The empty state claims at least half the viewport under the hero, with 24 pt insets, a title, one line and one tinted pill.
 - **Glass row** (`DrinkPickerView`): cells at a 66 pt minimum width on a 2 pt gap, each a 56 × 72 pt bottom-aligned glass frame over a caption at 4 pt, padded 6 pt vertical and 2 pt horizontal; the row has 4 pt vertical and 12 pt trailing padding. `scrollTargetLayout` with `.viewAligned` paging so a flick lands on a glass; indicators hidden. Sized so four glasses fit beside the 56 pt camera cell and the fifth peeks by about 20 pt.
@@ -344,7 +344,7 @@ A 36 pt surface disc with an Amber Wash overlay and the newest drink's glass at 
 
 ### Navigation
 - **Large titles** in rounded bold via `Theme.installNavigationBarAppearance()`, inline titles in rounded semibold headline; default bar background; titles collapse on scroll.
-- **Tab bar:** four items with filled SF Symbols (mug, person.2, map, gearshape), labels "Beers", "Mates", "Map", "Settings", tinted Pint Amber.
+- **Tab bar:** five items with filled SF Symbols (mug, person.2, map, trophy, gearshape), labels "Beers", "Mates", "Map", "Groups", "Settings", tinted Pint Amber.
 - **Lists:** Home is `.plain` with hidden separators, pull-to-refresh, swipe actions and context menus; Mates and Settings are `.insetGrouped`. Settings tints with Amber Ink; its Username row is a plain-styled button so the label stays primary and the value secondary.
 - **Sheets and dialogs:** full-screen covers for camera and photo viewer; detented sheets for the map callout, change username and QR; system confirmation dialogs for Report, Block, Remove mate, and the double Delete account confirm.
 
