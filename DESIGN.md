@@ -186,7 +186,7 @@ The glasses are the only place in the app with colour beyond amber, and they are
 - SF Pro for reading, SF Rounded bold for everything that names or commands (large titles, empty-state headlines, the hero label, initials).
 - Large continuous corners: 20 pt hero, 16 pt card, 12 pt favourite tile, capsules and circles everywhere else.
 - Native iOS canon throughout: four-tab bar, large collapsing titles, plain list on Home, inset grouped elsewhere, sheets with detents, swipe actions and context menus.
-- Motion is a 350 ms pour on the glass level, a spring on row arrival, a once-a-minute drain, and a fade on the glass leaving the row; Reduce Motion cuts every one of them to a 180 ms state change.
+- Motion is a 350 ms pour on the glass level, a spring on row arrival, a once-a-minute drain tick (each glass empties in 15 minutes), and a fade on the glass leaving the row; Reduce Motion cuts every one of them to a 180 ms state change.
 
 ## Colors
 
@@ -290,7 +290,7 @@ Motion belongs with the shapes it moves. `Theme.pour` (cubic-bezier 0.22, 1, 0.3
 ## Components
 
 ### Drink glass (`DrinkGlassView`, signature)
-The object the whole app is built around: never an image, always drawn, so it can fill on tap and drain over a day.
+The object the whole app is built around: never an image, always drawn, so it can fill on tap and empty in fifteen minutes.
 - **Anatomy:** glass body at 5% label; liquid clipped to the silhouette; a foam band on pils and special beer (cream, 7% of the height, sitting below the surface, only above the kind's resting level); three static bubbles in the flute; a 55% label outline at 2.8% of the height with round caps; stems, feet and straw stroked only.
 - **Level:** 0 is empty, 1 is the brim; the resting "empty-ish" level is tuned per kind so a martini shows a splash and a pint does not look half drunk (pils 0.18, special 0.28, wine 0.32, bubbles 0.30, cocktail 0.45, whisky 0.25, soft 0.18). A logged drink starts at 1 and drains linearly to 0 at 24 hours.
 - **Sizes:** 72 pt in the picker (in a 56 × 72 frame), 44 pt on a feed row inside a 56 pt Amber Wash disc, 32 pt on a callout row, 22 pt on a map pin.
