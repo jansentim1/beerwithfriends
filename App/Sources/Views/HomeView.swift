@@ -429,7 +429,6 @@ struct HomeView: View {
     /// Relative time, with the opt-in place after it when the beer carries one:
     /// "2 min · 📍 Café De Zon". One secondary line; the place is the part that
     /// truncates, since the time is what every row promises.
-    @ViewBuilder
     /// "just now", "9 min", "2 h", "1 d": whole units, no seconds ticking.
     static func relativeLabel(_ date: Date, now: Date) -> String {
         let s = max(0, now.timeIntervalSince(date))
@@ -439,6 +438,7 @@ struct HomeView: View {
         return "\(Int(s / 86400)) d"
     }
 
+    @ViewBuilder
     private func metadataLine(for beer: BeerLog, isAccessibilitySize: Bool, now: Date) -> some View {
         let time = Text(Self.relativeLabel(beer.createdAt, now: now))
         let place: String? = beer.place.flatMap { $0.isEmpty ? nil : $0 }
