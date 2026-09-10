@@ -90,7 +90,9 @@ struct DrinkPickerView<Accessory: View>: View {
     /// Cell metrics: seven glasses at 62 pt on a 2 pt gap put the sixth glass
     /// half past the trailing edge on the narrowest iPhone, which is what tells
     /// you the row scrolls. Paging is view-aligned so a flick lands on a glass.
-    private static var cellMinWidth: CGFloat { 62 }
+    // Sized so that, next to a 56 pt camera cell, four glasses fit and the fifth
+    // peeks by ~20 pt: the row visibly continues.
+    private static var cellMinWidth: CGFloat { 58 }
     private static var cellSpacing: CGFloat { 2 }
     /// How long the poured glass stays full before it eases back.
     private static var holdSeconds: Double { 0.6 }
@@ -115,12 +117,13 @@ struct DrinkPickerView<Accessory: View>: View {
                 accessory()
                     .padding(.horizontal, 2)
                     .padding(.vertical, 6)
-                    .frame(minWidth: Self.cellMinWidth)
             }
             .scrollTargetLayout()
             .padding(.vertical, 4)
+            .padding(.trailing, 12)
         }
         .scrollTargetBehavior(.viewAligned)
+        .scrollClipDisabled()
         .scrollIndicators(.hidden)
         .opacity(isBusy ? 0.5 : 1)
         .animation(Theme.quick, value: isBusy)

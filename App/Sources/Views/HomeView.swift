@@ -194,15 +194,20 @@ struct HomeView: View {
     /// footnote sits under the row. Everything is disabled while a photo uploads.
     private var heroRow: some View {
         VStack(alignment: .leading, spacing: 8) {
-            DrinkPickerView(
-                selected: $selectedDrink,
-                isBusy: viewModel.isUploadingPhoto,
-                onPick: { kind in
-                    // The row springs in from the feed animation, as before.
-                    Task { await viewModel.logBeer(photoJPEG: nil, drink: kind) }
-                },
-                accessory: { cameraCell }
-            )
+            // Camera pinned OUTSIDE the scrolling row so it is always in the first
+            // viewport; the glasses scroll beside it and the next one peeks.
+            HStack(alignment: .bottom, spacing: 8) {
+                DrinkPickerView(
+                    selected: $selectedDrink,
+                    isBusy: viewModel.isUploadingPhoto,
+                    onPick: { kind in
+                        // The row springs in from the feed animation, as before.
+                        Task { await viewModel.logBeer(photoJPEG: nil, drink: kind) }
+                    }
+                )
+                cameraCell
+                    .padding(.bottom, 4)
+            }
 
             Text("Tap a glass to log it")
                 .font(.footnote)
