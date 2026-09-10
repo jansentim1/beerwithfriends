@@ -24,7 +24,9 @@ final class ScreenshotTests: XCTestCase {
         XCTAssertTrue(testSignIn.waitForExistence(timeout: 10))
         testSignIn.tap()
         let log = app.buttons["home.log"]
-        XCTAssertTrue(log.waitForExistence(timeout: 20), "home did not appear for the seeded account")
+        let home = log.waitForExistence(timeout: 20)
+        if !home { snap("08x-after-seeded-signin") }
+        XCTAssertTrue(home, "home did not appear for the seeded account")
         XCTAssertTrue(app.staticTexts["joost"].waitForExistence(timeout: 15), "mate's drinks missing")
         snap("08-home-populated")
 
@@ -50,8 +52,9 @@ final class ScreenshotTests: XCTestCase {
     }
 
     override func tearDown() {
-        // Whatever is on screen when a step fails is the most useful evidence.
-        snap("99-final-state")
+        // Whatever is on screen when a step fails is the most useful evidence;
+        // one file per test, so the second test cannot overwrite the first's.
+        snap(name.contains("Populated") ? "99-final-populated" : "99-final-walkthrough")
     }
 
     func testWalkthrough() throws {
