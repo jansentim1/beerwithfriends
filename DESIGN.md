@@ -299,7 +299,7 @@ The object the whole app is built around: never an image, always drawn, so it ca
 ### Glass row (`DrinkPickerView`, signature)
 Seven glasses in canonical order (pils, special beer, wine, bubbles, cocktail, whisky, soft drink), one tap each, in a horizontal `ScrollView` with view-aligned paging.
 - **Cell:** glass over a caption, 66 pt minimum width, 6/2 pt padding, plain button style (the glass is the button, no tint on top). The last picked kind sits on a 12 pt Amber Wash tile with its caption in Amber Ink; other captions are secondary.
-- **Tap:** `.success` haptic, the glass pours full on `pour`, the kind is handed off, and after 0.6 s it settles back. Only one glass is poured at a time. While a photo uploads the whole row dims to 50%.
+- **Tap:** `.success` haptic, the glass pours full on `pour`, the kind is handed off, and the glass then stays full, emptying with the drink over fifteen minutes. Taps within a minute of a log shake the glass instead (warning haptic). While a photo uploads the whole row dims to 50%.
 - **Accessory:** the camera cell wears the same vertical chrome (6 pt inside, 4 pt on the scroll view) so "Photo" shares the captions' baseline. In the build it is pinned outside the scroll so it never leaves the first viewport.
 
 ### Camera cell (`RoundIconButtonStyle`)
