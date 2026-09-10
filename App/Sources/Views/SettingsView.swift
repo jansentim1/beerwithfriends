@@ -197,7 +197,7 @@ struct SettingsView: View {
         } header: {
             Text("Privacy")
         } footer: {
-            Text("Only the name of the bar or the city goes with your beer, never your exact location. Mates only.")
+            Text("The bar's name and its map position go with your drink, never your own location. Mates only, in the feed and on the Map.")
         }
     }
 
