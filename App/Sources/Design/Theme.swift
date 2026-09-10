@@ -150,6 +150,8 @@ struct PillButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.subheadline.weight(.semibold))
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)   // a pill never wraps
             .foregroundStyle(foreground)
             .padding(.horizontal, 14)
             .frame(minHeight: 36)
@@ -202,6 +204,8 @@ struct StatusPill: View {
     var body: some View {
         Text(text)
             .font(.caption.weight(.semibold))
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)   // a pill never wraps
             .foregroundStyle(.secondary)
             .padding(.horizontal, 10)
             .frame(minHeight: 28)

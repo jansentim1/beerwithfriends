@@ -351,31 +351,37 @@ struct HomeView: View {
     private func feedRow(_ beer: BeerLog, now: Date) -> some View {
         let isMine = beer.ownerUid == profile.id
         let isAccessibilitySize = dynamicTypeSize.isAccessibilitySize
-        // At accessibility sizes the chip and the cheers control drop under the
-        // name instead of squeezing it into an ellipsis.
-        let layout = isAccessibilitySize
-            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
-            : AnyLayout(HStackLayout(alignment: .center, spacing: 12))
 
-        return HStack(alignment: isAccessibilitySize ? .top : .center, spacing: 12) {
+        // The pills never wrap (fixedSize). When the row is crowded (a chip, two
+        // reply pills and cheers) ViewThatFits drops them under the name instead
+        // of squeezing them into letter-by-letter capsules (seen on device).
+        let identity = VStack(alignment: .leading, spacing: 2) {
+            // "You" stays a standalone static text — the UI test looks for it.
+            Text(isMine ? "You" : beer.ownerName)
+                .font(.headline)
+                .lineLimit(isAccessibilitySize ? nil : 1)
+            metadataLine(for: beer, isAccessibilitySize: isAccessibilitySize, now: now)
+        }
+        let pills = HStack(spacing: 8) {
+            photoChip(for: beer, now: now)
+            replyPills(for: beer)
+            reactionControl(for: beer, isMine: isMine)
+        }
+        .fixedSize(horizontal: true, vertical: false)
+
+        return HStack(alignment: .top, spacing: 12) {
             drinkGlass(for: beer, name: isMine ? profile.displayName : beer.ownerName, now: now)
 
-            layout {
-                VStack(alignment: .leading, spacing: 2) {
-                    // "You" stays a standalone static text — the UI test looks for it.
-                    Text(isMine ? "You" : beer.ownerName)
-                        .font(.headline)
-                        .lineLimit(isAccessibilitySize ? nil : 1)
-                    metadataLine(for: beer, isAccessibilitySize: isAccessibilitySize)
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .center, spacing: 12) {
+                    identity.frame(maxWidth: .infinity, alignment: .leading)
+                    pills
                 }
-                .fixedSize(horizontal: false, vertical: true)
+                VStack(alignment: .leading, spacing: 8) {
+                    identity
+                    pills
+                }
                 .frame(maxWidth: .infinity, alignment: .leading)
-
-                HStack(spacing: 8) {
-                    photoChip(for: beer, now: now)
-                    replyPills(for: beer)
-                    reactionControl(for: beer, isMine: isMine)
-                }
             }
         }
         .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
@@ -424,8 +430,17 @@ struct HomeView: View {
     /// "2 min · 📍 Café De Zon". One secondary line; the place is the part that
     /// truncates, since the time is what every row promises.
     @ViewBuilder
-    private func metadataLine(for beer: BeerLog, isAccessibilitySize: Bool) -> some View {
-        let time = Text(beer.createdAt, style: .relative)
+    /// "just now", "9 min", "2 h", "1 d": whole units, no seconds ticking.
+    static func relativeLabel(_ date: Date, now: Date) -> String {
+        let s = max(0, now.timeIntervalSince(date))
+        if s < 60 { return "just now" }
+        if s < 3600 { return "\(Int(s / 60)) min" }
+        if s < 86400 { return "\(Int(s / 3600)) h" }
+        return "\(Int(s / 86400)) d"
+    }
+
+    private func metadataLine(for beer: BeerLog, isAccessibilitySize: Bool, now: Date) -> some View {
+        let time = Text(Self.relativeLabel(beer.createdAt, now: now))
         let place: String? = beer.place.flatMap { $0.isEmpty ? nil : $0 }
         Group {
             if let place {
