@@ -11,7 +11,7 @@ import { getPhotoOnceCore, PhotoError, PhotoErrorCode } from "./photo";
 import { fanoutBeerCreated, notifyCheers, notifyReply, Pusher, ReplyKind } from "./pushes";
 import { sendApns, deadTokens } from "./apns";
 import { loadApnsKey } from "./apnsKey";
-import { mirrorFriendship, severOnBlock, cleanupExpiredCore, deleteAccountCore, changeUsernameCore, UsernameError, PhotoDeleter } from "./lifecycle";
+import { mirrorFriendship, severOnBlock, cleanupExpiredCore, deleteAccountCore, changeUsernameCore, enforceDrinkCooldown, UsernameError, PhotoDeleter } from "./lifecycle";
 
 // Colocated with Firestore + Storage (europe-west4); see .firebaserc / tools/deploy.sh.
 setGlobalOptions({ region: "europe-west4" });
@@ -79,6 +79,10 @@ const push: Pusher = async (targets, title, body, data) => {
 export const onBeerCreated = onDocumentCreated("beers/{beerId}", async (event) => {
   const beer = event.data?.data();
   if (!beer) return;
+  const createdAt = (beer.createdAt as { toDate?: () => Date } | undefined)?.toDate?.() ?? new Date();
+  // Anti-spam: one drink per person per minute; extras are deleted, no pushes.
+  const ok = await enforceDrinkCooldown(getFirestore(), event.params.beerId, beer.ownerUid, createdAt);
+  if (!ok) { console.warn(`cooldown: dropped beers/${event.params.beerId} from ${beer.ownerUid}`); return; }
   await fanoutBeerCreated(getFirestore(), push, event.params.beerId,
     beer as { ownerUid: string; ownerName: string; hasPhoto: boolean; place?: string });
 });

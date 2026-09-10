@@ -37,11 +37,13 @@ public struct BeerLog: Codable, Equatable, Identifiable, Sendable {
         self.hasPhoto = hasPhoto; self.cheersCount = cheersCount; self.place = place
         self.replies = replies; self.drink = drink; self.placeCoordinate = placeCoordinate
     }
-    /// 1.0 when just poured, 0.0 at expiry: the glass drains over the 24 hours.
+    /// How long a glass takes to empty (Tim: "beers are empty in 15 minutes").
+    /// The row itself stays in the feed until `expiresAt` (24 h), glass empty.
+    public static let drinkDuration: TimeInterval = 15 * 60
+    /// 1.0 when just poured, 0.0 fifteen minutes later.
     public func fillLevel(now: Date) -> Double {
-        let total = expiresAt.timeIntervalSince(createdAt)
-        guard total > 0 else { return 0 }
-        return min(1, max(0, expiresAt.timeIntervalSince(now) / total))
+        let elapsed = now.timeIntervalSince(createdAt)
+        return min(1, max(0, 1 - elapsed / Self.drinkDuration))
     }
     public func replyCount(_ kind: ReplyKind) -> Int { replies.values.filter { $0 == kind }.count }
     public static let placeMaxLength = 60

@@ -126,3 +126,22 @@ export async function changeUsernameCore(db: Firestore, uid: string, raw: string
   });
   return username;
 }
+
+export const DRINK_COOLDOWN_MS = 60_000;
+
+/**
+ * Anti-spam: a second drink from the same owner within the cooldown is deleted
+ * (and the caller skips the push fanout). Returns true when the drink survives.
+ */
+export async function enforceDrinkCooldown(db: Firestore, beerId: string, ownerUid: string, createdAt: Date): Promise<boolean> {
+  const since = Timestamp.fromDate(new Date(createdAt.getTime() - DRINK_COOLDOWN_MS));
+  const recent = await db.collection("beers")
+    .where("ownerUid", "==", ownerUid)
+    .where("createdAt", ">=", since)
+    .where("createdAt", "<", Timestamp.fromDate(createdAt))
+    .limit(1)
+    .get();
+  if (recent.empty) return true;
+  await db.recursiveDelete(db.doc(`beers/${beerId}`));
+  return false;
+}

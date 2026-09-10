@@ -320,6 +320,32 @@ final class FakePlaces: PlaceProviding, @unchecked Sendable {
     }
 }
 
+@Suite struct CooldownTests {
+    @Test @MainActor func secondLogWithinAMinuteIsRefused() async {
+        let svc = FakeBeerService()
+        var clock = Date(timeIntervalSince1970: 500)
+        let vm = HomeViewModel(service: svc, now: { clock })
+        #expect(await vm.logBeer(photoJPEG: nil, drink: .pils, myUid: "me"))
+        #expect(vm.cooldownRemaining(myUid: "me") > 0)
+        #expect(await vm.logBeer(photoJPEG: nil, drink: .wine, myUid: "me") == false)
+        #expect(svc.logged.count == 1)
+        clock = clock.addingTimeInterval(61)
+        #expect(vm.cooldownRemaining(myUid: "me") == 0)
+        #expect(await vm.logBeer(photoJPEG: nil, drink: .wine, myUid: "me"))
+        #expect(svc.logged.count == 2)
+    }
+    @Test @MainActor func latestOwnDrinkIgnoresMates() async {
+        let svc = FakeBeerService()
+        let vm = HomeViewModel(service: svc, now: { Date(timeIntervalSince1970: 500) })
+        let running = await startAndWaitForSubscription(vm, svc)
+        svc.feedContinuation?.yield([makeBeer("mate", createdAt: 499)])   // ownerUid u2
+        await waitForFeed(vm)
+        #expect(vm.latestOwnDrink(myUid: "me") == nil)
+        #expect(vm.cooldownRemaining(myUid: "me") == 0)
+        running.cancel(); await running.value
+    }
+}
+
 @Suite struct DrinkTests {
     @Test @MainActor func logCarriesTheChosenDrink() async {
         let svc = FakeBeerService()
@@ -328,12 +354,13 @@ final class FakePlaces: PlaceProviding, @unchecked Sendable {
         #expect(svc.logged.first?.0.drink == .wine)
         #expect(vm.feed.first?.drink == .wine)
     }
-    @Test func glassDrainsOverLifetime() {
+    @Test func glassEmptiesInFifteenMinutes() {
         let t0 = Date(timeIntervalSince1970: 0)
         let beer = BeerLog(id: "b", ownerUid: "u", ownerName: "n", createdAt: t0, expiresAt: BeerLog.expiry(from: t0), hasPhoto: false)
         #expect(beer.fillLevel(now: t0) == 1)
-        #expect(abs(beer.fillLevel(now: t0.addingTimeInterval(12 * 3600)) - 0.5) < 0.001)
-        #expect(beer.fillLevel(now: t0.addingTimeInterval(30 * 3600)) == 0)
+        #expect(abs(beer.fillLevel(now: t0.addingTimeInterval(7.5 * 60)) - 0.5) < 0.001)
+        #expect(beer.fillLevel(now: t0.addingTimeInterval(15 * 60)) == 0)
+        #expect(beer.fillLevel(now: t0.addingTimeInterval(3 * 3600)) == 0)   // still in the feed, empty
     }
     @Test func coordinateRoundsToAHundredMetres() {
         let c = Coordinate(latitude: 52.3702157, longitude: 4.8951679)

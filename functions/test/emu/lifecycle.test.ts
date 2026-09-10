@@ -1,4 +1,4 @@
-import { changeUsernameCore, UsernameError } from "../../src/lifecycle";
+import { changeUsernameCore, UsernameError, enforceDrinkCooldown } from "../../src/lifecycle";
 import { describe, it, expect, beforeEach } from "vitest";
 import { Timestamp } from "firebase-admin/firestore";
 import { initTestDb, seedUser, seedFriends, clearDb } from "./helpers";
@@ -151,5 +151,29 @@ describe("changeUsernameCore", () => {
     await changeUsernameCore(db, "u1", "timmy");
     await expect(changeUsernameCore(db, "u1", "timmo")).rejects.toMatchObject({ code: "TOO_SOON" });
     expect(new UsernameError("TAKEN").code).toBe("TAKEN");
+  });
+});
+
+describe("enforceDrinkCooldown", () => {
+  const base = { ownerUid: "u1", ownerName: "Tim", hasPhoto: false, photoPath: "", cheersCount: 0 };
+  it("keeps the first drink and deletes a second within a minute", async () => {
+    const t0 = new Date("2026-09-10T20:00:00Z");
+    await db.doc("beers/d1").set({ ...base, createdAt: Timestamp.fromDate(t0), expiresAt: Timestamp.fromDate(new Date(t0.getTime() + 86400_000)) });
+    expect(await enforceDrinkCooldown(db, "d1", "u1", t0)).toBe(true);
+    const t1 = new Date(t0.getTime() + 20_000);
+    await db.doc("beers/d2").set({ ...base, createdAt: Timestamp.fromDate(t1), expiresAt: Timestamp.fromDate(new Date(t1.getTime() + 86400_000)) });
+    expect(await enforceDrinkCooldown(db, "d2", "u1", t1)).toBe(false);
+    expect((await db.doc("beers/d2").get()).exists).toBe(false);
+    expect((await db.doc("beers/d1").get()).exists).toBe(true);
+  });
+  it("allows a drink after the cooldown and does not count other people", async () => {
+    const t0 = new Date("2026-09-10T20:00:00Z");
+    await db.doc("beers/d1").set({ ...base, createdAt: Timestamp.fromDate(t0), expiresAt: Timestamp.fromDate(new Date(t0.getTime() + 86400_000)) });
+    const t2 = new Date(t0.getTime() + 61_000);
+    await db.doc("beers/d3").set({ ...base, createdAt: Timestamp.fromDate(t2), expiresAt: Timestamp.fromDate(new Date(t2.getTime() + 86400_000)) });
+    expect(await enforceDrinkCooldown(db, "d3", "u1", t2)).toBe(true);
+    const t3 = new Date(t0.getTime() + 5_000);
+    await db.doc("beers/d4").set({ ...base, ownerUid: "u2", createdAt: Timestamp.fromDate(t3), expiresAt: Timestamp.fromDate(new Date(t3.getTime() + 86400_000)) });
+    expect(await enforceDrinkCooldown(db, "d4", "u2", t3)).toBe(true);
   });
 });

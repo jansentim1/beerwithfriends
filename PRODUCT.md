@@ -44,7 +44,7 @@ chat. One button.
   drinks at the bar's position, opt-in), Settings (profile, change username, privacy toggle,
   blocked users, sign out, delete account).
 - Drinks: seven kinds (pils, special, wine, bubbles, cocktail, whisky, soft) drawn as vector
-  glasses that fill on tap and drain over the 24 h lifetime.
+  glasses that fill on tap and empty in 15 minutes.
 - Feed rows: owner, relative time, photo chip (sealed / seen / none), cheers pill.
 - Photos: camera only, JPEG ≤ 1080 px, 24 h, view once per friend, screenshot receipts.
 - Terminology: "beer" is the brand noun (app name, Beers tab, "I'm having a beer" copy);

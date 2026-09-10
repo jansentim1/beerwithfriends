@@ -23,6 +23,8 @@ public final class HomeViewModel: ObservableObject {
     private var cheersLookupDone: Set<String> = []
     /// Consecutive feed-stream failures (for backoff); reset on a good snapshot.
     private(set) var feedFailures = 0
+    /// Minimum time between two of the user's own drinks (mirrored server-side).
+    public static let logCooldown: TimeInterval = 60
 
     public init(
         service: any BeerServicing,
@@ -108,13 +110,30 @@ public final class HomeViewModel: ObservableObject {
         }
     }
 
+    // MARK: - Anti-spam
+
+    /// The user's most recent drink in the feed (optimistic rows included).
+    public func latestOwnDrink(myUid: String) -> BeerLog? {
+        feed.filter { $0.ownerUid == myUid }.max { $0.createdAt < $1.createdAt }
+    }
+
+    /// Seconds until the next drink may be logged; 0 when free.
+    public func cooldownRemaining(myUid: String) -> TimeInterval {
+        guard let last = latestOwnDrink(myUid: myUid) else { return 0 }
+        return max(0, Self.logCooldown - now().timeIntervalSince(last.createdAt))
+    }
+
     // MARK: - Log a beer
 
     /// Optimistic: the row is in the feed before any network round-trip. Only a
     /// photo upload blocks the button (a second photo mid-upload makes no sense).
-    public func logBeer(photoJPEG: Data?, drink: DrinkKind = .pils) async {
+    /// Returns false (and logs nothing) while the cooldown after the previous
+    /// drink is still running; the picker shakes instead.
+    @discardableResult
+    public func logBeer(photoJPEG: Data?, drink: DrinkKind = .pils, myUid: String? = nil) async -> Bool {
+        if let myUid, cooldownRemaining(myUid: myUid) > 0 { return false }
         if photoJPEG != nil {
-            guard !isUploadingPhoto else { return }
+            guard !isUploadingPhoto else { return false }
             isUploadingPhoto = true
         }
         defer { if photoJPEG != nil { isUploadingPhoto = false } }
@@ -132,10 +151,12 @@ public final class HomeViewModel: ObservableObject {
         do {
             try await service.logBeer(beer, photoJPEG: photoJPEG)
             pendingIds.remove(beer.id)
+            return true
         } catch {
             pendingIds.remove(beer.id)
             feed.removeAll { $0.id == beer.id }
             errorMessage = "Couldn't log your beer — try again."
+            return false
         }
     }
 
