@@ -1,5 +1,6 @@
 # Loop state
 - HANDOVER: docs/HANDOVER_2026-09-10.md (everything open + the one big plan). Read it first.
+- 2026-09-10 night: build 17 (pour→camera, universal invite links, 15-min glass, cooldown, soft drink out) and build 18 (Groups tab + leaderboard, join links) shipped; both submitted to mates. Milestone G done except the design review pass; universal-link AASA fixed (hosting ignore).
 - Current task: 12 (handover; compile loop now lives in CI)
 - Done: 1-8, 9, 10 (all screens compiled on GitHub macOS runner, run 33852266356), 11 (report/block wired; docs/privacy-policy.md, docs/app-store-checklist.md)
 - Infra done 2026-09-04: `ios-build` workflow (unsigned simulator compile on every App/BeerKit push), `ios-testflight` workflow (manual, cloud-managed signing), iOS app registered in beerwithme-prod, GoogleService-Info.plist in App/Resources (gitignored) + GitHub secret FIREBASE_PLIST_B64. All 7 functions deployed in europe-west4 and matching source.
