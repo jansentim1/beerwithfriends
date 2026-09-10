@@ -9,10 +9,10 @@ import SwiftUI
 /// the screenshot reporter closure is injected pre-wired by RootView.
 ///
 /// Layout follows docs/design/direction.md: large title "PubDates" collapsing on
-/// scroll, then the hero — a row of drawn glasses, one tap each — with the round
-/// camera button under it (all inside the scroll view, so the title collapses
-/// natively), then the last 24 hours of drinks as plain rows. Every row carries
-/// the glass that was picked, draining as the 24 hours run out.
+/// scroll, then the hero — a row of drawn glasses, one tap each, with the round
+/// camera button as the row's last cell (all inside the scroll view, so the
+/// title collapses natively), then the last 24 hours of drinks as plain rows.
+/// Every row carries the glass that was picked, draining as the 24 hours run out.
 struct HomeView: View {
     @StateObject private var viewModel: HomeViewModel
     @Environment(\.scenePhase) private var scenePhase
@@ -42,7 +42,7 @@ struct HomeView: View {
     /// fresh `.now` in the body, so the schedule never restarts.
     @State private var glassClock = Date()
 
-    static let reportReasons = ["Not a beer 🚨", "Inappropriate photo", "Harassment", "Other"]
+    static let reportReasons = ["Not a drink 🚨", "Inappropriate photo", "Harassment", "Other"]
 
     init(
         profile: UserProfile,
@@ -153,7 +153,7 @@ struct HomeView: View {
             )
         }
         .confirmationDialog(
-            "Report this beer",
+            "Report this drink",
             isPresented: $showReportDialog,
             titleVisibility: .visible,
             presenting: reportTarget
@@ -189,34 +189,49 @@ struct HomeView: View {
 
     /// The glasses own the screen: pick what you are drinking and it is logged on
     /// the tap that fills the glass (Tim: "je moet selecteren wat voor drankje").
-    /// Under them a quiet caption and the camera shortcut. Both halves are
-    /// disabled while a photo uploads.
+    /// The camera is the LAST cell of the same scrolling row — a photo is just
+    /// another way to log this round, not a second, competing control — and one
+    /// footnote sits under the row. Everything is disabled while a photo uploads.
     private var heroRow: some View {
         VStack(alignment: .leading, spacing: 8) {
-            DrinkPickerView(selected: $selectedDrink, isBusy: viewModel.isUploadingPhoto) { kind in
-                // The row springs in from the feed animation, as before.
-                Task { await viewModel.logBeer(photoJPEG: nil, drink: kind) }
-            }
+            DrinkPickerView(
+                selected: $selectedDrink,
+                isBusy: viewModel.isUploadingPhoto,
+                onPick: { kind in
+                    // The row springs in from the feed animation, as before.
+                    Task { await viewModel.logBeer(photoJPEG: nil, drink: kind) }
+                },
+                accessory: { cameraCell }
+            )
 
-            HStack(spacing: 12) {
-                Text("Tap a glass to log it")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                Button {
-                    Haptics.light()
-                    showCamera = true
-                } label: {
-                    Image(systemName: "camera.fill")
-                }
-                .buttonStyle(RoundIconButtonStyle(size: 56))
-                .accessibilityLabel("Log a drink with a photo")
-                .accessibilityHint("Uses the last glass you picked")
-                .accessibilityIdentifier("home.camera")
-            }
+            Text("Tap a glass to log it")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
         .disabled(viewModel.isUploadingPhoto)
+    }
+
+    /// The camera as a glass-row cell: a 56 pt round button with its own caption,
+    /// so it lines up with the glasses' labels along the bottom of the row.
+    private var cameraCell: some View {
+        VStack(spacing: 4) {
+            Button {
+                Haptics.light()
+                showCamera = true
+            } label: {
+                Image(systemName: "camera.fill")
+            }
+            .buttonStyle(RoundIconButtonStyle(size: 56))
+            .accessibilityLabel("Log a drink with a photo")
+            .accessibilityHint("Uses the last glass you picked")
+            .accessibilityIdentifier("home.camera")
+
+            Text("Photo")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
     }
 
     // MARK: - Empty state

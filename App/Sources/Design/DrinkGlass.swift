@@ -72,28 +72,33 @@ struct DrinkGlassView: View {
 
 // MARK: - Picker
 
-/// The hero of Home: seven glasses, "empty-ish", one tap each. Tapping pours the
-/// glass full over `Theme.pour`, hands the kind to `onPick`, and eases back down
-/// so the row is ready for the next round. The last drink is remembered and
-/// shown first with a soft amber ring.
-struct DrinkPickerView: View {
+/// The hero of Home: seven glasses, "empty-ish", one tap each, in the canonical
+/// `DrinkKind` order — the row never reshuffles, so the glass you reach for is
+/// always in the same place. Tapping pours the glass full over `Theme.pour`,
+/// hands the kind to `onPick`, and eases back down so the row is ready for the
+/// next round. The last drink you picked keeps a soft amber tile.
+///
+/// `accessory` is one extra cell appended after the glasses, inside the same
+/// scrolling row (Home puts the camera shortcut there), so the row reads as one
+/// set of choices rather than a row plus a stray button underneath.
+struct DrinkPickerView<Accessory: View>: View {
     @Binding var selected: DrinkKind?
     var isBusy: Bool = false
     let onPick: (DrinkKind) -> Void
+    @ViewBuilder var accessory: () -> Accessory
 
-    /// The glass a picker sits at when nothing is happening: a splash left in
-    /// the bottom, which reads as a glass rather than an outline.
-    static let restingLevel: Double = 0.15
+    /// Cell metrics: seven glasses at 62 pt on a 2 pt gap put the sixth glass
+    /// half past the trailing edge on the narrowest iPhone, which is what tells
+    /// you the row scrolls. Paging is view-aligned so a flick lands on a glass.
+    private static var cellMinWidth: CGFloat { 62 }
+    private static var cellSpacing: CGFloat { 2 }
     /// How long the poured glass stays full before it eases back.
-    private static let holdSeconds: Double = 0.6
+    private static var holdSeconds: Double { 0.6 }
 
     @AppStorage("lastDrink") private var lastDrink = DrinkKind.pils.rawValue
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// The glass currently poured full (one at a time).
     @State private var poured: DrinkKind?
-    /// Snapshotted on appear: the "last drink first" order must not reshuffle
-    /// under the thumb the moment you tap a glass.
-    @State private var order: [DrinkKind] = DrinkKind.allCases
 
     private var favourite: DrinkKind {
         selected ?? DrinkKind(rawValue: lastDrink) ?? .pils
@@ -101,22 +106,29 @@ struct DrinkPickerView: View {
 
     var body: some View {
         ScrollView(.horizontal) {
-            HStack(alignment: .bottom, spacing: 6) {
-                ForEach(order, id: \.self) { kind in
+            HStack(alignment: .bottom, spacing: Self.cellSpacing) {
+                ForEach(DrinkKind.allCases, id: \.self) { kind in
                     glass(kind)
                 }
+                // The accessory wears the same cell chrome as a glass, so it
+                // bottom-aligns with the labels instead of floating.
+                accessory()
+                    .padding(.horizontal, 2)
+                    .padding(.vertical, 6)
+                    .frame(minWidth: Self.cellMinWidth)
             }
+            .scrollTargetLayout()
             .padding(.vertical, 4)
         }
+        .scrollTargetBehavior(.viewAligned)
         .scrollIndicators(.hidden)
         .opacity(isBusy ? 0.5 : 1)
         .animation(Theme.quick, value: isBusy)
-        .onAppear { order = Self.order(favouring: DrinkKind(rawValue: lastDrink) ?? .pils) }
     }
 
     private func glass(_ kind: DrinkKind) -> some View {
         let isFavourite = kind == favourite
-        let level: Double = poured == kind ? 1 : Self.restingLevel
+        let level: Double = poured == kind ? 1 : kind.restingLevel
 
         return Button {
             pick(kind)
@@ -131,18 +143,15 @@ struct DrinkPickerView: View {
                     .minimumScaleFactor(0.7)
                     .multilineTextAlignment(.center)
             }
-            .padding(.horizontal, 4)
+            .padding(.horizontal, 2)
             .padding(.vertical, 6)
             // Comfortably past the 44 pt minimum in both directions.
-            .frame(minWidth: 68)
+            .frame(minWidth: Self.cellMinWidth)
             .background {
                 if isFavourite {
+                    // Wash only: a ring on a 62 pt tile reads as a text field.
                     RoundedRectangle(cornerRadius: Theme.chipRadius, style: .continuous)
                         .fill(Theme.accentSoft)
-                        .overlay {
-                            RoundedRectangle(cornerRadius: Theme.chipRadius, style: .continuous)
-                                .stroke(Theme.accentSoft, lineWidth: 2)
-                        }
                 }
             }
             .contentShape(Rectangle())
@@ -154,8 +163,9 @@ struct DrinkPickerView: View {
         // UI test taps, and an element carries exactly one identifier.
         .accessibilityIdentifier(kind == .pils ? "home.log" : "home.drink.\(kind.rawValue)")
         .accessibilityLabel("I'm having \(kind.pushPhrase)")
-        .accessibilityHint("Tells your mates, with this glass on your row")
-        .accessibilityAddTraits(isFavourite ? [.isSelected] : [])
+        // No `.isSelected` trait: the tile marks the last drink, it is not a
+        // selection you are sitting in.
+        .accessibilityHint(isFavourite ? "Your last one" : "Tells your mates, with this glass on your row")
     }
 
     private func pick(_ kind: DrinkKind) {
@@ -173,9 +183,34 @@ struct DrinkPickerView: View {
             }
         }
     }
+}
 
-    private static func order(favouring kind: DrinkKind) -> [DrinkKind] {
-        [kind] + DrinkKind.allCases.filter { $0 != kind }
+/// Convenience for the common case (no accessory cell): the previews and any
+/// caller that just wants the seven glasses.
+extension DrinkPickerView where Accessory == EmptyView {
+    init(selected: Binding<DrinkKind?>, isBusy: Bool = false, onPick: @escaping (DrinkKind) -> Void) {
+        self.init(selected: selected, isBusy: isBusy, onPick: onPick, accessory: { EmptyView() })
+    }
+}
+
+// MARK: - Resting level
+
+extension DrinkKind {
+    /// What "empty-ish" means for this glass. One number for all seven read as
+    /// a dry smear in the wide shapes (a martini is nearly all rim) and as a
+    /// full pint in the narrow ones, so the resting splash is tuned per kind:
+    /// enough liquid to name the drink by its colour at 44 pt, never enough to
+    /// be mistaken for a glass someone is already drinking.
+    var restingLevel: Double {
+        switch self {
+        case .pils: return 0.18
+        case .special: return 0.28
+        case .wine: return 0.32
+        case .bubbles: return 0.30
+        case .cocktail: return 0.45
+        case .whisky: return 0.25
+        case .soft: return 0.18
+        }
     }
 }
 
@@ -220,11 +255,15 @@ private struct FoamShape: Shape {
         set { level = newValue }
     }
     func path(in rect: CGRect) -> Path {
-        // No head on a glass that is barely wet (the resting picker state).
-        guard level > 0.15 else { return Path() }
+        // No head on a glass that is barely wet (the resting picker state), and
+        // the threshold is that kind's own resting level — a special beer rests
+        // deeper than a pils.
+        guard level > kind.restingLevel + 0.05 else { return Path() }
         let surface = DrinkGlassGeometry.surfaceY(kind, level: level, in: rect)
         let thickness = max(2, rect.height * 0.07)
-        let band = CGRect(x: rect.minX, y: surface - thickness * 0.55,
+        // The band sits entirely BELOW the surface: riding it half-out leaves a
+        // white sliver hanging in the empty glass at low fills.
+        let band = CGRect(x: rect.minX, y: surface,
                           width: rect.width, height: thickness)
         return Path(roundedRect: band, cornerRadius: thickness * 0.45)
     }
@@ -270,7 +309,7 @@ private enum DrinkGlassGeometry {
     static func widthRatio(_ kind: DrinkKind) -> CGFloat {
         switch kind {
         case .pils: return 0.56
-        case .special: return 0.58
+        case .special: return 0.66
         case .wine: return 0.60
         case .bubbles: return 0.42
         case .cocktail: return 0.64
@@ -284,7 +323,7 @@ private enum DrinkGlassGeometry {
     static func bowl(_ kind: DrinkKind) -> (top: CGFloat, bottom: CGFloat) {
         switch kind {
         case .pils: return (0.02, 0.97)
-        case .special: return (0.03, 0.62)
+        case .special: return (0.05, 0.55)
         case .wine: return (0.04, 0.52)
         case .bubbles: return (0.03, 0.57)
         case .cocktail: return (0.06, 0.52)
@@ -319,13 +358,16 @@ private enum DrinkGlassGeometry {
             path.addQuadCurve(to: p(0.20, 0.92, rect), control: p(0.21, 0.97, rect))
             path.closeSubpath()
         case .special:
-            // Tulip: flares below the rim, gathers into a short stem.
-            path.move(to: p(0.09, 0.03, rect))
-            path.addCurve(to: p(0.34, 0.58, rect),
-                          control1: p(0.03, 0.26, rect), control2: p(0.22, 0.42, rect))
-            path.addQuadCurve(to: p(0.66, 0.58, rect), control: p(0.50, 0.66, rect))
-            path.addCurve(to: p(0.91, 0.03, rect),
-                          control1: p(0.78, 0.42, rect), control2: p(0.97, 0.26, rect))
+            // Chalice: a wide, shallow bowl on a short stem. Deliberately NOT a
+            // tulip — at 44 pt a tulip and the wine glass are the same drawing,
+            // and beer vs wine has to read from the silhouette alone.
+            path.move(to: p(0.05, 0.04, rect))
+            path.addLine(to: p(0.95, 0.04, rect))
+            path.addCurve(to: p(0.62, 0.55, rect),
+                          control1: p(0.93, 0.32, rect), control2: p(0.81, 0.55, rect))
+            path.addQuadCurve(to: p(0.38, 0.55, rect), control: p(0.50, 0.58, rect))
+            path.addCurve(to: p(0.05, 0.04, rect),
+                          control1: p(0.19, 0.55, rect), control2: p(0.07, 0.32, rect))
             path.closeSubpath()
         case .wine:
             // Stemmed bowl: a rounded U under a wide rim.
@@ -379,7 +421,7 @@ private enum DrinkGlassGeometry {
         case .pils, .whisky:
             break // nothing under the glass
         case .special:
-            addStem(&path, in: rect, top: 0.62, halfWidth: 0.055, footWidth: 0.46, footY: 0.94)
+            addStem(&path, in: rect, top: 0.55, halfWidth: 0.055, footWidth: 0.46, footY: 0.94)
         case .wine:
             addStem(&path, in: rect, top: 0.52, halfWidth: 0.035, footWidth: 0.54, footY: 0.94)
         case .bubbles:
@@ -442,7 +484,7 @@ private enum DrinkGlassPalette {
     /// Caramel.
     static let whisky = paired(light: (0.74, 0.44, 0.11), dark: (0.85, 0.54, 0.18))
     /// Cola brown.
-    static let soft = paired(light: (0.28, 0.15, 0.09), dark: (0.42, 0.24, 0.15))
+    static let soft = paired(light: (0.28, 0.15, 0.09), dark: (0.56, 0.34, 0.21))
     /// The head: cream rather than pure white, so it reads on both grounds.
     static let foam = paired(light: (0.99, 0.98, 0.94), dark: (0.94, 0.92, 0.87))
 

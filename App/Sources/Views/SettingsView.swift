@@ -49,6 +49,7 @@ struct SettingsView: View {
         NavigationStack {
             List {
                 profileSection
+                accountDetailsSection
                 blockedSection
                 privacySection
                 aboutSection
@@ -94,48 +95,59 @@ struct SettingsView: View {
     // MARK: - Sections
 
     /// Big amber initial, name, @username and one quiet stat. No section header:
-    /// the header *is* the profile.
+    /// the header *is* the profile. Identity only — changing the username is a
+    /// list row below, not a control in here.
     private var profileSection: some View {
         Section {
             VStack(spacing: 12) {
-                // Identity reads as one VoiceOver element; the button below is its
-                // own control, so it stays reachable (hence no `.ignore` on the
-                // whole header any more).
-                VStack(spacing: 12) {
-                    AvatarView(name: profile.displayName, size: 72)
-                    VStack(spacing: 2) {
-                        Text(profile.displayName)
-                            .font(Theme.displayTitle2)
-                            .multilineTextAlignment(.center)
-                            .lineLimit(2)
-                            .minimumScaleFactor(0.7)
-                        Text("@\(shownUsername)")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
+                AvatarView(name: profile.displayName, size: 72)
+                VStack(spacing: 2) {
+                    Text(profile.displayName)
+                        .font(Theme.displayTitle2)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.7)
+                    Text("@\(shownUsername)")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
                 }
-                .frame(maxWidth: .infinity)
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel("\(profile.displayName), @\(shownUsername)")
-
-                Button("Change username") {
-                    showChangeUsername = true
-                }
-                .buttonStyle(PillButtonStyle(emphasis: .tinted))
-                .frame(minHeight: 44)
-                .contentShape(Rectangle())
-                .disabled(isDeleting)
-                .accessibilityIdentifier("settings.changeUsername")
-                .accessibilityLabel("Change username")
-                .accessibilityHint("Currently @\(shownUsername)")
-
-                StatusPill(text: beerCountText)
-                    .accessibilityLabel(beerCountText)
+                StatusPill(text: drinkCountText)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 12)
             .listRowBackground(Color.clear)
             .listRowSeparator(.hidden)
+            // Nothing tappable in here any more, so the whole header can read as
+            // one VoiceOver element.
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("\(profile.displayName), @\(shownUsername), \(drinkCountText)")
+        }
+    }
+
+    /// An editable account field is a list row on iOS: label, current value,
+    /// chevron. `.plain` keeps the row's own colours (primary label, secondary
+    /// value) instead of painting the whole thing in the list's amber tint.
+    private var accountDetailsSection: some View {
+        Section("Account details") {
+            Button {
+                showChangeUsername = true
+            } label: {
+                HStack(spacing: 8) {
+                    LabeledContent("Username", value: "@\(shownUsername)")
+                    Image(systemName: "chevron.right")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.tertiary)
+                        .accessibilityHidden(true)
+                }
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(isDeleting)
+            .accessibilityIdentifier("settings.changeUsername")
+            .accessibilityLabel("Username")
+            .accessibilityValue("@\(shownUsername)")
+            .accessibilityHint("Change your username")
         }
     }
 
@@ -262,8 +274,10 @@ struct SettingsView: View {
         }
     }
 
-    private var beerCountText: String {
-        "\(profile.beerCount) beer\(profile.beerCount == 1 ? "" : "s") logged"
+    /// "N drinks logged" — the logged thing is a drink (PRODUCT.md terminology).
+    private var drinkCountText: String {
+        let n = profile.beerCount
+        return "\(n) drink\(n == 1 ? "" : "s") logged"
     }
 
     private static var versionString: String {

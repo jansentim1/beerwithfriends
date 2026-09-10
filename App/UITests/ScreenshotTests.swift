@@ -59,7 +59,10 @@ final class ScreenshotTests: XCTestCase {
         snap("06-settings")
 
         app.tabBars.buttons["Beers"].tap()
-        app.buttons["home.camera"].tap()
+        // The camera is the last cell of the horizontal glass row: bring it on screen.
+        let camera = app.buttons["home.camera"]
+        for _ in 0..<4 where !camera.isHittable { app.swipeLeft() }
+        camera.tap()
         sleep(2) // camera permission / unavailable state on the simulator
         snap("07-camera")
     }

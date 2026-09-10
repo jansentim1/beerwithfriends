@@ -24,15 +24,19 @@ struct MapView: View {
     /// The tab keeps its own small feed copy rather than a second HomeViewModel:
     /// the map needs the snapshot and nothing else (no cheers, no photo state).
     @State private var beers: [BeerLog] = []
-    @State private var position: MapCameraPosition = .automatic
+    /// Opens on the Netherlands rather than a whole-globe `.automatic` view: with
+    /// no pins and no blue dot, `.automatic` has nothing to frame and lands on a
+    /// view of the planet. Handed back to `.automatic` the moment pins exist.
+    @State private var position: MapCameraPosition = MapView.defaultPosition
+    /// Set once, the first time pins arrive, so re-framing never yanks a camera
+    /// the user has since panned.
+    @State private var hasFramedPins = false
     @State private var selection: ClusterSelection?
     @State private var showsUserLocation = false
     /// Flipped by onAppear/onDisappear. `.task(id:)` keys off it, so exactly one
     /// feed subscription is alive while the tab is on screen and none behind it —
     /// a Firestore listener is not free, and TabView keeps this view alive.
     @State private var isOnScreen = false
-
-    @ScaledMetric(relativeTo: .subheadline) private var glassHeight: CGFloat = 28
 
     init(profile: UserProfile, beerService: any BeerServicing) {
         self.profile = profile
@@ -87,43 +91,39 @@ struct MapView: View {
         }
     }
 
-    /// One pin: a 36 pt amber-washed glass on a surface disc (a wash on a surface
-    /// card, per the No-Shadow Rule), the newest drinker's initials, and a count
-    /// when several mates share the spot.
+    /// One pin: the drawn glass of whoever poured last, on a 36 pt amber wash
+    /// over a surface disc (a wash on a card, per the No-Shadow Rule), plus a
+    /// count when several mates share the spot. No initials badge — at 20 pt the
+    /// letters are 8 pt and unreadable, and the callout names everyone here.
     private func marker(for cluster: DrinkCluster) -> some View {
         let newest = cluster.newest
         return Button {
             Haptics.light()
             selection = ClusterSelection(id: cluster.id)
         } label: {
-            ZStack(alignment: .bottomTrailing) {
-                Circle()
-                    .fill(Theme.surface)
-                    .frame(width: 36, height: 36)
-                    .overlay {
-                        Circle().fill(Theme.accentSoft)
+            Circle()
+                .fill(Theme.surface)
+                .frame(width: 36, height: 36)
+                .overlay {
+                    Circle().fill(Theme.accentSoft)
+                }
+                .overlay {
+                    // The glass drains with the beer, exactly as in the feed.
+                    DrinkGlassView(kind: newest.drink, level: newest.fillLevel(now: Date()), size: 22)
+                }
+                .overlay(alignment: .topTrailing) {
+                    if cluster.beers.count > 1 {
+                        Text("\(cluster.beers.count)")
+                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                            .foregroundStyle(Theme.onAccent)
+                            .frame(width: 18, height: 18)
+                            .background(Theme.accent, in: Circle())
+                            .offset(x: 5, y: -5)
                     }
-                    .overlay {
-                        Text(newest.drink.emoji)
-                            .font(.system(size: 18))
-                    }
-                    .overlay(alignment: .topTrailing) {
-                        if cluster.beers.count > 1 {
-                            Text("\(cluster.beers.count)")
-                                .font(.system(size: 11, weight: .bold, design: .rounded))
-                                .foregroundStyle(Theme.onAccent)
-                                .frame(width: 18, height: 18)
-                                .background(Theme.accent, in: Circle())
-                                .offset(x: 5, y: -5)
-                        }
-                    }
-
-                AvatarView(name: displayName(for: newest), size: 20)
-                    .offset(x: 6, y: 2)
-            }
-            // The paint is 36 pt; the target is 44 (the 44-Point Rule).
-            .frame(width: 44, height: 44)
-            .contentShape(Circle())
+                }
+                // The paint is 36 pt; the target is 44 (the 44-Point Rule).
+                .frame(width: 44, height: 44)
+                .contentShape(Circle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(cluster.accessibilityLabel(myUid: profile.id))
@@ -132,17 +132,19 @@ struct MapView: View {
 
     private var emptyState: some View {
         VStack(spacing: 8) {
-            Text("No mates on the map yet.")
+            Text("No mates on the map yet")
                 .font(Theme.displayTitle2)
                 .multilineTextAlignment(.center)
-            Text("Turn on 'Share where I'm drinking' in Settings and log a drink.")
+            Text("Mates who log a drink with ‘Share where I’m drinking’ on show up here. Turn yours on in Settings to be on theirs.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
         }
         .padding(20)
         .frame(maxWidth: 340)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
+        // Material, not a surface card: this one floats over the map, and the
+        // blur is what keeps the streets underneath from fighting the words.
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
         .padding(24)
         .accessibilityElement(children: .combine)
         // The card explains, it doesn't catch: pans and pinches still reach the map.
@@ -192,7 +194,7 @@ struct MapView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(name)
                     .font(.headline)
-                Text("\(beer.drink.emoji) \(beer.drink.label)")
+                Text(beer.drink.label)
                     .font(.subheadline)
                 if let place = beer.place, !place.isEmpty {
                     Text("📍 \(place)")
@@ -206,25 +208,19 @@ struct MapView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            glassLevel(for: beer)
+            glass(for: beer)
         }
         .padding(.vertical, 4)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(calloutAccessibilityLabel(for: beer, name: name))
     }
 
-    /// How much is left in the glass: it drains over the beer's 24 hours.
-    private func glassLevel(for beer: BeerLog) -> some View {
+    /// How much is left in the glass: it drains over the beer's 24 hours. The
+    /// drawn glass, not an abstract bar — the same object the feed shows.
+    private func glass(for beer: BeerLog) -> some View {
         let level = beer.fillLevel(now: Date())
-        return ZStack(alignment: .bottom) {
-            RoundedRectangle(cornerRadius: 4, style: .continuous)
-                .fill(Color(.tertiarySystemFill))
-            RoundedRectangle(cornerRadius: 4, style: .continuous)
-                .fill(Theme.accent)
-                .frame(height: max(2, glassHeight * level))
-        }
-        .frame(width: glassHeight * 0.5, height: glassHeight)
-        .accessibilityHidden(true)
+        return DrinkGlassView(kind: beer.drink, level: level, size: 32)
+            .accessibilityHidden(true)
     }
 
     private func calloutAccessibilityLabel(for beer: BeerLog, name: String) -> String {
@@ -255,10 +251,35 @@ struct MapView: View {
         do {
             for try await logs in beerService.observeFeed() {
                 beers = logs
+                frameFirstPins()
             }
         } catch {
             // Nothing to say here; the pins simply stop updating.
         }
+    }
+
+    // MARK: - Camera
+
+    /// Where the map opens with nothing to show: the Netherlands, whole.
+    /// Computed rather than a `static let`, so nothing here depends on
+    /// `MapCameraPosition` being `Sendable` under Swift 6.
+    private static var defaultPosition: MapCameraPosition {
+        .region(
+            MKCoordinateRegion(
+                center: CLLocationCoordinate2D(latitude: 52.2, longitude: 5.3),
+                span: MKCoordinateSpan(latitudeDelta: 3.5, longitudeDelta: 3.5)
+            )
+        )
+    }
+
+    /// The first snapshot that has pins hands the camera to MapKit, which frames
+    /// them (and the blue dot, when it is showing). Once only: after that the
+    /// camera belongs to whoever is panning it.
+    @MainActor
+    private func frameFirstPins() {
+        guard !hasFramedPins, !clusters.isEmpty else { return }
+        hasFramedPins = true
+        withAnimation(Theme.spring) { position = .automatic }
     }
 
     // MARK: - Clustering
