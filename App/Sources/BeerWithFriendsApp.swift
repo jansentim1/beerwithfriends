@@ -124,7 +124,7 @@ private struct MainTabView: View {
     @EnvironmentObject private var appState: AppState
     let profile: UserProfile
 
-    private enum Tab: Hashable { case beers, friends, settings }
+    private enum Tab: Hashable { case beers, friends, map, settings }
     @State private var selectedTab: Tab = .beers
 
     var body: some View {
@@ -146,6 +146,10 @@ private struct MainTabView: View {
                 FriendsView(profile: profile, friendService: friendService)
                     .tabItem { Label("Mates", systemImage: "person.2.fill") }
                     .tag(Tab.friends)
+
+                MapView(profile: profile, beerService: beerService)
+                    .tabItem { Label("Map", systemImage: "map.fill") }
+                    .tag(Tab.map)
 
                 SettingsView(profile: profile)
                     .tabItem { Label("Settings", systemImage: "gearshape.fill") }

@@ -17,6 +17,12 @@ struct SettingsView: View {
     @EnvironmentObject private var appState: AppState
     let profile: UserProfile
 
+    /// The handle shown in the header. `profile` is a `let`, and a successful
+    /// change re-keys the whole session through `AppState.becomeReady` — this
+    /// shows the new name straight away instead of waiting for that rebuild to
+    /// reach us. Kept in step with the profile in case it changes elsewhere.
+    @State private var shownUsername: String
+    @State private var showChangeUsername = false
     @State private var blockedUsers: [BlockedUser] = []
     @State private var blockedUnavailable = false
     @State private var isDeleting = false
@@ -29,6 +35,11 @@ struct SettingsView: View {
 
     // Placeholder until Task 11/12 publish the real policy URL.
     private let privacyPolicyURL = URL(string: "https://example.com/beerwithme/privacy")!
+
+    init(profile: UserProfile) {
+        self.profile = profile
+        _shownUsername = State(initialValue: profile.username)
+    }
 
     private var concreteFriendService: FirebaseFriendService? {
         appState.friendService as? FirebaseFriendService
@@ -50,6 +61,16 @@ struct SettingsView: View {
             .navigationBarTitleDisplayMode(.large)
             .task { await loadBlocked() }
             .refreshable { await loadBlocked() }
+            // A rebuild with a different profile (another device changed the
+            // handle) wins over the locally shown one.
+            .onChange(of: profile.username) { _, newValue in
+                shownUsername = newValue
+            }
+            .sheet(isPresented: $showChangeUsername) {
+                ChangeUsernameSheet(currentUsername: shownUsername) { newUsername in
+                    shownUsername = newUsername
+                }
+            }
             .alert("Oops", isPresented: errorBinding) {
                 Button("OK", role: .cancel) {}
             } message: {
@@ -77,25 +98,44 @@ struct SettingsView: View {
     private var profileSection: some View {
         Section {
             VStack(spacing: 12) {
-                AvatarView(name: profile.displayName, size: 72)
-                VStack(spacing: 2) {
-                    Text(profile.displayName)
-                        .font(Theme.displayTitle2)
-                        .multilineTextAlignment(.center)
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.7)
-                    Text("@\(profile.username)")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                // Identity reads as one VoiceOver element; the button below is its
+                // own control, so it stays reachable (hence no `.ignore` on the
+                // whole header any more).
+                VStack(spacing: 12) {
+                    AvatarView(name: profile.displayName, size: 72)
+                    VStack(spacing: 2) {
+                        Text(profile.displayName)
+                            .font(Theme.displayTitle2)
+                            .multilineTextAlignment(.center)
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.7)
+                        Text("@\(shownUsername)")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
                 }
+                .frame(maxWidth: .infinity)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("\(profile.displayName), @\(shownUsername)")
+
+                Button("Change username") {
+                    showChangeUsername = true
+                }
+                .buttonStyle(PillButtonStyle(emphasis: .tinted))
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+                .disabled(isDeleting)
+                .accessibilityIdentifier("settings.changeUsername")
+                .accessibilityLabel("Change username")
+                .accessibilityHint("Currently @\(shownUsername)")
+
                 StatusPill(text: beerCountText)
+                    .accessibilityLabel(beerCountText)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 12)
             .listRowBackground(Color.clear)
             .listRowSeparator(.hidden)
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel("\(profile.displayName), @\(profile.username), \(beerCountText)")
         }
     }
 
@@ -279,6 +319,216 @@ struct SettingsView: View {
         Binding(
             get: { errorMessage != nil },
             set: { if !$0 { errorMessage = nil } }
+        )
+    }
+}
+
+// MARK: - Change username
+
+/// One field, the same debounced availability copy as onboarding, one hero
+/// Save. Errors that only the server knows ("taken", "once a day") come back
+/// through `AppState.errorMessage` and are shown here, on the sheet, so the
+/// sheet can stay open and the user can try another name.
+private struct ChangeUsernameSheet: View {
+    @EnvironmentObject private var appState: AppState
+    @Environment(\.dismiss) private var dismiss
+
+    /// Used only to recognise "that's you already" while typing.
+    let currentUsername: String
+    /// Called with the new (normalized) username after a successful save.
+    let onSaved: (String) -> Void
+
+    @State private var username = ""
+    @State private var availability: Availability = .idle
+    @State private var isSaving = false
+    @State private var alertMessage: String?
+
+    private enum Availability: Equatable {
+        case idle          // empty field
+        case invalid       // fails Username.normalize
+        case checking
+        case available
+        case taken
+        case mine          // the name you already have
+        case unknown       // availability lookup failed (offline etc.)
+    }
+
+    private var canSave: Bool {
+        !isSaving && (availability == .available || availability == .unknown)
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                Text("New username")
+                    .font(Theme.displayTitle2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityAddTraits(.isHeader)
+
+                VStack(alignment: .leading, spacing: 10) {
+                    fieldSurface {
+                        HStack(spacing: 4) {
+                            Text("@")
+                                .font(.body.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                                .accessibilityHidden(true)
+                            TextField("username", text: $username)
+                                .accessibilityIdentifier("settings.newUsername")
+                                .accessibilityLabel("New username")
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                                .keyboardType(.asciiCapable)
+                                .submitLabel(.done)
+                                .disabled(isSaving)
+                        }
+                    }
+                    availabilityLabel
+                        .animation(Theme.quick, value: availability)
+                }
+
+                Text("Mates find you by exact username. You can change it once a day.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Button {
+                    Haptics.light()
+                    save()
+                } label: {
+                    if isSaving {
+                        ProgressView()
+                            .tint(Theme.onAccent)
+                    } else {
+                        Text("Save")
+                    }
+                }
+                .buttonStyle(HeroButtonStyle())
+                .accessibilityIdentifier("settings.saveUsername")
+                .accessibilityLabel("Save")
+                .disabled(!canSave)
+                .opacity(canSave ? 1 : 0.5)
+                .animation(Theme.quick, value: canSave)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 20)
+            .padding(.top, 24)
+            .padding(.bottom, 24)
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        .scrollDismissesKeyboard(.interactively)
+        .background(Theme.ground.ignoresSafeArea())
+        .presentationDetents([.medium])
+        .presentationDragIndicator(.visible)
+        // Debounced live availability: retyping changes the id, which cancels the
+        // in-flight check (including its sleep) and starts a new one.
+        .task(id: username) {
+            await checkAvailability()
+        }
+        .alert("Oops", isPresented: alertBinding) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(alertMessage ?? "")
+        }
+    }
+
+    /// Rounded card that holds a text field (Theme.surface, cardRadius).
+    private func fieldSurface<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        content()
+            .font(.body)
+            .padding(.horizontal, 14)
+            .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
+                    .fill(Theme.surface)
+            )
+    }
+
+    @ViewBuilder
+    private var availabilityLabel: some View {
+        Group {
+            switch availability {
+            case .idle:
+                Text("3–15 characters: a–z, 0–9, _ — starts with a letter.")
+                    .foregroundStyle(.secondary)
+            case .invalid:
+                Label("3–15 characters: a–z, 0–9, _ — starts with a letter.", systemImage: "xmark.circle")
+                    .foregroundStyle(.red)
+            case .checking:
+                HStack(spacing: 6) {
+                    ProgressView().controlSize(.small)
+                    Text("Checking…").foregroundStyle(.secondary)
+                }
+            case .available:
+                Label("Available 🍻", systemImage: "checkmark.circle")
+                    .foregroundStyle(.green)
+            case .taken:
+                Label("Taken — try another.", systemImage: "xmark.circle")
+                    .foregroundStyle(.red)
+            case .mine:
+                Label("That's you already.", systemImage: "person.crop.circle")
+                    .foregroundStyle(.secondary)
+            case .unknown:
+                Label("Couldn't check availability — you can still try to save it.", systemImage: "wifi.slash")
+                    .foregroundStyle(.orange)
+            }
+        }
+        .font(.footnote)
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 4)
+    }
+
+    private func checkAvailability() async {
+        guard !username.isEmpty else {
+            availability = .idle
+            return
+        }
+        guard let normalized = Username.normalize(username) else {
+            availability = .invalid
+            return
+        }
+        // Your own name is reserved by you, so the lookup would say "taken".
+        guard normalized != currentUsername else {
+            availability = .mine
+            return
+        }
+        availability = .checking
+        try? await Task.sleep(for: .milliseconds(400)) // debounce window
+        guard !Task.isCancelled else { return }
+        let taken = await appState.isUsernameTaken(normalized)
+        guard !Task.isCancelled else { return }
+        switch taken {
+        case .some(true): availability = .taken
+        case .some(false): availability = .available
+        case .none: availability = .unknown
+        }
+    }
+
+    private func save() {
+        let typed = username
+        isSaving = true
+        Task {
+            // AppState normalizes, calls the server and re-keys the session on
+            // success; on failure it left the reason in `errorMessage`.
+            let ok = await appState.changeUsername(typed)
+            isSaving = false
+            if ok {
+                Haptics.success()
+                onSaved(Username.normalize(typed) ?? typed)
+                dismiss()
+            } else {
+                // The reason (taken / once a day / offline) is only known here, and
+                // the sheet stays open so it can be read and acted on.
+                alertMessage = appState.errorMessage ?? "Couldn't change your username — try again."
+                appState.errorMessage = nil
+            }
+        }
+    }
+
+    private var alertBinding: Binding<Bool> {
+        Binding(
+            get: { alertMessage != nil },
+            set: { if !$0 { alertMessage = nil } }
         )
     }
 }

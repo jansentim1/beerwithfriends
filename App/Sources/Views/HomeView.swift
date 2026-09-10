@@ -4,14 +4,15 @@ import SwiftUI
 // COMPILE-PARKED (Task 10): no Xcode on this machine — written against
 // iOS 17 SDK APIs under Swift 6 concurrency, not yet compiled.
 
-/// The main screen: one big log button, a camera shortcut, and the live feed.
+/// The main screen: the drink picker, a camera shortcut, and the live feed.
 /// Consumes ONLY BeerKit (`HomeViewModel`, protocols) — never Firebase types;
 /// the screenshot reporter closure is injected pre-wired by RootView.
 ///
 /// Layout follows docs/design/direction.md: large title "PubDates" collapsing on
-/// scroll, the amber hero + round camera button directly under it (both inside
-/// the scroll view, so the title collapses natively), then the last 24 hours of
-/// beers as plain rows.
+/// scroll, then the hero — a row of drawn glasses, one tap each — with the round
+/// camera button under it (all inside the scroll view, so the title collapses
+/// natively), then the last 24 hours of drinks as plain rows. Every row carries
+/// the glass that was picked, draining as the 24 hours run out.
 struct HomeView: View {
     @StateObject private var viewModel: HomeViewModel
     @Environment(\.scenePhase) private var scenePhase
@@ -33,9 +34,13 @@ struct HomeView: View {
     @State private var blockTarget: BeerLog?
     @State private var showBlockDialog = false
     @State private var infoMessage: String?
-    /// Signature interaction: every plain tap of the hero button bumps this, and
-    /// `HeroButtonStyle` pours a fresh amber sweep on the change.
-    @State private var pourCount = 0
+    /// The glass tapped this session; the camera falls back to `lastDrink`.
+    @State private var selectedDrink: DrinkKind?
+    /// Shared with `DrinkPickerView` (same key): what to pour a photo beer into.
+    @AppStorage("lastDrink") private var lastDrink = DrinkKind.pils.rawValue
+    /// Anchor for the feed's minute tick. Stable across re-renders, unlike a
+    /// fresh `.now` in the body, so the schedule never restarts.
+    @State private var glassClock = Date()
 
     static let reportReasons = ["Not a beer 🚨", "Inappropriate photo", "Harassment", "Other"]
 
@@ -62,42 +67,47 @@ struct HomeView: View {
             // The reader only measures the viewport, so the empty state can claim
             // half of it and sit in the middle of what's left under the hero.
             GeometryReader { proxy in
-                List {
-                    Section {
-                        heroRow
-                            .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 20, trailing: 16))
-                            .listRowSeparator(.hidden)
-                            .listRowBackground(Color.clear)
-                    }
-
-                    if viewModel.feed.isEmpty {
+                // The glasses on the rows drain over the 24 hours: one tick a
+                // minute re-renders their levels (and retires an expired photo
+                // chip) without a timer of our own.
+                TimelineView(.periodic(from: glassClock, by: 60)) { context in
+                    List {
                         Section {
-                            emptyState
-                                .frame(minHeight: max(0, proxy.size.height * 0.5))
-                                .listRowInsets(EdgeInsets(top: 24, leading: 24, bottom: 24, trailing: 24))
+                            heroRow
+                                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 20, trailing: 16))
                                 .listRowSeparator(.hidden)
                                 .listRowBackground(Color.clear)
                         }
-                    } else {
-                        // No eyebrow above the feed: the relative time on every row
-                        // already says these are the last 24 hours.
-                        Section {
-                            ForEach(viewModel.feed) { beer in
-                                feedRow(beer)
+
+                        if viewModel.feed.isEmpty {
+                            Section {
+                                emptyState
+                                    .frame(minHeight: max(0, proxy.size.height * 0.5))
+                                    .listRowInsets(EdgeInsets(top: 24, leading: 24, bottom: 24, trailing: 24))
+                                    .listRowSeparator(.hidden)
+                                    .listRowBackground(Color.clear)
+                            }
+                        } else {
+                            // No eyebrow above the feed: the relative time on every row
+                            // already says these are the last 24 hours.
+                            Section {
+                                ForEach(viewModel.feed) { beer in
+                                    feedRow(beer, now: context.date)
+                                }
                             }
                         }
                     }
+                    .listStyle(.plain)
+                    .listSectionSeparator(.hidden)
+                    // Pull-to-refresh works on the empty state too: the hero row keeps
+                    // the list scrollable even with no beers.
+                    .refreshable {
+                        feedEpoch += 1
+                    }
+                    // Signature interaction: a new row springs in at the top. Reduce
+                    // Motion downgrades it to a crossfade.
+                    .animation(reduceMotion ? Theme.quick : Theme.spring, value: viewModel.feed.map(\.id))
                 }
-                .listStyle(.plain)
-                .listSectionSeparator(.hidden)
-                // Pull-to-refresh works on the empty state too: the hero row keeps
-                // the list scrollable even with no beers.
-                .refreshable {
-                    feedEpoch += 1
-                }
-                // Signature interaction: a new row springs in at the top. Reduce
-                // Motion downgrades it to a crossfade.
-                .animation(reduceMotion ? Theme.quick : Theme.spring, value: viewModel.feed.map(\.id))
             }
             .navigationTitle("PubDates")
             .navigationBarTitleDisplayMode(.large)
@@ -122,7 +132,8 @@ struct HomeView: View {
         }
         .fullScreenCover(isPresented: $showCamera) {
             CameraView { data in
-                Task { await viewModel.logBeer(photoJPEG: data) }
+                let drink = selectedDrink ?? DrinkKind(rawValue: lastDrink) ?? .pils
+                Task { await viewModel.logBeer(photoJPEG: data, drink: drink) }
             }
             .ignoresSafeArea()
         }
@@ -176,31 +187,34 @@ struct HomeView: View {
 
     // MARK: - Hero
 
-    /// One button owns the screen: full-width amber log button with the camera
-    /// shortcut to its right. Both are disabled while a photo uploads.
+    /// The glasses own the screen: pick what you are drinking and it is logged on
+    /// the tap that fills the glass (Tim: "je moet selecteren wat voor drankje").
+    /// Under them a quiet caption and the camera shortcut. Both halves are
+    /// disabled while a photo uploads.
     private var heroRow: some View {
-        HStack(spacing: 12) {
-            Button {
-                Haptics.success()
-                pourCount += 1
-                Task { await viewModel.logBeer(photoJPEG: nil) }
-            } label: {
-                Text("🍺 I'm having a beer")
+        VStack(alignment: .leading, spacing: 8) {
+            DrinkPickerView(selected: $selectedDrink, isBusy: viewModel.isUploadingPhoto) { kind in
+                // The row springs in from the feed animation, as before.
+                Task { await viewModel.logBeer(photoJPEG: nil, drink: kind) }
             }
-            .buttonStyle(HeroButtonStyle(pour: pourCount, isBusy: viewModel.isUploadingPhoto))
-            .accessibilityLabel("I'm having a beer")
-            .accessibilityHint("Tells your mates you cracked one open")
-            .accessibilityIdentifier("home.log")
 
-            Button {
-                Haptics.light()
-                showCamera = true
-            } label: {
-                Image(systemName: "camera.fill")
+            HStack(spacing: 12) {
+                Text("Tap a glass to log it")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                Button {
+                    Haptics.light()
+                    showCamera = true
+                } label: {
+                    Image(systemName: "camera.fill")
+                }
+                .buttonStyle(RoundIconButtonStyle(size: 56))
+                .accessibilityLabel("Log a drink with a photo")
+                .accessibilityHint("Uses the last glass you picked")
+                .accessibilityIdentifier("home.camera")
             }
-            .buttonStyle(RoundIconButtonStyle())
-            .accessibilityLabel("Log a beer with a photo")
-            .accessibilityIdentifier("home.camera")
         }
         .disabled(viewModel.isUploadingPhoto)
     }
@@ -235,7 +249,7 @@ struct HomeView: View {
 
     // MARK: - Feed
 
-    private func feedRow(_ beer: BeerLog) -> some View {
+    private func feedRow(_ beer: BeerLog, now: Date) -> some View {
         let isMine = beer.ownerUid == profile.id
         let isAccessibilitySize = dynamicTypeSize.isAccessibilitySize
         // At accessibility sizes the chip and the cheers control drop under the
@@ -245,7 +259,7 @@ struct HomeView: View {
             : AnyLayout(HStackLayout(alignment: .center, spacing: 12))
 
         return HStack(alignment: isAccessibilitySize ? .top : .center, spacing: 12) {
-            AvatarView(name: isMine ? profile.displayName : beer.ownerName, size: 56)
+            drinkGlass(for: beer, name: isMine ? profile.displayName : beer.ownerName, now: now)
 
             layout {
                 VStack(alignment: .leading, spacing: 2) {
@@ -259,7 +273,7 @@ struct HomeView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
 
                 HStack(spacing: 8) {
-                    photoChip(for: beer)
+                    photoChip(for: beer, now: now)
                     replyPills(for: beer)
                     reactionControl(for: beer, isMine: isMine)
                 }
@@ -333,9 +347,22 @@ struct HomeView: View {
         .lineLimit(isAccessibilitySize ? nil : 1)
     }
 
+    /// The glass that stands in for an avatar: what they are drinking, draining
+    /// from full at the tap to empty when the beer expires 24 hours later.
+    private func drinkGlass(for beer: BeerLog, name: String, now: Date) -> some View {
+        let level = beer.fillLevel(now: now)
+        return DrinkGlassView(kind: beer.drink, level: level, size: 44)
+            .frame(width: 56, height: 56)
+            .background(Theme.accentSoft, in: Circle())
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(
+                "\(name) is having \(beer.drink.label), glass \(Int(level * 100)) percent"
+            )
+    }
+
     @ViewBuilder
-    private func photoChip(for beer: BeerLog) -> some View {
-        switch beer.photoChipState(viewedByMe: viewModel.viewedBeerIds.contains(beer.id), now: Date()) {
+    private func photoChip(for beer: BeerLog, now: Date) -> some View {
+        switch beer.photoChipState(viewedByMe: viewModel.viewedBeerIds.contains(beer.id), now: now) {
         case .sealed:
             Button {
                 openPhoto(beer)

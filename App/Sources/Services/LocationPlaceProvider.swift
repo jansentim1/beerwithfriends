@@ -7,14 +7,16 @@ import MapKit
 // iOS 17 SDK (CoreLocation + MapKit) under Swift 6 concurrency, not yet compiled.
 
 /// Opt-in place naming for a logged beer: one coarse fix, turned into a short
-/// human name ("Café De Zon", "Amsterdam") and then thrown away.
+/// human name ("Café De Zon", "Amsterdam") plus that PLACE's coordinate, with
+/// the fix itself thrown away.
 ///
 /// Contract (see `PlaceProviding` in BeerKit): never longer than a few seconds,
 /// never a reason a beer fails to log, `nil` whenever the switch is off, the
 /// permission is missing, or nothing sensible was found in time. Coordinates
 /// live only inside a single `currentPlace()` call — they are never stored on
 /// the instance, written to defaults, or logged (not even inside error text,
-/// which is why failures are swallowed silently).
+/// which is why failures are swallowed silently). The only coordinate that ever
+/// leaves is the bar's or the city's, rounded to ~100 m by `Coordinate`.
 ///
 /// Threading: every `CLLocationManager` touch happens on the main actor (the
 /// manager is created there, so its delegate callbacks arrive there too), while
@@ -51,14 +53,26 @@ final class LocationPlaceProvider: NSObject, PlaceProviding, CLLocationManagerDe
 
     // MARK: - PlaceProviding
 
-    func currentPlace() async -> String? {
+    func currentPlace() async -> PlaceResult? {
         guard UserDefaults.standard.bool(forKey: Self.sharePlaceKey) else { return nil }
         // Timeout.run returns nil on timeout, and the operation itself returns an
-        // optional name — hence the double optional, flattened here.
-        let resolved: String?? = await BeerKit.Timeout.run(seconds: Self.overallTimeout) { [self] in
+        // optional result — hence the double optional, flattened here.
+        let resolved: PlaceResult?? = await BeerKit.Timeout.run(seconds: Self.overallTimeout) { [self] in
             await resolvePlace()
         }
         return resolved ?? nil
+    }
+
+    /// Read-only: is when-in-use already granted? The Map tab shows the blue
+    /// user dot only when it is, and asks nothing when it isn't. Goes through the
+    /// one shared manager on purpose — a second CLLocationManager would be a
+    /// second system prompt waiting to happen.
+    @MainActor
+    var isLocationAuthorized: Bool {
+        switch sharedManager().authorizationStatus {
+        case .authorizedWhenInUse, .authorizedAlways: return true
+        default: return false
+        }
     }
 
     /// Asks for when-in-use permission, but only when the user has never been
@@ -74,7 +88,7 @@ final class LocationPlaceProvider: NSObject, PlaceProviding, CLLocationManagerDe
 
     // MARK: - Resolution
 
-    private func resolvePlace() async -> String? {
+    private func resolvePlace() async -> PlaceResult? {
         // Documented as slow on the main thread; we are on a background task.
         guard CLLocationManager.locationServicesEnabled() else { return nil }
 
@@ -86,15 +100,24 @@ final class LocationPlaceProvider: NSObject, PlaceProviding, CLLocationManagerDe
         guard status == .authorizedWhenInUse || status == .authorizedAlways else { return nil }
 
         guard let coordinate = await awaitLocationFix() else { return nil }
-        if let poi = await nearbyPointOfInterestName(near: coordinate) {
-            return shortened(poi)
+        // The coordinate that leaves this class is ALWAYS the place's, never the
+        // device fix above: the POI's own coordinate, or the one the reverse
+        // geocoder gives for the city. `Coordinate` rounds it to ~100 m again.
+        if let poi = await nearbyPointOfInterest(near: coordinate) {
+            guard let name = shortened(poi.name) else { return nil }
+            return PlaceResult(name: name, coordinate: poi.coordinate)
         }
-        return shortened(await cityName(near: coordinate))
+        guard let city = await cityPlace(near: coordinate), let name = shortened(city.name) else {
+            return nil
+        }
+        return PlaceResult(name: name, coordinate: city.coordinate)
     }
 
     /// The bar itself, when there is one within `poiRadius` — filtered to places
     /// you would actually be drinking in, so a dentist next door never wins.
-    private func nearbyPointOfInterestName(near coordinate: CLLocationCoordinate2D) async -> String? {
+    private func nearbyPointOfInterest(
+        near coordinate: CLLocationCoordinate2D
+    ) async -> (name: String, coordinate: Coordinate)? {
         let request = MKLocalPointsOfInterestRequest(center: coordinate, radius: Self.poiRadius)
         request.pointOfInterestFilter = MKPointOfInterestFilter(including: [
             .brewery, .cafe, .restaurant, .nightlife, .winery, .bakery, .foodMarket
@@ -105,7 +128,10 @@ final class LocationPlaceProvider: NSObject, PlaceProviding, CLLocationManagerDe
             let nearest = response.mapItems.min { lhs, rhs in
                 distance(from: origin, to: lhs) < distance(from: origin, to: rhs)
             }
-            return nearest?.name
+            // Nameless (or no) match: fall through to the city, exactly as before.
+            guard let nearest, let name = nearest.name else { return nil }
+            let spot = nearest.placemark.coordinate
+            return (name, Coordinate(latitude: spot.latitude, longitude: spot.longitude))
         } catch {
             // Silent by design: MapKit errors can echo the query location.
             return nil
@@ -117,13 +143,20 @@ final class LocationPlaceProvider: NSObject, PlaceProviding, CLLocationManagerDe
     }
 
     /// Fallback when no drinking spot is nearby: just the city.
-    private func cityName(near coordinate: CLLocationCoordinate2D) async -> String? {
+    private func cityPlace(
+        near coordinate: CLLocationCoordinate2D
+    ) async -> (name: String, coordinate: Coordinate?)? {
         let geocoder = CLGeocoder()
         let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
         do {
             let placemarks = try await geocoder.reverseGeocodeLocation(location)
             guard let placemark = placemarks.first else { return nil }
-            return placemark.locality ?? placemark.subLocality ?? placemark.administrativeArea
+            guard let name = placemark.locality ?? placemark.subLocality ?? placemark.administrativeArea
+            else { return nil }
+            // The city's own centre as the geocoder reports it — nil rather than
+            // the device fix when it has none.
+            let centre = placemark.location?.coordinate
+            return (name, centre.map { Coordinate(latitude: $0.latitude, longitude: $0.longitude) })
         } catch {
             return nil
         }
