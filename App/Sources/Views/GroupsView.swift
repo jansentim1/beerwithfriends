@@ -1,5 +1,6 @@
 import BeerKit
 import SwiftUI
+import UIKit
 
 // COMPILE-PARKED (Task 12): no Xcode on this machine — written against
 // iOS 17 SDK APIs + BeerKit's GroupServicing, not yet compiled.
@@ -9,14 +10,15 @@ import SwiftUI
 /// andere groepen; er is een leaderboard-pagina waar je kan zien welke groepen
 /// er zijn en hoeveel er deze dag al gelogd is."
 ///
-/// Two sections: my groups (with the actions that change membership) and the
-/// whole leaderboard for today, my groups washed amber so they're findable in
-/// the list. Consumes only `GroupServicing` + `LeaderboardViewModel` — never
-/// Firebase types.
+/// Two sections: my groups and the whole leaderboard for today, with the two
+/// actions that change membership in a clear row of their own between them. My
+/// groups are marked by an amber name, not by a washed row. Consumes only
+/// `GroupServicing` + `LeaderboardViewModel` — never Firebase types.
 ///
 /// Design: docs/design/direction.md / DESIGN.md — inset grouped sections,
-/// eyebrow headers, one amber accent on the pills and the medal badges,
-/// system everything else.
+/// eyebrow headers, one amber accent on the pills and the rank disc, system
+/// everything else. With nothing to rank yet, one Home-style empty state
+/// claims half the viewport and the two sections stay away.
 struct GroupsView: View {
     @StateObject private var viewModel: LeaderboardViewModel
     @EnvironmentObject private var appState: AppState
@@ -46,23 +48,40 @@ struct GroupsView: View {
 
     var body: some View {
         NavigationStack {
-            List {
-                myGroupsSection
-                leaderboardSection
+            // The reader only measures the viewport, so the empty state can
+            // claim half of it — the same move as Home's.
+            GeometryReader { proxy in
+                List {
+                    if viewModel.groups.isEmpty {
+                        // Nothing to rank yet: one empty state carrying the two
+                        // pills that fix it, and no sections behind it.
+                        Section {
+                            emptyState
+                                .frame(minHeight: max(0, proxy.size.height * 0.5))
+                                .listRowInsets(EdgeInsets(top: 24, leading: 24, bottom: 24, trailing: 24))
+                                .listRowSeparator(.hidden)
+                                .listRowBackground(Color.clear)
+                        }
+                    } else {
+                        myGroupsSection
+                        actionSection
+                        leaderboardSection
+                    }
+                }
+                .listStyle(.insetGrouped)
+                .refreshable { epoch += 1 }
+                // Changing the id cancels the previous start(); the new one awaits
+                // the old stream's teardown itself, so no sleep is needed here.
+                .task(id: epoch) {
+                    today = GroupDay.today()
+                    await viewModel.start()
+                }
+                // A `/join/<code>` link lands in AppState and waits for this screen.
+                .onAppear { consumePendingGroupCode() }
+                .onChange(of: appState.pendingGroupCode) { _, _ in consumePendingGroupCode() }
             }
-            .listStyle(.insetGrouped)
             .navigationTitle("Groups")
             .navigationBarTitleDisplayMode(.large)
-            .refreshable { epoch += 1 }
-            // Changing the id cancels the previous start(); the new one awaits
-            // the old stream's teardown itself, so no sleep is needed here.
-            .task(id: epoch) {
-                today = GroupDay.today()
-                await viewModel.start()
-            }
-            // A `/join/<code>` link lands in AppState and waits for this screen.
-            .onAppear { consumePendingGroupCode() }
-            .onChange(of: appState.pendingGroupCode) { _, _ in consumePendingGroupCode() }
             .sheet(isPresented: $showCreateSheet) {
                 CreateGroupSheet(viewModel: viewModel)
                     .presentationDetents([.medium, .large])
@@ -89,11 +108,29 @@ struct GroupsView: View {
                 Text(viewModel.errorMessage ?? "")
             }
         }
-        .alert("🍻", isPresented: infoBinding) {
+        // Only the join flow raises this one, so the title is its headline.
+        .alert("You're in!", isPresented: infoBinding) {
             Button("Cheers", role: .cancel) {}
         } message: {
             Text(infoMessage ?? "")
         }
+    }
+
+    // MARK: - Empty state
+
+    /// The Home pattern: a rounded title, one secondary line, then the actions.
+    private var emptyState: some View {
+        VStack(spacing: 10) {
+            Text("No groups yet")
+                .font(Theme.displayTitle2)
+            Text("Make one, share the code, and every drink your crew logs counts today.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+            actionRow(centred: true)
+                .padding(.top, 6)
+        }
+        .frame(maxWidth: .infinity)
     }
 
     // MARK: - My groups
@@ -101,69 +138,50 @@ struct GroupsView: View {
     private var myGroupsSection: some View {
         Section {
             if viewModel.mine.isEmpty {
-                Text("You're in no group yet.")
+                Text("Not in a group yet.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .padding(.vertical, 8)
             } else {
                 ForEach(viewModel.mine) { group in
-                    myGroupRow(group)
+                    groupRow(group)
+                        .accessibilityHint("Opens the group, with its join code")
+                        .accessibilityIdentifier("groups.mine.\(group.id)")
                 }
             }
-            // Footer-like row: the two actions that change what's above them.
-            actionRow
-                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
         } header: {
             Eyebrow(text: "My groups")
         }
     }
 
-    private func myGroupRow(_ group: GroupSummary) -> some View {
-        let rank = viewModel.rank(of: group)
-        let count = group.countToday(today)
-        return Button {
-            Haptics.light()
-            detailGroup = group
-        } label: {
-            HStack(spacing: 12) {
-                rankBadge(rank)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(group.name)
-                        .font(.headline)
-                    Text(subtitle(for: group, count: count))
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-                .lineLimit(1)
-                Spacer(minLength: 8)
-                StatusPill(text: "🍺 \(count)")
-            }
-            .padding(.vertical, 6)
-            .frame(minHeight: 44)
-            .contentShape(Rectangle())
+    /// The two actions that change membership, in a clear row of their own: kept
+    /// out of the section above so that card keeps its bottom corners.
+    private var actionSection: some View {
+        Section {
+            actionRow(centred: false)
+                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel("\(group.name), rank \(rank), \(count) today, \(group.totalCount) total, \(mates(group.memberCount))")
-        .accessibilityHint("Opens the group, with its join code")
-        .accessibilityIdentifier("groups.mine.\(group.id)")
+        .listSectionSpacing(8)
     }
 
-    private var actionRow: some View {
+    /// Create and join. `centred` is the empty state, where they sit under the
+    /// copy rather than on the leading edge of a row.
+    private func actionRow(centred: Bool) -> some View {
         // At accessibility sizes two pills won't fit side by side.
         let layout = dynamicTypeSize.isAccessibilitySize
-            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 10))
+            ? AnyLayout(VStackLayout(alignment: centred ? .center : .leading, spacing: 10))
             : AnyLayout(HStackLayout(alignment: .center, spacing: 10))
         return layout {
             Button {
                 Haptics.light()
                 showCreateSheet = true
             } label: {
-                Label("Create a group", systemImage: "plus")
-                    .frame(minHeight: 44)
+                Text("Create a group")
             }
             .buttonStyle(PillButtonStyle(emphasis: .filled))
+            .frame(minHeight: 44)
             .contentShape(Rectangle())
             .accessibilityLabel("Create a group")
             .accessibilityIdentifier("groups.create")
@@ -173,14 +191,16 @@ struct GroupsView: View {
                 showJoinSheet = true
             } label: {
                 Text("Join with code")
-                    .frame(minHeight: 44)
             }
             .buttonStyle(PillButtonStyle(emphasis: .tinted))
+            .frame(minHeight: 44)
             .contentShape(Rectangle())
             .accessibilityLabel("Join a group with a code")
             .accessibilityIdentifier("groups.join")
 
-            if !dynamicTypeSize.isAccessibilitySize {
+            // Left-aligned in a row; centred in the empty state, where the
+            // stack does the centring itself.
+            if !dynamicTypeSize.isAccessibilitySize, !centred {
                 Spacer(minLength: 0)
             }
         }
@@ -190,87 +210,76 @@ struct GroupsView: View {
 
     private var leaderboardSection: some View {
         Section {
-            if viewModel.ranked.isEmpty {
-                Text("No groups yet. Make one and get your mates in.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .padding(.vertical, 8)
-            } else {
-                ForEach(viewModel.ranked) { group in
-                    leaderboardRow(group)
-                        // My groups are washed amber so they're findable in a
-                        // long list; everyone else keeps the plain card.
-                        .listRowBackground(group.isMine ? Theme.accentSoft : Theme.surface)
-                }
+            ForEach(viewModel.ranked) { group in
+                groupRow(group)
+                    .accessibilityHint("Opens the group")
+                    .accessibilityIdentifier("groups.row.\(group.id)")
             }
         } header: {
             Eyebrow(text: "Leaderboard · \(todayLabel)")
         }
     }
 
-    private func leaderboardRow(_ group: GroupSummary) -> some View {
+    /// One anatomy for both sections: the rank disc, the name over its tally,
+    /// and today's count on the trailing edge. A group of mine is marked by the
+    /// amber name — the row itself stays a plain card. At accessibility sizes
+    /// the pill drops under the text.
+    private func groupRow(_ group: GroupSummary) -> some View {
         let rank = viewModel.rank(of: group)
         let count = group.countToday(today)
+        let isAccessibilitySize = dynamicTypeSize.isAccessibilitySize
+        let layout = isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+            : AnyLayout(HStackLayout(alignment: .center, spacing: 12))
         return Button {
             Haptics.light()
             detailGroup = group
         } label: {
-            HStack(spacing: 12) {
-                rankMarker(rank)
-                Text(group.name)
-                    .font(.headline)
-                    .lineLimit(1)
-                Spacer(minLength: 8)
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text("\(count) today")
-                        .font(.subheadline.weight(.semibold))
-                    Text("\(group.totalCount) total")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+            HStack(alignment: isAccessibilitySize ? .top : .center, spacing: 12) {
+                rankBadge(rank)
+                layout {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(group.name)
+                            .font(.headline)
+                            .foregroundStyle(group.isMine ? Theme.accentInk : .primary)
+                            .lineLimit(2)
+                        Text(subtitle(for: group))
+                            .font(.subheadline)
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                    StatusPill(text: "🍺 \(count)")
+                        // The count ticks while the screen is open.
+                        .contentTransition(.numericText())
                 }
-                .lineLimit(1)
             }
             .padding(.vertical, 6)
             .frame(minHeight: 44)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(rankSpoken(rank)), \(group.name), \(count) today, \(group.totalCount) total\(group.isMine ? ", one of your groups" : "")")
-        .accessibilityHint("Opens the group")
-        .accessibilityIdentifier("groups.row.\(group.id)")
+        .accessibilityLabel("\(rankSpoken(rank)), \(group.name), \(count) today, \(group.totalCount) total, \(mates(group.memberCount))\(group.isMine ? ", one of your groups" : "")")
     }
 
-    /// `#n` in a circle: amber for the podium, quiet grey below it.
+    /// The one rank marker, drawn: a crown for the leader, `#n` for everyone
+    /// else — amber on the wash for the podium, quiet grey below it.
     private func rankBadge(_ rank: Int) -> some View {
         let isPodium = rank <= 3
-        return Text("#\(rank)")
-            .font(.caption.weight(.bold).monospacedDigit())
-            .foregroundStyle(isPodium ? Theme.accentInk : Color.secondary)
-            .frame(width: 30, height: 30)
-            .background(isPodium ? Theme.accentSoft : Color(.tertiarySystemFill), in: Circle())
-            .accessibilityHidden(true)
-    }
-
-    /// The leaderboard puts medals on the podium instead of numbers.
-    @ViewBuilder
-    private func rankMarker(_ rank: Int) -> some View {
-        if let medal = Self.medal(rank) {
-            Text(medal)
-                .font(.title3)
-                .frame(width: 30, height: 30)
-                .accessibilityHidden(true)
-        } else {
-            rankBadge(rank)
+        return Group {
+            if rank == 1 {
+                Image(systemName: "crown.fill")
+                    .font(.caption.weight(.bold))
+            } else {
+                Text("#\(rank)")
+                    .font(.caption.weight(.bold).monospacedDigit())
+            }
         }
-    }
-
-    private static func medal(_ rank: Int) -> String? {
-        switch rank {
-        case 1: return "🥇"
-        case 2: return "🥈"
-        case 3: return "🥉"
-        default: return nil
-        }
+        .foregroundStyle(isPodium ? Theme.accentInk : Color.secondary)
+        .frame(width: 30, height: 30)
+        .background(isPodium ? Theme.accentSoft : Color(.tertiarySystemFill), in: Circle())
+        .accessibilityHidden(true)
     }
 
     private func rankSpoken(_ rank: Int) -> String {
@@ -282,8 +291,8 @@ struct GroupsView: View {
         }
     }
 
-    private func subtitle(for group: GroupSummary, count: Int) -> String {
-        "\(count) today · \(group.totalCount) total · \(mates(group.memberCount))"
+    private func subtitle(for group: GroupSummary) -> String {
+        "\(mates(group.memberCount)) · \(group.totalCount) total"
     }
 
     private func mates(_ count: Int) -> String {
@@ -318,7 +327,7 @@ struct GroupsView: View {
         Task {
             if await viewModel.join(code: code) {
                 Haptics.success()
-                infoMessage = "You're in! Your beers count for this group from now on."
+                infoMessage = "Your drinks count for this group from now on."
             }
         }
     }
@@ -355,6 +364,10 @@ private struct GroupDetailSheet: View {
     @State private var isLoadingMembers = true
     @State private var membersFailed = false
     @State private var showLeaveDialog = false
+    /// True for 1.5 s after a tap on the code: the "Copied" pill is the receipt.
+    @State private var didCopy = false
+    /// Latest tap wins — an older one must not retire a newer pill.
+    @State private var copyToken = 0
 
     /// The counters keep ticking while the sheet is open: read the live row from
     /// the leaderboard, falling back to the snapshot the row was tapped with
@@ -372,7 +385,8 @@ private struct GroupDetailSheet: View {
                 if live.isMine { leaveSection }
             }
             .listStyle(.insetGrouped)
-            .navigationTitle("Group")
+            // The name is the title, so the header carries only the counters.
+            .navigationTitle(live.name)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -387,13 +401,8 @@ private struct GroupDetailSheet: View {
 
     private var headerSection: some View {
         Section {
-            VStack(alignment: .leading, spacing: 12) {
-                Text(live.name)
-                    .font(Theme.displayTitle2)
-                    .fixedSize(horizontal: false, vertical: true)
-                statPills
-            }
-            .padding(.vertical, 6)
+            statPills
+                .padding(.vertical, 6)
         }
     }
 
@@ -416,12 +425,30 @@ private struct GroupDetailSheet: View {
     private func inviteSection(code: String) -> some View {
         Section {
             VStack(alignment: .leading, spacing: 12) {
-                Text(code)
-                    .font(.system(.title, design: .rounded, weight: .bold))
-                    .tracking(4)
-                    .textSelection(.enabled)
-                    .accessibilityLabel("Join code, \(code.map { String($0) }.joined(separator: " "))")
-                    .accessibilityIdentifier("groups.detail.code")
+                // Tapping the code copies it: the pill is the receipt, and it
+                // retires itself a beat later.
+                Button {
+                    UIPasteboard.general.string = code
+                    Haptics.light()
+                    flashCopied()
+                } label: {
+                    HStack(spacing: 12) {
+                        Text(code)
+                            .font(.system(.title, design: .rounded, weight: .bold))
+                            .tracking(4)
+                        Spacer(minLength: 8)
+                        if didCopy {
+                            StatusPill(text: "Copied")
+                        }
+                    }
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .animation(Theme.quick, value: didCopy)
+                .accessibilityLabel("Join code, \(code.map { String($0) }.joined(separator: " "))")
+                .accessibilityHint("Copies the code")
+                .accessibilityIdentifier("groups.detail.code")
                 Text("Read the code out, or send the link — it opens the app and drops them in.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
@@ -466,18 +493,24 @@ private struct GroupDetailSheet: View {
                     .foregroundStyle(.secondary)
                     .padding(.vertical, 8)
             } else {
+                // Same anatomy as a mate row in Friends: avatar, name over
+                // @username.
                 ForEach(members) { member in
                     HStack(spacing: 12) {
-                        AvatarView(name: member.username, size: 36)
-                        Text("@\(member.username)")
-                            .font(.subheadline)
-                            .lineLimit(1)
+                        AvatarView(name: member.displayName, size: 44)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(member.displayName)
+                                .font(.headline)
+                            Text("@\(member.username)")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
                         Spacer(minLength: 0)
                     }
-                    .padding(.vertical, 4)
-                    .frame(minHeight: 44)
+                    .padding(.vertical, 6)
                     .accessibilityElement(children: .combine)
-                    .accessibilityLabel("@\(member.username)")
+                    .accessibilityLabel("\(member.displayName), @\(member.username)")
                 }
             }
         } header: {
@@ -509,6 +542,17 @@ private struct GroupDetailSheet: View {
             } message: {
                 Text("Your beers stop counting for this group. You can join again with the code.")
             }
+        }
+    }
+
+    /// Shows "Copied" for 1.5 s, then lets it go.
+    private func flashCopied() {
+        copyToken += 1
+        let token = copyToken
+        didCopy = true
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(1.5))
+            if copyToken == token { didCopy = false }
         }
     }
 
@@ -563,10 +607,13 @@ private struct CreateGroupSheet: View {
                             }
                         }
 
-                    Text("\(name.count)/\(GroupSummary.nameMaxLength)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .accessibilityHidden(true)
+                    // The counter only earns its place near the ceiling.
+                    if name.count >= 20 {
+                        Text("\(name.count)/\(GroupSummary.nameMaxLength)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .accessibilityHidden(true)
+                    }
 
                     Button {
                         Haptics.light()
