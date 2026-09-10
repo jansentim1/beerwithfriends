@@ -44,3 +44,7 @@ API, stored as secrets, and applied only to the app target (not SwiftPM targets)
 
 2,400 lines written without a compiler compiled clean on the first cloud build. Cheap
 compile checks (5 min, free on a public repo) beat careful reasoning about SDK signatures.
+
+## Auth emulator: accounts live in the `--project` namespace (2026-09-10)
+The Firestore and Storage emulators namespace by whatever project id the client names (the iOS app uses the plist's beerwithme-prod, and admin-SDK seeds must match). The Auth emulator does not: `getProjectIdByApiKey` returns the emulator's default project for every API-key request, so app sign-ins always land in demo-pubdates. A seed that creates users under beerwithme-prod produces EMAIL_NOT_FOUND in the app. `tools/rig/seed.mjs` uses a second admin app (projectId demo-pubdates) for Auth only. Verify sign-in with a plain curl to `accounts:signInWithPassword?key=anything` before blaming the app.
+

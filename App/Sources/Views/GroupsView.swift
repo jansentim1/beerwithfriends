@@ -258,6 +258,10 @@ struct GroupsView: View {
             .padding(.vertical, 6)
             .frame(minHeight: 44)
             .contentShape(Rectangle())
+            // The system aligns a separator to the row's first Text, so the
+            // crown row (an Image) got a name-aligned line and the `#n` rows a
+            // badge-aligned one. Pin every separator to the name.
+            .alignmentGuide(.listRowSeparatorLeading) { d in d[.leading] + 30 + 12 }
         }
         .buttonStyle(.plain)
         .accessibilityLabel("\(rankSpoken(rank)), \(group.name), \(count) today, \(group.totalCount) total, \(mates(group.memberCount))\(group.isMine ? ", one of your groups" : "")")
