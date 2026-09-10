@@ -92,7 +92,7 @@ struct DrinkPickerView<Accessory: View>: View {
     /// you the row scrolls. Paging is view-aligned so a flick lands on a glass.
     // Sized so that, next to a 56 pt camera cell, four glasses fit and the fifth
     // peeks by ~20 pt: the row visibly continues.
-    private static var cellMinWidth: CGFloat { 58 }
+    private static var cellMinWidth: CGFloat { 66 }
     private static var cellSpacing: CGFloat { 2 }
     /// How long the poured glass stays full before it eases back.
     private static var holdSeconds: Double { 0.6 }
