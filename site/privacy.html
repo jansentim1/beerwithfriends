@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PubDates Privacy Policy</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { margin: 0; font-family: -apple-system, system-ui, sans-serif; background: #F2F2F7; color: #111; line-height: 1.5; }
+  @media (prefers-color-scheme: dark) { body { background: #000; color: #fff; } .card { background: #1C1C1E; } th { color: #fff; } td, th { border-color: #3A3A3C; } .muted { color: #98989D; } }
+  .card { background: #fff; border-radius: 20px; padding: 28px 24px; max-width: 720px; margin: 24px auto; }
+  h1 { font-size: 28px; margin: 0 0 4px; }
+  h2 { font-size: 20px; margin: 28px 0 8px; }
+  .muted { color: #6E6E73; }
+  table { border-collapse: collapse; width: 100%; font-size: 15px; }
+  th, td { text-align: left; vertical-align: top; padding: 8px 6px; border-top: 1px solid #E5E5EA; }
+  th { font-weight: 600; }
+  code { font-size: 13px; }
+  a { color: #A35A00; }
+  @media (max-width: 600px) { .where { display: none; } }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>PubDates Privacy Policy</h1>
+  <p class="muted">Last updated: 11 September 2026</p>
+  <p>PubDates is a small app for telling friends you are having a drink. This policy explains what the app stores, why, and how to get rid of it. It is written to be read, not to be scrolled past.</p>
+
+  <h2>What we collect</h2>
+  <table>
+    <tr><th>Data</th><th>Why</th><th class="where">Where it lives</th></tr>
+    <tr><td>Apple account identifier (from Sign in with Apple)</td><td>To sign you in. We never see your email or password; Sign in with Apple gives us an opaque user id.</td><td class="where">Firebase Authentication</td></tr>
+    <tr><td>Username and nickname</td><td>So friends can find and recognise you.</td><td class="where">Firestore <code>users/{uid}</code>, <code>usernames/{name}</code></td></tr>
+    <tr><td>Drink logs (timestamps, cheers count, quick replies)</td><td>The feed. Each entry expires two hours after it was logged, or as soon as you log your next drink, and is then deleted by a scheduled job.</td><td class="where">Firestore <code>beers/{beerId}</code></td></tr>
+    <tr><td>Photos taken in the app</td><td>Attached to a drink log. Stored for at most two hours. Each friend can view a photo exactly once; the server enforces this.</td><td class="where">Firebase Storage <code>photos/{beerId}.jpg</code></td></tr>
+    <tr><td>View and screenshot receipts</td><td>So the photo owner can see who viewed their photo and whether a screenshot was taken. Deleted with the drink.</td><td class="where">Firestore under <code>beers/{beerId}</code></td></tr>
+    <tr><td>Friend list, friend requests, blocks</td><td>To decide whose drinks you see and who can see yours.</td><td class="where">Firestore</td></tr>
+    <tr><td>Groups you join</td><td>The Groups leaderboard: group name, join code, your username and nickname as a member, and how many drinks the group logged today and in total.</td><td class="where">Firestore <code>groups/{groupId}</code></td></tr>
+    <tr><td>Push notification token</td><td>To send "X is having a beer" and "Y cheersed you" notifications. Stored in a private subcollection only you and the server can read. Removed on sign-out.</td><td class="where">Firestore <code>users/{uid}/private/push</code></td></tr>
+    <tr><td>Place on a drink (optional)</td><td>Off by default. If you switch on "Share where I'm drinking", the name of the bar or the city, and that place's map position, are attached to a drink you log, so mates see it in the feed and on the Map tab. Your phone's exact position is used once, locally, to find the place; the position stored is the bar's or the city centre's, rounded to about 100 metres, never yours.</td><td class="where">Firestore <code>beers/{beerId}.place</code> and <code>placeCoordinate</code>, deleted with the drink</td></tr>
+    <tr><td>What you drank</td><td>The drink type you picked (pils, wine, cocktail, ...).</td><td class="where">Firestore <code>beers/{beerId}.drink</code></td></tr>
+    <tr><td>Username changes</td><td>The time of your last username change, to limit changes to once a day.</td><td class="where">Firestore <code>users/{uid}.usernameChangedAt</code></td></tr>
+    <tr><td>Reports you file</td><td>Trust and safety review. Only the reporter's id, the reported user or drink, and the reason are stored.</td><td class="where">Firestore <code>reports</code></td></tr>
+  </table>
+  <p>We do not collect your email, contacts, photo library, analytics, or advertising identifiers. Location is only used, on your phone, to name a place when you opt in. The camera is the only photo source, and only when you tap a glass to log a drink.</p>
+
+  <h2>What we do not do</h2>
+  <ul>
+    <li>No advertising, no tracking, no selling or sharing of data with third parties.</li>
+    <li>No analytics SDKs. The only third party is Google Firebase, which hosts the backend (servers in the Netherlands, europe-west4).</li>
+    <li>Photos are never shown to anyone except friends you have accepted, once each, for two hours.</li>
+  </ul>
+
+  <h2>Retention</h2>
+  <ul>
+    <li>Drink logs and photos: deleted automatically two hours after logging, or when you log your next drink.</li>
+    <li>Everything else: kept until you delete your account.</li>
+  </ul>
+
+  <h2>Deleting your account</h2>
+  <p>Settings, then Delete account. This runs a server function that removes your profile, username reservation, drinks, photos, friendships, requests, blocks, group memberships, push token and authentication record. It is immediate and cannot be undone. Reports you filed are kept without your identifier for abuse-prevention purposes.</p>
+
+  <h2>Children</h2>
+  <p>PubDates is about drinking and is rated 17+. It is not intended for anyone under the legal drinking age in their country.</p>
+
+  <h2>Security</h2>
+  <p>All data is transferred over TLS. Access is governed by Firebase security rules that restrict every document to its owner and accepted friends; the rules are tested in the project's automated test suite.</p>
+
+  <h2>Contact</h2>
+  <p>Questions or deletion requests: <a href="mailto:twj.jansen@gmail.com">twj.jansen@gmail.com</a></p>
+</div>
+</body>
+</html>

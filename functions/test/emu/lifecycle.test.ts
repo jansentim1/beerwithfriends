@@ -113,6 +113,21 @@ describe("deleteAccountCore", () => {
     await deleteAccountCore(db, deletePhoto, "u1");
     expect((await db.doc("friendRequests/u2/incoming/u1").get()).exists).toBe(false);
   });
+  it("leaves every group: member doc gone, count down, empty group deleted", async () => {
+    await seedUser(db, "u1", "tim");
+    await db.doc("groups/g1").set({ name: "De Kroeg", code: "KROEG7", createdBy: "u2", memberCount: 2, todayCount: 0, totalCount: 0 });
+    await db.doc("groups/g1/members/u1").set({ username: "tim", displayName: "tim", joinedAt: Timestamp.now() });
+    await db.doc("groups/g1/members/u2").set({ username: "joost", displayName: "joost", joinedAt: Timestamp.now() });
+    await db.doc("groups/g2").set({ name: "Solo", code: "SOLO11", createdBy: "u1", memberCount: 1, todayCount: 0, totalCount: 0 });
+    await db.doc("groups/g2/members/u1").set({ username: "tim", displayName: "tim", joinedAt: Timestamp.now() });
+    await db.doc("users/u1/groups/g1").set({ name: "De Kroeg", joinedAt: Timestamp.now() });
+    await db.doc("users/u1/groups/g2").set({ name: "Solo", joinedAt: Timestamp.now() });
+    await deleteAccountCore(db, deletePhoto, "u1");
+    expect((await db.doc("groups/g1/members/u1").get()).exists).toBe(false);
+    expect((await db.doc("groups/g1").get()).get("memberCount")).toBe(1);
+    expect((await db.doc("groups/g2").get()).exists).toBe(false);
+    expect((await db.doc("users/u1/groups/g1").get()).exists).toBe(false);
+  });
 
   it("purges cheers and views the user left on others' beers", async () => {
     await seedUser(db, "u1", "tim");

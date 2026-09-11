@@ -1,4 +1,5 @@
 import { Firestore, Timestamp } from "firebase-admin/firestore";
+import { leaveGroupCore } from "./groups";
 
 export type PhotoDeleter = (path: string) => Promise<void>;
 
@@ -93,9 +94,14 @@ export async function deleteAccountCore(db: Firestore, deletePhoto: PhotoDeleter
     const traces = await db.collectionGroup(coll).where("uid", "==", uid).get();
     for (const d of traces.docs) await d.ref.delete();
   }
+  // Group memberships: the member doc (and the count) on every group they are in.
+  const memberships = await db.collection(`users/${uid}/groups`).get();
+  for (const m of memberships.docs) {
+    await leaveGroupCore(db, uid, m.id).catch(() => {});
+  }
   if (username) await db.doc(`usernames/${username}`).delete();
   // recursiveDelete so the private subcollection (users/{uid}/private/push
-  // with the FCM token) goes too.
+  // with the FCM token) and the groups mirror go too.
   await db.recursiveDelete(db.doc(`users/${uid}`));
 }
 
