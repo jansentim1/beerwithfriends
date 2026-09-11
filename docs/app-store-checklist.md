@@ -9,7 +9,7 @@ Everything App Review will look at for PubDates, and where it is handled.
 - Age rating: **17+**. In the questionnaire answer "Frequent/Intense" for
   "Alcohol, Tobacco, or Drug Use or References" and "Frequent/Intense" for
   "Unrestricted Web Access: No". User Generated Content: Yes.
-- Privacy policy URL: host `docs/privacy-policy.md` somewhere public (GitHub Pages is fine)
+- Privacy policy URL: https://beerwithme-prod.web.app/privacy (site/privacy.html, deployed with `tools/deploy.sh --no-gates --hosting`; keep it in step with docs/privacy-policy.md)
   and paste the URL. Required for any app with accounts.
 - Support URL: the repo README or the same page.
 
@@ -82,7 +82,7 @@ scales the rest if you tick "use for all sizes".
 - [ ] APNs key uploaded to Firebase Cloud Messaging and a push received on a real device.
 - [ ] Sign in with Apple capability on the App ID and the Apple provider enabled in Firebase Auth.
 - [ ] Account deletion tested end to end on production.
-- [ ] Privacy policy URL live.
+- [x] Privacy policy URL live (2026-09-11).
 - [ ] Export compliance: answer "No" to non-exempt encryption (only HTTPS); set
       `ITSAppUsesNonExemptEncryption = NO` in Info.plist to skip the question per build.
 - [ ] Build uploaded via CI, tested on TestFlight by at least two people cheersing each other.
