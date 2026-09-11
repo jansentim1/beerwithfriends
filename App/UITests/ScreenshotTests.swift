@@ -50,7 +50,7 @@ final class ScreenshotTests: XCTestCase {
         sleep(1)
         snap("08f-nickname-sheet")
         // A medium-detent sheet closes on a tap in the dimmed area above it.
-        app.coordinate(withNormalizedOffset: CGPoint(x: 0.5, y: 0.12)).tap()
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.12)).tap()
         sleep(1)
         let username = app.buttons["settings.changeUsername"]
         XCTAssertTrue(username.waitForExistence(timeout: 5))
