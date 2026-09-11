@@ -493,6 +493,15 @@ final class CameraSessionController: @unchecked Sendable {
                 delegate.fail()
                 return
             }
+            // The preview layer mirrors the front camera on its own; the photo
+            // output does not, so a selfie came out flipped against what the
+            // screen showed (Tim, 2026-09-11: "de foto is gespiegeld"). Match
+            // the preview: mirror the capture for the front camera only.
+            let isFront = (self.session.inputs.first as? AVCaptureDeviceInput)?.device.position == .front
+            if connection.isVideoMirroringSupported {
+                connection.automaticallyAdjustsVideoMirroring = false
+                connection.isVideoMirrored = isFront
+            }
             let settings: AVCapturePhotoSettings
             if self.photoOutput.availablePhotoCodecTypes.contains(.jpeg) {
                 settings = AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.jpeg])
