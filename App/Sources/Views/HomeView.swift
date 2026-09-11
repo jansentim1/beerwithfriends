@@ -114,6 +114,9 @@ struct HomeView: View {
                                 ForEach(rows) { beer in
                                     feedRow(beer, now: context.date)
                                 }
+                                // Rows sit straight on the ground; the plain list's
+                                // own row background is the system black in dark mode.
+                                .listRowBackground(Color.clear)
                             }
                         }
                     }
