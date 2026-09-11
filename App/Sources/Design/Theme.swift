@@ -30,8 +30,19 @@ enum Theme {
             ? UIColor(red: 1.00, green: 0.655, blue: 0.20, alpha: 0.18)
             : UIColor(red: 0.90, green: 0.54, blue: 0.00, alpha: 0.14)
     })
-    static let surface = Color(.secondarySystemGroupedBackground)
-    static let ground = Color(.systemGroupedBackground)
+    /// Cards on the ground. Light: the system grouped white. Dark: a neutral grey
+    /// lifted off a near-black ground (Menno: "heel donker" on the system black),
+    /// so dark mode reads as evening, not a void.
+    static let surface = Color(UIColor { trait in
+        trait.userInterfaceStyle == .dark
+            ? UIColor(red: 0.149, green: 0.149, blue: 0.161, alpha: 1)   // #262629
+            : UIColor.secondarySystemGroupedBackground
+    })
+    static let ground = Color(UIColor { trait in
+        trait.userInterfaceStyle == .dark
+            ? UIColor(red: 0.082, green: 0.082, blue: 0.090, alpha: 1)   // #151517
+            : UIColor.systemGroupedBackground
+    })
 
     // MARK: Shape
 

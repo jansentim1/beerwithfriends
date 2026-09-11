@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the app icon (1024x1024 PNG, no alpha, as App Store Connect requires).
+"""LEGACY placeholder generator; the shipped icon is candidate A from tools/icon/candidates.js.
 Two clinking pints on a warm amber gradient. Pure Pillow, no fonts needed.
 Usage: python3 tools/icon/make_icon.py App/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.png
 """

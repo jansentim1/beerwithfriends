@@ -49,6 +49,8 @@ struct FriendsView: View {
                 inviteSection
             }
             .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
+            .background(Theme.ground.ignoresSafeArea())
             .scrollDismissesKeyboard(.interactively)
             .navigationTitle("Mates")
             .navigationBarTitleDisplayMode(.large)
@@ -128,6 +130,7 @@ struct FriendsView: View {
         } header: {
             Eyebrow(text: "Add a mate")
         }
+        .listRowBackground(Theme.surface)
     }
 
     /// A bare field in the grouped cell — no nested box. The magnifying glass
@@ -205,6 +208,7 @@ struct FriendsView: View {
         } header: {
             Eyebrow(text: "Requests")
         }
+        .listRowBackground(Theme.surface)
     }
 
     private func requestRow(_ request: FriendRequest) -> some View {
@@ -255,6 +259,7 @@ struct FriendsView: View {
         } header: {
             Eyebrow(text: "Mates")
         }
+        .listRowBackground(Theme.surface)
     }
 
     private func friendRow(_ friend: UserProfile) -> some View {

@@ -61,6 +61,8 @@ struct SettingsView: View {
                 versionFooterSection
             }
             .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
+            .background(Theme.ground.ignoresSafeArea())
             .tint(Theme.accentInk)  // tint colours words and glyphs; fills use Theme.accent
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.large)
@@ -183,6 +185,7 @@ struct SettingsView: View {
             .accessibilityValue("@\(shownUsername)")
             .accessibilityHint("Change your username")
         }
+        .listRowBackground(Theme.surface)
     }
 
     private var blockedSection: some View {
@@ -201,6 +204,7 @@ struct SettingsView: View {
                 }
             }
         }
+        .listRowBackground(Theme.surface)
     }
 
     private func blockedRow(_ blocked: BlockedUser) -> some View {
@@ -245,6 +249,7 @@ struct SettingsView: View {
         } footer: {
             Text("The bar's name and its map position go with your drink, never your own location. Mates only, in the feed and on the Map.")
         }
+        .listRowBackground(Theme.surface)
     }
 
     private var aboutSection: some View {
@@ -264,6 +269,7 @@ struct SettingsView: View {
             .accessibilityLabel("Privacy policy")
             .accessibilityHint("Opens in your browser")
         }
+        .listRowBackground(Theme.surface)
     }
 
     private var accountSection: some View {
@@ -294,6 +300,7 @@ struct SettingsView: View {
             .disabled(isDeleting)
             .accessibilityIdentifier("settings.delete")
         }
+        .listRowBackground(Theme.surface)
     }
 
     private var versionFooterSection: some View {
@@ -306,6 +313,7 @@ struct SettingsView: View {
                 .multilineTextAlignment(.center)
                 .padding(.top, 8)
         }
+        .listRowBackground(Theme.surface)
     }
 
     /// "N drinks logged" — the logged thing is a drink (PRODUCT.md terminology).

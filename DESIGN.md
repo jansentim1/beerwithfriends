@@ -10,9 +10,9 @@ colors:
   amber-wash: "rgba(230, 138, 0, 0.14)"
   amber-wash-dark: "rgba(255, 167, 51, 0.18)"
   ground: "#F2F2F7"
-  ground-dark: "#000000"
+  ground-dark: "#151517"
   surface: "#FFFFFF"
-  surface-dark: "#1C1C1E"
+  surface-dark: "#262629"
   glass-on-black: "rgba(255, 255, 255, 0.18)"
   glass-outline: "rgba(0, 0, 0, 0.55)"
   glass-outline-dark: "rgba(255, 255, 255, 0.55)"
@@ -345,6 +345,7 @@ A 36 pt surface disc with an Amber Wash overlay and the newest drink's glass at 
 ### Navigation
 - **Large titles** in rounded bold via `Theme.installNavigationBarAppearance()`, inline titles in rounded semibold headline; default bar background; titles collapse on scroll.
 - **Tab bar:** five items with filled SF Symbols (mug, person.2, map, trophy, gearshape), labels "Beers", "Mates", "Map", "Groups", "Settings", tinted Pint Amber.
+- **Dark mode (decided 2026-09-11, Tim delegated):** kept, but lifted off system black. Ground #151517, cards #262629; every List hides the system scroll background and paints `Theme.ground`, every grouped Section paints `Theme.surface` on its rows (Menno: "heel donker" on the old pure black). Bars keep the system blur.
 - **Lists:** Home is `.plain` with hidden separators, pull-to-refresh, swipe actions and context menus; Mates and Settings are `.insetGrouped`. Settings tints with Amber Ink; its Username row is a plain-styled button so the label stays primary and the value secondary.
 - **Sheets and dialogs:** full-screen covers for camera and photo viewer; detented sheets for the map callout, change username and QR; system confirmation dialogs for Report, Block, Remove mate, and the double Delete account confirm.
 

@@ -69,6 +69,8 @@ struct GroupsView: View {
                     }
                 }
                 .listStyle(.insetGrouped)
+                .scrollContentBackground(.hidden)
+                .background(Theme.ground.ignoresSafeArea())
                 .refreshable { epoch += 1 }
                 // Changing the id cancels the previous start(); the new one awaits
                 // the old stream's teardown itself, so no sleep is needed here.
@@ -152,6 +154,7 @@ struct GroupsView: View {
         } header: {
             Eyebrow(text: "My groups")
         }
+        .listRowBackground(Theme.surface)
     }
 
     /// The two actions that change membership, in a clear row of their own: kept
@@ -218,6 +221,7 @@ struct GroupsView: View {
         } header: {
             Eyebrow(text: "Leaderboard · \(todayLabel)")
         }
+        .listRowBackground(Theme.surface)
     }
 
     /// One anatomy for both sections: the rank disc, the name over its tally,
@@ -389,6 +393,8 @@ private struct GroupDetailSheet: View {
                 if live.isMine { leaveSection }
             }
             .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
+            .background(Theme.ground.ignoresSafeArea())
             // The name is the title, so the header carries only the counters.
             .navigationTitle(live.name)
             .navigationBarTitleDisplayMode(.inline)
@@ -408,6 +414,7 @@ private struct GroupDetailSheet: View {
             statPills
                 .padding(.vertical, 6)
         }
+        .listRowBackground(Theme.surface)
     }
 
     private var statPills: some View {
@@ -473,6 +480,7 @@ private struct GroupDetailSheet: View {
         } header: {
             Eyebrow(text: "Join code")
         }
+        .listRowBackground(Theme.surface)
     }
 
     private var membersSection: some View {
@@ -520,6 +528,7 @@ private struct GroupDetailSheet: View {
         } header: {
             Eyebrow(text: "Mates")
         }
+        .listRowBackground(Theme.surface)
     }
 
     private var leaveSection: some View {
@@ -547,6 +556,7 @@ private struct GroupDetailSheet: View {
                 Text("Your beers stop counting for this group. You can join again with the code.")
             }
         }
+        .listRowBackground(Theme.surface)
     }
 
     /// Shows "Copied" for 1.5 s, then lets it go.

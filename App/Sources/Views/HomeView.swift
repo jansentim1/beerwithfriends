@@ -118,6 +118,8 @@ struct HomeView: View {
                         }
                     }
                     .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
+                    .background(Theme.ground.ignoresSafeArea())
                     .listSectionSeparator(.hidden)
                     // Pull-to-refresh works on the empty state too: the hero row keeps
                     // the list scrollable even with no beers.
