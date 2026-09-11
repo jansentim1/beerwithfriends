@@ -96,6 +96,19 @@ processed build appears in his TestFlight app automatically.
    build needs a short Apple review, usually under a day. After that, new builds
    go to testers automatically.
 
+### Shipping a build to the mates (tim-server)
+
+After `gh workflow run ios-testflight` finishes, the build (number = the run
+number) needs attaching to the external group and a beta review submission:
+
+```
+tools/ship-build.sh <build number> "What's new, one paragraph"
+```
+
+It polls App Store Connect until the build is processed, attaches it to the
+"Mates" group, sets the what's-new text and submits the beta review (Apple's
+re-review of an update is usually minutes). Uses `~/bin/asc`.
+
 ## 6. Backend changes
 
 Any change under `functions/`, `firestore.rules`, `firestore.indexes.json` or
