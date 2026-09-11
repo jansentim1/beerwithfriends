@@ -89,14 +89,14 @@ public final class HomeViewModel: ObservableObject {
     }
 
     private func apply(snapshot logs: [BeerLog]) {
-        let cutoff = now()
-        var merged = logs.filter { $0.expiresAt > cutoff }
+        var merged = logs
         let present = Set(merged.map(\.id))
         // Keep optimistic rows the snapshot doesn't know about yet.
         for beer in feed where pendingIds.contains(beer.id) && !present.contains(beer.id) {
             merged.append(beer)
         }
-        feed = merged.sorted { $0.createdAt > $1.createdAt }
+        // One row per person (their newest), alive ones only, newest first.
+        feed = BeerLog.latestPerOwner(merged, now: now())
         loadCheersState(for: feed.map(\.id))
     }
 

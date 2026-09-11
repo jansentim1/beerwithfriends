@@ -125,6 +125,23 @@ final class AppState: ObservableObject {
         return false
     }
 
+    /// Settings → Change nickname. Re-keys the session like a username change,
+    /// so the feed's own rows and the next drink carry the new name.
+    func changeDisplayName(_ rawDisplayName: String) async -> Bool {
+        guard let displayName = DisplayName.normalize(rawDisplayName) else {
+            errorMessage = "Nicknames are 1–\(DisplayName.maxLength) characters."
+            return false
+        }
+        do {
+            let profile = try await authService.changeDisplayName(to: displayName)
+            becomeReady(profile)
+            return true
+        } catch {
+            errorMessage = "Couldn't change your nickname — try again."
+        }
+        return false
+    }
+
     /// Live availability check for the onboarding username picker (Task 10).
     /// `friendService` doesn't exist yet while `phase == .needsUsername`, so
     /// this reads the reservation doc directly (rules: any signed-in get).

@@ -6,7 +6,7 @@ import UIKit
 // iOS 17 SDK APIs, not yet compiled.
 
 // The drinks half of the visual system: every glass is DRAWN, never an image, so
-// it can fill on tap (Theme.pour) and drain over the 24 h life of a beer.
+// it can fill on tap (Theme.pour) and drain over the 15 minutes of a drink.
 // Vocabulary (docs/design/direction.md): a 2 pt outline in `primary` at 55 %, a
 // 5 % `primary` glass fill, and one explicit liquid colour per drink so the
 // content reads as the drink itself in both schemes.
@@ -99,7 +99,7 @@ struct DrinkPickerView<Accessory: View>: View {
     /// and how full that glass is — `nil` when they have nothing on the go.
     var currentDrink: DrinkKind?
     /// Live fill of `currentDrink`: 1.0 the moment it is logged, draining over
-    /// the 24 hours. Ignored when `currentDrink` is nil.
+    /// its 15 minutes. Ignored when `currentDrink` is nil.
     var currentLevel: Double = 0
     /// True while the one-minute cooldown after the last drink is running.
     var isLocked: Bool = false
@@ -170,11 +170,13 @@ struct DrinkPickerView<Accessory: View>: View {
 
     /// The pour wins while it stands — so tapping another of what you are already
     /// drinking still fills the glass to the brim — then the parent's live level
-    /// takes over: the glass you are drinking drains, every other glass rests.
+    /// takes over: the glass you are drinking drains, every other glass is empty
+    /// (Tim, 2026-09-11: "all glasses should be empty unless filled"; the label
+    /// under each names the drink).
     private func displayLevel(for kind: DrinkKind) -> Double {
         if kind == poured { return 1 }
         if kind == currentDrink { return currentLevel }
-        return kind.restingLevel
+        return 0
     }
 
     private func glass(_ kind: DrinkKind) -> some View {
@@ -334,26 +336,6 @@ extension View {
     }
 }
 
-// MARK: - Resting level
-
-extension DrinkKind {
-    /// What "empty-ish" means for this glass. One number for all seven read as
-    /// a dry smear in the wide shapes (a martini is nearly all rim) and as a
-    /// full pint in the narrow ones, so the resting splash is tuned per kind:
-    /// enough liquid to name the drink by its colour at 44 pt, never enough to
-    /// be mistaken for a glass someone is already drinking.
-    var restingLevel: Double {
-        switch self {
-        case .pils: return 0.18
-        case .special: return 0.28
-        case .wine: return 0.32
-        case .bubbles: return 0.30
-        case .cocktail: return 0.45
-        case .whisky: return 0.25
-        }
-    }
-}
-
 // MARK: - Shapes
 
 /// The silhouette that holds liquid (bowl only — stems and feet are decoration).
@@ -370,7 +352,7 @@ private struct GlassDecorationShape: Shape {
 
 /// A full-width slab from the bottom of the cavity up to the surface; the glass
 /// silhouette clips it into shape. `level` is animatable, which is what makes
-/// the pour (and the 24 h drain) a real animation rather than a jump.
+/// the pour (and the 15-minute drain) a real animation rather than a jump.
 private struct LiquidShape: Shape {
     let kind: DrinkKind
     var level: Double
@@ -395,10 +377,9 @@ private struct FoamShape: Shape {
         set { level = newValue }
     }
     func path(in rect: CGRect) -> Path {
-        // No head on a glass that is barely wet (the resting picker state), and
-        // the threshold is that kind's own resting level — a special beer rests
+        // No head on a glass that is barely wet: the last seconds of a drain
         // deeper than a pils.
-        guard level > kind.restingLevel + 0.05 else { return Path() }
+        guard level > 0.05 else { return Path() }
         let surface = DrinkGlassGeometry.surfaceY(kind, level: level, in: rect)
         let thickness = max(2, rect.height * 0.07)
         // The band sits entirely BELOW the surface: riding it half-out leaves a

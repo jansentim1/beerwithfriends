@@ -54,6 +54,23 @@ final class FirebaseAuthService: AuthServicing, @unchecked Sendable {
                            beerCount: 0, createdAt: Date())
     }
 
+    /// `changeDisplayName` callable: the server updates the profile and the
+    /// group member mirrors in one go.
+    func changeDisplayName(to displayName: String) async throws -> UserProfile {
+        guard let uid = Auth.auth().currentUser?.uid else { throw ServiceError.notSignedIn }
+        let result = try await EmulatorConfig.functions(region: "europe-west4")
+            .httpsCallable("changeDisplayName").call(["displayName": displayName])
+        let name = (result.data as? [String: Any])?["displayName"] as? String ?? displayName
+        let snap = try await Firestore.firestore().document("users/\(uid)").getDocument()
+        return UserProfile(
+            id: uid,
+            username: snap.get("usernameLower") as? String ?? "",
+            displayName: name,
+            beerCount: snap.get("beerCount") as? Int ?? 0,
+            createdAt: (snap.get("createdAt") as? Timestamp)?.dateValue() ?? Date()
+        )
+    }
+
     /// `changeUsername` callable: server moves the reservation atomically.
     func changeUsername(to username: String) async throws -> UserProfile {
         guard let uid = Auth.auth().currentUser?.uid else { throw ServiceError.notSignedIn }

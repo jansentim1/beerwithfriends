@@ -61,9 +61,9 @@ final class FakeBeerService: BeerServicing, @unchecked Sendable {
     }
 }
 
-func makeBeer(_ id: String, createdAt: TimeInterval, hasPhoto: Bool = false) -> BeerLog {
+func makeBeer(_ id: String, createdAt: TimeInterval, hasPhoto: Bool = false, owner: String = "u2") -> BeerLog {
     let t = Date(timeIntervalSince1970: createdAt)
-    return BeerLog(id: id, ownerUid: "u2", ownerName: "Joost", createdAt: t,
+    return BeerLog(id: id, ownerUid: owner, ownerName: "Joost", createdAt: t,
                    expiresAt: BeerLog.expiry(from: t), hasPhoto: hasPhoto)
 }
 
@@ -168,10 +168,12 @@ func waitForFeed(_ vm: HomeViewModel) async {
         let svc = FakeBeerService()
         let vm = HomeViewModel(service: svc, now: { Date(timeIntervalSince1970: 200_000) })
         let running = await startAndWaitForSubscription(vm, svc)
-        let expired = makeBeer("expired", createdAt: 100_000)   // expires at 186_400 < now
-        let older = makeBeer("older", createdAt: 150_000)
-        let newer = makeBeer("newer", createdAt: 190_000)
-        svc.feedContinuation?.yield([expired, older, newer])
+        let expired = makeBeer("expired", createdAt: 190_000, owner: "u3")   // expires at 197_200 < now
+        let older = makeBeer("older", createdAt: 195_000, owner: "u4")
+        let newer = makeBeer("newer", createdAt: 199_000)
+        // Same owner as `newer`, so it is superseded: one row per person.
+        let replaced = makeBeer("replaced", createdAt: 198_000)
+        svc.feedContinuation?.yield([expired, older, newer, replaced])
         await Task.yield(); await Task.yield()
         #expect(vm.feed.map(\.id) == ["newer", "older"])
         running.cancel(); await running.value
@@ -219,11 +221,11 @@ func waitForFeed(_ vm: HomeViewModel) async {
         svc.cheersedOnServer = ["b1"]
         let vm = HomeViewModel(service: svc, now: now)
         let running = await startAndWaitForSubscription(vm, svc)
-        svc.feedContinuation?.yield([makeBeer("b1", createdAt: 400), makeBeer("b2", createdAt: 300)])
+        svc.feedContinuation?.yield([makeBeer("b1", createdAt: 400), makeBeer("b2", createdAt: 300, owner: "u3")])
         for _ in 0..<10 { await Task.yield() }
         #expect(vm.cheersedBeerIds == ["b1"])
         #expect(svc.cheersLookups == [["b1", "b2"]])
-        svc.feedContinuation?.yield([makeBeer("b1", createdAt: 400), makeBeer("b2", createdAt: 300)])
+        svc.feedContinuation?.yield([makeBeer("b1", createdAt: 400), makeBeer("b2", createdAt: 300, owner: "u3")])
         for _ in 0..<5 { await Task.yield() }
         #expect(svc.cheersLookups.count == 1)          // no re-lookup for known ids
         running.cancel(); await running.value

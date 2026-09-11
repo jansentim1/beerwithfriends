@@ -18,7 +18,7 @@ arrives and you want to cheers back in one tap.
 
 PubDates lets you tell your friends you are having a beer with one tap. Friends get a push,
 can cheers back (which pushes back to you), and can attach a live camera photo that each
-friend may look at exactly once. Everything expires after 24 hours. Success: a group of
+friend may look at exactly once. A drink stays two hours, and only your newest one shows: logging again replaces it (Tim, 2026-09-11). Success: a group of
 friends installs it and keeps using it for weeks because the loop is instant, low-effort
 and a little bit fun.
 
@@ -48,7 +48,7 @@ personal score.
 - Drinks: seven kinds (pils, special, wine, bubbles, cocktail, whisky, soft) drawn as vector
   glasses that fill on tap and empty in 15 minutes.
 - Feed rows: owner, relative time, photo chip (sealed / seen / none), cheers pill.
-- Photos: camera only, JPEG ≤ 1080 px, 24 h, view once per friend, screenshot receipts.
+- Photos: camera only, JPEG ≤ 1080 px, 2 h, view once per friend, screenshot receipts.
 - Terminology: "beer" is the brand noun (app name, Beers tab, "I'm having a beer" copy);
   "drink" is the logged thing when the kind matters (pils, wine, cocktail... "log a drink",
   "N drinks logged", "Report this drink"). "cheers" (🍻) is the reaction; "view once" is the
@@ -78,7 +78,7 @@ personal score.
 
 1. One thumb, one tap: the log button is the product; everything else is secondary.
 2. Instant: optimistic UI everywhere; the network never blocks the ritual.
-3. Ephemeral by design: 24 h and view-once are features, the UI should make them legible.
+3. Ephemeral by design: two hours, one live drink per person, and view-once are features; the UI should make them legible.
 4. Friends, not followers: small groups, exact usernames, no discovery, no personal numbers
    to chase (the only counter is a crew's today, on the Groups leaderboard).
 5. Native first: an iPhone user should never pause at an off-spec control.

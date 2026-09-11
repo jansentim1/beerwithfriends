@@ -11,3 +11,16 @@ public enum Username {
         return c
     }
 }
+
+/// The nickname ("bijnaam") shown on feed rows, pushes and group member lists.
+/// Free text, unlike the username: trimmed, inner whitespace collapsed, 1–30
+/// characters. Same bounds on the server (`changeDisplayNameCore`).
+public enum DisplayName {
+    public static let maxLength = 30
+    public static func normalize(_ raw: String) -> String? {
+        let words = raw.split(whereSeparator: { $0.isWhitespace || $0.isNewline })
+        let c = words.joined(separator: " ")
+        guard (1...maxLength).contains(c.count) else { return nil }
+        return c
+    }
+}

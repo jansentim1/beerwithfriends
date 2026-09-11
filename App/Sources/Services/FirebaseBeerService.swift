@@ -37,7 +37,7 @@ final class FirebaseBeerService: BeerServicing, @unchecked Sendable {
     /// already shows the optimistic row; this returns on server ack.
     /// Doc schema is pinned by the rules: exactly the seven keys below,
     /// `createdAt == request.time` (hence serverTimestamp) and
-    /// `expiresAt` within (now, now + 25h] (hence client-computed now + 24h).
+    /// `expiresAt` within (now, now + 25h]; the client sends now + 2 h and the server clamps anything longer.
     func logBeer(_ beer: BeerLog, photoJPEG: Data?) async throws {
         let photoPath = beer.hasPhoto ? "photos/\(beer.id).jpg" : ""
         if let photoJPEG, beer.hasPhoto {

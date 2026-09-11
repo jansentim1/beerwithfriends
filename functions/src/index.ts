@@ -12,7 +12,7 @@ import { fanoutBeerCreated, notifyCheers, notifyReply, Pusher, ReplyKind } from 
 import { sendApns, deadTokens } from "./apns";
 import { loadApnsKey } from "./apnsKey";
 import { createGroupCore, joinGroupCore, leaveGroupCore, countDrinkForGroups, GroupError } from "./groups";
-import { mirrorFriendship, severOnBlock, cleanupExpiredCore, deleteAccountCore, changeUsernameCore, enforceDrinkCooldown, UsernameError, PhotoDeleter } from "./lifecycle";
+import { mirrorFriendship, severOnBlock, cleanupExpiredCore, deleteAccountCore, changeUsernameCore, changeDisplayNameCore, enforceDrinkCooldown, supersedeOlderDrinks, UsernameError, DisplayNameError, PhotoDeleter } from "./lifecycle";
 
 // Colocated with Firestore + Storage (europe-west4); see .firebaserc / tools/deploy.sh.
 setGlobalOptions({ region: "europe-west4" });
@@ -89,6 +89,13 @@ export const onBeerCreated = onDocumentCreated("beers/{beerId}", async (event) =
   } catch (e) {
     console.error("cooldown check failed, continuing with fanout", e);
   }
+  // One live drink per person, two hours max: older ones go, a long expiry is
+  // clamped. Fail open as well — the client hides superseded rows itself.
+  try {
+    await supersedeOlderDrinks(getFirestore(), storagePhotoDeleter, event.params.beerId, beer.ownerUid, createdAt);
+  } catch (e) {
+    console.error("supersede failed, continuing with fanout", e);
+  }
   // Leaderboard: count the drink for every group the owner is in (never blocks pushes).
   countDrinkForGroups(getFirestore(), beer.ownerUid, createdAt).catch((e) => console.error("group count failed", e));
   await fanoutBeerCreated(getFirestore(), push, event.params.beerId,
@@ -114,6 +121,21 @@ export const changeUsername = onCall(async (req) => {
       const status: Record<string, FunctionsErrorCode> = {
         INVALID: "invalid-argument", TAKEN: "already-exists", TOO_SOON: "resource-exhausted", NO_PROFILE: "failed-precondition",
       };
+      throw new HttpsError(status[e.code], e.code, { code: e.code });
+    }
+    throw e;
+  }
+});
+
+export const changeDisplayName = onCall(async (req) => {
+  if (!req.auth) throw new HttpsError("unauthenticated", "Sign in required");
+  const raw = req.data?.displayName;
+  if (typeof raw !== "string") throw new HttpsError("invalid-argument", "displayName required");
+  try {
+    return { displayName: await changeDisplayNameCore(getFirestore(), req.auth.uid, raw) };
+  } catch (e) {
+    if (e instanceof DisplayNameError) {
+      const status: Record<string, FunctionsErrorCode> = { INVALID: "invalid-argument", NO_PROFILE: "failed-precondition" };
       throw new HttpsError(status[e.code], e.code, { code: e.code });
     }
     throw e;

@@ -38,8 +38,12 @@ public struct BeerLog: Codable, Equatable, Identifiable, Sendable {
         self.replies = replies; self.drink = drink; self.placeCoordinate = placeCoordinate
     }
     /// How long a glass takes to empty (Tim: "beers are empty in 15 minutes").
-    /// The row itself stays in the feed until `expiresAt` (24 h), glass empty.
+    /// The row itself stays in the feed until `expiresAt` (2 h), glass empty.
     public static let drinkDuration: TimeInterval = 15 * 60
+    /// How long a drink stays in the feed and on the map (Tim, 2026-09-11:
+    /// "2 hours max"). The server clamps anything longer and the hourly
+    /// cleanup deletes what has expired.
+    public static let lifetime: TimeInterval = 2 * 3600
     /// 1.0 when just poured, 0.0 fifteen minutes later.
     public func fillLevel(now: Date) -> Double {
         let elapsed = now.timeIntervalSince(createdAt)
@@ -47,7 +51,20 @@ public struct BeerLog: Codable, Equatable, Identifiable, Sendable {
     }
     public func replyCount(_ kind: ReplyKind) -> Int { replies.values.filter { $0 == kind }.count }
     public static let placeMaxLength = 60
-    public static func expiry(from createdAt: Date) -> Date { createdAt.addingTimeInterval(24 * 3600) }
+    public static func expiry(from createdAt: Date) -> Date { createdAt.addingTimeInterval(lifetime) }
+
+    /// What the feed and the map show: one drink per person, the newest, and
+    /// only while it is alive (Tim: "only one update per person should stay in
+    /// the main overview, so it overwrites"). Newest first. The server deletes
+    /// superseded drinks too; this keeps the screens right before it has.
+    public static func latestPerOwner(_ logs: [BeerLog], now: Date) -> [BeerLog] {
+        var newest: [String: BeerLog] = [:]
+        for log in logs where log.expiresAt > now {
+            if let current = newest[log.ownerUid], current.createdAt >= log.createdAt { continue }
+            newest[log.ownerUid] = log
+        }
+        return newest.values.sorted { $0.createdAt > $1.createdAt }
+    }
 }
 
 public struct FriendRequest: Codable, Equatable, Identifiable, Sendable {

@@ -1,4 +1,4 @@
-import { changeUsernameCore, UsernameError, enforceDrinkCooldown } from "../../src/lifecycle";
+import { changeUsernameCore, UsernameError, enforceDrinkCooldown, supersedeOlderDrinks, changeDisplayNameCore, DisplayNameError, DRINK_LIFETIME_MS } from "../../src/lifecycle";
 import { describe, it, expect, beforeEach } from "vitest";
 import { Timestamp } from "firebase-admin/firestore";
 import { initTestDb, seedUser, seedFriends, clearDb } from "./helpers";
@@ -177,3 +177,56 @@ describe("enforceDrinkCooldown", () => {
     expect(await enforceDrinkCooldown(db, "d4", "u2", t3)).toBe(true);
   });
 });
+
+describe("supersedeOlderDrinks", () => {
+  const base = { ownerUid: "u1", ownerName: "Tim", hasPhoto: false, photoPath: "", cheersCount: 0 };
+  const at = (t: Date, lifeMs = 24 * 3600_000) => ({ createdAt: Timestamp.fromDate(t), expiresAt: Timestamp.fromDate(new Date(t.getTime() + lifeMs)) });
+  it("deletes the owner's older drinks (photo included), not other people's or newer ones", async () => {
+    const t0 = new Date("2026-09-11T20:00:00Z");
+    await db.doc("beers/old").set({ ...base, ...at(t0), hasPhoto: true, photoPath: "photos/old.jpg" });
+    await db.doc("beers/old/cheers/u2").set({ at: Timestamp.now() });
+    await db.doc("beers/theirs").set({ ...base, ownerUid: "u2", ...at(t0) });
+    const t1 = new Date(t0.getTime() + 10 * 60_000);
+    await db.doc("beers/new").set({ ...base, ...at(t1) });
+    const t2 = new Date(t0.getTime() + 20 * 60_000);
+    await db.doc("beers/newer").set({ ...base, ...at(t2) });
+    expect(await supersedeOlderDrinks(db, deletePhoto, "new", "u1", t1)).toBe(1);
+    expect((await db.doc("beers/old").get()).exists).toBe(false);
+    expect((await db.doc("beers/old/cheers/u2").get()).exists).toBe(false);
+    expect(deletedPhotos).toEqual(["photos/old.jpg"]);
+    expect((await db.doc("beers/theirs").get()).exists).toBe(true);
+    expect((await db.doc("beers/new").get()).exists).toBe(true);
+    expect((await db.doc("beers/newer").get()).exists).toBe(true);
+  });
+  it("clamps a 24 h expiry to the two-hour lifetime and leaves a short one alone", async () => {
+    const t0 = new Date("2026-09-11T20:00:00Z");
+    await db.doc("beers/long").set({ ...base, ...at(t0) });
+    await supersedeOlderDrinks(db, deletePhoto, "long", "u1", t0);
+    expect((await db.doc("beers/long").get()).get("expiresAt").toMillis()).toBe(t0.getTime() + DRINK_LIFETIME_MS);
+    const t1 = new Date(t0.getTime() + 5 * 60_000);
+    await db.doc("beers/short").set({ ...base, ...at(t1, 30 * 60_000) });
+    await supersedeOlderDrinks(db, deletePhoto, "short", "u1", t1);
+    expect((await db.doc("beers/short").get()).get("expiresAt").toMillis()).toBe(t1.getTime() + 30 * 60_000);
+  });
+});
+
+describe("changeDisplayNameCore", () => {
+  it("normalizes and mirrors into group member docs", async () => {
+    await seedUser(db, "u1", "tim");
+    await db.doc("users/u1/groups/g1").set({ name: "De Kroeg", joinedAt: Timestamp.now() });
+    await db.doc("groups/g1/members/u1").set({ username: "tim", displayName: "tim", joinedAt: Timestamp.now() });
+    expect(await changeDisplayNameCore(db, "u1", "  Timmy   J ")).toBe("Timmy J");
+    expect((await db.doc("users/u1").get()).get("displayName")).toBe("Timmy J");
+    const member = await db.doc("groups/g1/members/u1").get();
+    expect(member.get("displayName")).toBe("Timmy J");
+    expect(member.get("username")).toBe("tim");
+  });
+  it("rejects blank, too long and profile-less", async () => {
+    await seedUser(db, "u1", "tim");
+    await expect(changeDisplayNameCore(db, "u1", "   ")).rejects.toMatchObject({ code: "INVALID" });
+    await expect(changeDisplayNameCore(db, "u1", "x".repeat(31))).rejects.toMatchObject({ code: "INVALID" });
+    await expect(changeDisplayNameCore(db, "nobody", "Tim")).rejects.toMatchObject({ code: "NO_PROFILE" });
+    expect(new DisplayNameError("INVALID").code).toBe("INVALID");
+  });
+});
+

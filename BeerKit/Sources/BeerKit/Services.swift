@@ -38,6 +38,9 @@ public protocol AuthServicing: Sendable {
     /// Renames an existing account (server callable; once per day). Throws
     /// `UsernameClaimError.taken` when the name is in use, `.tooSoon` when rate-limited.
     func changeUsername(to username: String) async throws -> UserProfile
+    /// Renames the nickname (server callable; no cooldown). `displayName` must
+    /// already be normalized (`DisplayName.normalize`).
+    func changeDisplayName(to displayName: String) async throws -> UserProfile
     func deleteAccount() async throws
     func signOut() throws
 }

@@ -22,7 +22,10 @@ struct SettingsView: View {
     /// shows the new name straight away instead of waiting for that rebuild to
     /// reach us. Kept in step with the profile in case it changes elsewhere.
     @State private var shownUsername: String
+    /// Same idea for the nickname.
+    @State private var shownDisplayName: String
     @State private var showChangeUsername = false
+    @State private var showChangeDisplayName = false
     @State private var blockedUsers: [BlockedUser] = []
     @State private var blockedUnavailable = false
     @State private var isDeleting = false
@@ -39,6 +42,7 @@ struct SettingsView: View {
     init(profile: UserProfile) {
         self.profile = profile
         _shownUsername = State(initialValue: profile.username)
+        _shownDisplayName = State(initialValue: profile.displayName)
     }
 
     private var concreteFriendService: FirebaseFriendService? {
@@ -67,9 +71,17 @@ struct SettingsView: View {
             .onChange(of: profile.username) { _, newValue in
                 shownUsername = newValue
             }
+            .onChange(of: profile.displayName) { _, newValue in
+                shownDisplayName = newValue
+            }
             .sheet(isPresented: $showChangeUsername) {
                 ChangeUsernameSheet(currentUsername: shownUsername) { newUsername in
                     shownUsername = newUsername
+                }
+            }
+            .sheet(isPresented: $showChangeDisplayName) {
+                ChangeDisplayNameSheet(currentDisplayName: shownDisplayName) { newName in
+                    shownDisplayName = newName
                 }
             }
             .alert("Oops", isPresented: errorBinding) {
@@ -100,9 +112,9 @@ struct SettingsView: View {
     private var profileSection: some View {
         Section {
             VStack(spacing: 12) {
-                AvatarView(name: profile.displayName, size: 72)
+                AvatarView(name: shownDisplayName, size: 72)
                 VStack(spacing: 2) {
-                    Text(profile.displayName)
+                    Text(shownDisplayName)
                         .font(Theme.displayTitle2)
                         .multilineTextAlignment(.center)
                         .lineLimit(2)
@@ -120,7 +132,7 @@ struct SettingsView: View {
             // Nothing tappable in here any more, so the whole header can read as
             // one VoiceOver element.
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel("\(profile.displayName), @\(shownUsername), \(drinkCountText)")
+            .accessibilityLabel("\(shownDisplayName), @\(shownUsername), \(drinkCountText)")
         }
     }
 
@@ -129,6 +141,28 @@ struct SettingsView: View {
     /// value) instead of painting the whole thing in the list's amber tint.
     private var accountDetailsSection: some View {
         Section("Account details") {
+            // The nickname first: it is the name mates actually see on rows and
+            // in pushes. The handle below is how they find you.
+            Button {
+                showChangeDisplayName = true
+            } label: {
+                HStack(spacing: 8) {
+                    LabeledContent("Nickname", value: shownDisplayName)
+                    Image(systemName: "chevron.right")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.tertiary)
+                        .accessibilityHidden(true)
+                }
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(isDeleting)
+            .accessibilityIdentifier("settings.changeDisplayName")
+            .accessibilityLabel("Nickname")
+            .accessibilityValue(shownDisplayName)
+            .accessibilityHint("Change your nickname")
+
             Button {
                 showChangeUsername = true
             } label: {
@@ -534,6 +568,126 @@ private struct ChangeUsernameSheet: View {
                 // The reason (taken / once a day / offline) is only known here, and
                 // the sheet stays open so it can be read and acted on.
                 alertMessage = appState.errorMessage ?? "Couldn't change your username — try again."
+                appState.errorMessage = nil
+            }
+        }
+    }
+
+    private var alertBinding: Binding<Bool> {
+        Binding(
+            get: { alertMessage != nil },
+            set: { if !$0 { alertMessage = nil } }
+        )
+    }
+}
+
+// MARK: - Change nickname
+
+/// The nickname is free text with no reservation to check, so this is the
+/// username sheet without the availability machinery: one field, one line of
+/// help, Save. Mates see the new name on every drink you log from now on.
+private struct ChangeDisplayNameSheet: View {
+    @EnvironmentObject private var appState: AppState
+    @Environment(\.dismiss) private var dismiss
+
+    let currentDisplayName: String
+    /// Called with the normalized nickname after a successful save.
+    let onSaved: (String) -> Void
+
+    @State private var displayName = ""
+    @State private var isSaving = false
+    @State private var alertMessage: String?
+
+    private var normalized: String? { DisplayName.normalize(displayName) }
+    private var canSave: Bool {
+        guard !isSaving, let normalized else { return false }
+        return normalized != currentDisplayName
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                Text("New nickname")
+                    .font(Theme.displayTitle2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityAddTraits(.isHeader)
+
+                VStack(alignment: .leading, spacing: 10) {
+                    TextField("nickname", text: $displayName)
+                        .accessibilityIdentifier("settings.newDisplayName")
+                        .accessibilityLabel("New nickname")
+                        .textInputAutocapitalization(.words)
+                        .submitLabel(.done)
+                        .disabled(isSaving)
+                        .font(.body)
+                        .padding(.horizontal, 14)
+                        .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
+                        .background(
+                            RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
+                                .fill(Theme.surface)
+                        )
+                    Text(displayName.isEmpty || normalized != nil
+                         ? "Up to \(DisplayName.maxLength) characters."
+                         : "Up to \(DisplayName.maxLength) characters, and not blank.")
+                        .font(.footnote)
+                        .foregroundStyle(displayName.isEmpty || normalized != nil ? Color.secondary : .red)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.horizontal, 4)
+                }
+
+                Text("This is the name mates see on your drinks. Your @username stays the same.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Button {
+                    Haptics.light()
+                    save()
+                } label: {
+                    if isSaving {
+                        ProgressView()
+                            .tint(Theme.onAccent)
+                    } else {
+                        Text("Save")
+                    }
+                }
+                .buttonStyle(HeroButtonStyle())
+                .accessibilityIdentifier("settings.saveDisplayName")
+                .accessibilityLabel("Save")
+                .disabled(!canSave)
+                .opacity(canSave ? 1 : 0.5)
+                .animation(Theme.quick, value: canSave)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 20)
+            .padding(.top, 24)
+            .padding(.bottom, 24)
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        .scrollDismissesKeyboard(.interactively)
+        .background(Theme.ground.ignoresSafeArea())
+        .presentationDetents([.medium])
+        .presentationDragIndicator(.visible)
+        .onAppear { if displayName.isEmpty { displayName = currentDisplayName } }
+        .alert("Oops", isPresented: alertBinding) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(alertMessage ?? "")
+        }
+    }
+
+    private func save() {
+        guard let normalized else { return }
+        isSaving = true
+        Task {
+            let ok = await appState.changeDisplayName(normalized)
+            isSaving = false
+            if ok {
+                Haptics.success()
+                onSaved(normalized)
+                dismiss()
+            } else {
+                alertMessage = appState.errorMessage ?? "Couldn't change your nickname — try again."
                 appState.errorMessage = nil
             }
         }

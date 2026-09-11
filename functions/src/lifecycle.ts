@@ -53,7 +53,7 @@ export async function cleanupExpiredCore(db: Firestore, deletePhoto: PhotoDelete
   // Data minimization (Task 5 review outcome): once every friend has used their
   // one view, getPhotoOnce stamps `allViewedAt`. After a 10-minute grace period
   // (so the last viewer's ~60s signed URL stays valid), delete the Storage
-  // object early — the beer doc itself lives on until the 24h expiry, but
+  // object early — the beer doc itself lives on until the 2 h expiry, but
   // `hasPhoto` flips to false so clients stop offering the photo chip.
   const cutoff = Timestamp.fromDate(new Date(now.getTime() - EARLY_PHOTO_DELETE_MS));
   const fullyViewed = await db.collection("beers")
@@ -128,6 +128,75 @@ export async function changeUsernameCore(db: Firestore, uid: string, raw: string
 }
 
 export const DRINK_COOLDOWN_MS = 60_000;
+/** How long a drink stays in the feed and on the map (mirrors BeerLog.lifetime). */
+export const DRINK_LIFETIME_MS = 2 * 3600_000;
+
+/**
+ * One live drink per person (Tim, 2026-09-11: "only one update per person
+ * should stay in the main overview, so it overwrites"): a surviving new drink
+ * deletes the owner's older ones, photos included. And every drink lives at
+ * most two hours — older clients still send a 24 h expiry, so it is clamped
+ * here rather than rejected by the rules. Returns how many drinks were replaced.
+ */
+export async function supersedeOlderDrinks(db: Firestore, deletePhoto: PhotoDeleter, beerId: string, ownerUid: string, createdAt: Date): Promise<number> {
+  const ref = db.doc(`beers/${beerId}`);
+  const cap = createdAt.getTime() + DRINK_LIFETIME_MS;
+  const fresh = await ref.get();
+  const expiresAt = (fresh.get("expiresAt") as Timestamp | undefined)?.toMillis();
+  if (fresh.exists && expiresAt !== undefined && expiresAt > cap) {
+    await ref.update({ expiresAt: Timestamp.fromMillis(cap) });
+  }
+  const older = await db.collection("beers")
+    .where("ownerUid", "==", ownerUid)
+    .where("createdAt", "<", Timestamp.fromDate(createdAt))
+    .get();
+  let replaced = 0;
+  for (const doc of older.docs) {
+    if (doc.id === beerId) continue;
+    try {
+      await deleteBeer(db, deletePhoto, doc.id, doc.get("photoPath"), doc.get("hasPhoto"));
+      replaced++;
+    } catch (e) {
+      // Left for the hourly cleanup; the client hides it meanwhile.
+      console.error(`supersede: failed to delete beer ${doc.id}`, e);
+    }
+  }
+  return replaced;
+}
+
+export class DisplayNameError extends Error {
+  constructor(public code: "INVALID" | "NO_PROFILE") { super(code); }
+}
+export const DISPLAY_NAME_MAX = 30;
+
+/** Trimmed, inner whitespace collapsed, 1–30 chars; mirrors BeerKit's DisplayName.normalize. */
+export function normalizeDisplayName(raw: string): string | null {
+  const name = raw.split(/\s+/).filter(Boolean).join(" ");
+  const length = Array.from(name).length;
+  if (length < 1 || length > DISPLAY_NAME_MAX) return null;
+  return name;
+}
+
+/**
+ * Changes the nickname on the profile and on every group member doc that
+ * mirrors it (users/{uid}/groups lists them). Drinks keep the name they were
+ * logged with; they are gone within two hours anyway.
+ */
+export async function changeDisplayNameCore(db: Firestore, uid: string, raw: string): Promise<string> {
+  const displayName = normalizeDisplayName(raw);
+  if (!displayName) throw new DisplayNameError("INVALID");
+  const userRef = db.doc(`users/${uid}`);
+  const user = await userRef.get();
+  if (!user.exists || !user.get("usernameLower")) throw new DisplayNameError("NO_PROFILE");
+  const groups = await userRef.collection("groups").get();
+  const batch = db.batch();
+  batch.update(userRef, { displayName });
+  for (const g of groups.docs) {
+    batch.set(db.doc(`groups/${g.id}/members/${uid}`), { displayName }, { merge: true });
+  }
+  await batch.commit();
+  return displayName;
+}
 
 /**
  * Anti-spam: a second drink from the same owner within the cooldown is deleted

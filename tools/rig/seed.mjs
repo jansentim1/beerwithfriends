@@ -33,8 +33,13 @@ async function user(email, username) {
 
 const tim = await user("tim@test.local", "tim");
 const joost = await user("joost@test.local", "joost");
-await db.doc(`friendships/${tim}/friends/${joost}`).set({ since: Timestamp.now() });
-await db.doc(`friendships/${joost}/friends/${tim}`).set({ since: Timestamp.now() });
+// The feed shows one drink per person, so a second mate carries the older
+// pils (reply pill + second map pin).
+const menno = await user("menno@test.local", "menno");
+for (const mate of [joost, menno]) {
+  await db.doc(`friendships/${tim}/friends/${mate}`).set({ since: Timestamp.now() });
+  await db.doc(`friendships/${mate}/friends/${tim}`).set({ since: Timestamp.now() });
+}
 
 // A tiny valid JPEG (1x1) so getPhotoOnce has bytes to return.
 const jpeg = Buffer.from("/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q==", "base64");
@@ -43,13 +48,13 @@ const mk = async (id, owner, ownerName, drink, minutesAgo, extra) => {
   const created = new Date(now.getTime() - minutesAgo * 60_000);
   await db.doc(`beers/${id}`).set({
     ownerUid: owner, ownerName, drink, createdAt: Timestamp.fromDate(created),
-    expiresAt: Timestamp.fromDate(new Date(created.getTime() + 24 * 3600_000)),
+    expiresAt: Timestamp.fromDate(new Date(created.getTime() + 2 * 3600_000)),
     hasPhoto: false, photoPath: "", cheersCount: 0, ...extra,
   });
 };
 await getStorage().bucket().file("photos/seed-wine.jpg").save(jpeg, { contentType: "image/jpeg" });
 await mk("seed-wine", joost, "joost", "wine", 4, { hasPhoto: true, photoPath: "photos/seed-wine.jpg", place: "Café De Zon", placeCoordinate: new GeoPoint(52.37, 4.895), cheersCount: 2 });
-await mk("seed-pils", joost, "joost", "pils", 40, { place: "Amsterdam", placeCoordinate: new GeoPoint(52.373, 4.9), replies: { [tim]: "onmyway" } });
+await mk("seed-pils", menno, "menno", "pils", 40, { place: "Amsterdam", placeCoordinate: new GeoPoint(52.373, 4.9), replies: { [tim]: "onmyway" } });
 await mk("seed-mine", tim, "tim", "special", 9, {});
 
 const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Amsterdam", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);

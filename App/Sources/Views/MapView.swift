@@ -215,7 +215,7 @@ struct MapView: View {
         .accessibilityLabel(calloutAccessibilityLabel(for: beer, name: name))
     }
 
-    /// How much is left in the glass: it drains over the beer's 24 hours. The
+    /// How much is left in the glass: it drains over the drink's first 15 minutes. The
     /// drawn glass, not an abstract bar — the same object the feed shows.
     private func glass(for beer: BeerLog) -> some View {
         let level = beer.fillLevel(now: Date())
@@ -284,13 +284,12 @@ struct MapView: View {
 
     // MARK: - Clustering
 
-    /// Active, located beers grouped by place, newest group first. `Coordinate`
-    /// is already rounded to ~100 m, so two mates in the same bar land on one pin.
+    /// Each mate's newest live drink, the located ones grouped by place, newest
+    /// group first. `Coordinate` is already rounded to ~100 m, so two mates in
+    /// the same bar land on one pin.
     private var clusters: [DrinkCluster] {
-        let now = Date()
-        let located = beers
-            .filter { $0.expiresAt > now && $0.placeCoordinate != nil }
-            .sorted { $0.createdAt > $1.createdAt }
+        let located = BeerLog.latestPerOwner(beers, now: Date())
+            .filter { $0.placeCoordinate != nil }
         var order: [String] = []
         var grouped: [String: [BeerLog]] = [:]
         for beer in located {

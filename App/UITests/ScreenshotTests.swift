@@ -44,6 +44,13 @@ final class ScreenshotTests: XCTestCase {
         if app.buttons["Close"].exists { app.buttons["Close"].tap() } else { app.swipeDown() }
 
         app.tabBars.buttons["Settings"].tap()
+        let nickname = app.buttons["settings.changeDisplayName"]
+        XCTAssertTrue(nickname.waitForExistence(timeout: 5))
+        nickname.tap()
+        sleep(1)
+        snap("08f-nickname-sheet")
+        app.swipeDown()
+        sleep(1)
         let username = app.buttons["settings.changeUsername"]
         XCTAssertTrue(username.waitForExistence(timeout: 5))
         username.tap()

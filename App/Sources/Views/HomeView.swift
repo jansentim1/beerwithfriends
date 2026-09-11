@@ -11,9 +11,9 @@ import SwiftUI
 ///
 /// Layout follows docs/design/direction.md: large title "PubDates" collapsing on
 /// scroll, then the hero — a row of drawn glasses, one tap each (all inside the
-/// scroll view, so the title collapses natively), then the last 24 hours of
+/// scroll view, so the title collapses natively), then the last two hours of
 /// drinks as plain rows.
-/// Every row carries the glass that was picked, draining as the 24 hours run out.
+/// Every row carries the glass that was picked, draining over its first 15 minutes.
 struct HomeView: View {
     @StateObject private var viewModel: HomeViewModel
     @Environment(\.scenePhase) private var scenePhase
@@ -81,7 +81,7 @@ struct HomeView: View {
             // The reader only measures the viewport, so the empty state can claim
             // half of it and sit in the middle of what's left under the hero.
             GeometryReader { proxy in
-                // The glasses on the rows drain over the 24 hours: one tick a
+                // The glasses on the rows drain over 15 minutes: one tick a
                 // minute re-renders their levels (and retires an expired photo
                 // chip) without a timer of our own. While the one-minute lock
                 // runs, the same tick goes to 1 s so "next in Ns" counts down —
@@ -95,7 +95,11 @@ struct HomeView: View {
                                 .listRowBackground(Color.clear)
                         }
 
-                        if viewModel.feed.isEmpty {
+                        // The listener's query is pinned to subscription time, so a
+                        // row that expires while the screen is open leaves on the
+                        // minute tick rather than on the next snapshot.
+                        let rows = viewModel.feed.filter { $0.expiresAt > context.date }
+                        if rows.isEmpty {
                             Section {
                                 emptyState
                                     .frame(minHeight: max(0, proxy.size.height * 0.5))
@@ -105,9 +109,9 @@ struct HomeView: View {
                             }
                         } else {
                             // No eyebrow above the feed: the relative time on every row
-                            // already says these are the last 24 hours.
+                            // already says these are the last two hours.
                             Section {
-                                ForEach(viewModel.feed) { beer in
+                                ForEach(rows) { beer in
                                     feedRow(beer, now: context.date)
                                 }
                             }
@@ -462,7 +466,7 @@ struct HomeView: View {
     }
 
     /// The glass that stands in for an avatar: what they are drinking, draining
-    /// from full at the tap to empty when the beer expires 24 hours later.
+    /// from full at the tap to empty 15 minutes later.
     private func drinkGlass(for beer: BeerLog, name: String, now: Date) -> some View {
         let level = beer.fillLevel(now: now)
         return DrinkGlassView(kind: beer.drink, level: level, size: 44)
