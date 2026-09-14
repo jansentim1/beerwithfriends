@@ -424,10 +424,39 @@ final class CameraCaptureViewController: UIViewController {
         guard let data, let image = UIImage(data: data) else {
             return // capture failed — stay on the live view for another try
         }
-        capturedImage = image
+        // What you framed is what you get: the live preview fills the screen
+        // (`.resizeAspectFill`) and so trims the sensor's 4:3 frame top and
+        // bottom; the capture is cropped the same way (tester, 2026-09-14:
+        // "foto's zijn ingezoomd" — the review and the photo showed more than
+        // the preview did, so the preview read as zoomed in).
+        let framed = Self.cropped(image, toAspectOf: view.bounds.size)
+        capturedImage = framed
         camera.stop() // freeze while reviewing; retake restarts
-        previewImageView.image = image
+        previewImageView.image = framed
         setMode(reviewing: true)
+    }
+
+    /// Centre-crops `image` to the aspect ratio of `size`, drawn upright at
+    /// pixel size (so EXIF orientation is baked in before the crop).
+    private static func cropped(_ image: UIImage, toAspectOf size: CGSize) -> UIImage {
+        guard size.width > 0, size.height > 0 else { return image }
+        let pixelWidth = image.size.width * image.scale
+        let pixelHeight = image.size.height * image.scale
+        guard pixelWidth > 0, pixelHeight > 0 else { return image }
+        let target = size.width / size.height
+        var crop = CGRect(x: 0, y: 0, width: pixelWidth, height: pixelHeight)
+        if pixelWidth / pixelHeight > target {
+            crop.size.width = (pixelHeight * target).rounded(.down)
+            crop.origin.x = ((pixelWidth - crop.width) / 2).rounded(.down)
+        } else {
+            crop.size.height = (pixelWidth / target).rounded(.down)
+            crop.origin.y = ((pixelHeight - crop.height) / 2).rounded(.down)
+        }
+        let format = UIGraphicsImageRendererFormat.default()
+        format.scale = 1
+        return UIGraphicsImageRenderer(size: crop.size, format: format).image { _ in
+            image.draw(in: CGRect(x: -crop.origin.x, y: -crop.origin.y, width: pixelWidth, height: pixelHeight))
+        }
     }
 
     /// Max 1080px long edge, JPEG quality 0.8 — comfortably under the 5 MB
