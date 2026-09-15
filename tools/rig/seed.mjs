@@ -4,6 +4,7 @@
 //   FIRESTORE_EMULATOR_HOST=127.0.0.1:8085 FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099 \
 //   FIREBASE_STORAGE_EMULATOR_HOST=127.0.0.1:9199 node tools/rig/seed.mjs
 import { createRequire } from "node:module";
+import { readFileSync } from "node:fs";
 const require = createRequire(import.meta.url + "/../../../functions/package.json");
 const { initializeApp } = require("firebase-admin/app");
 const { getAuth } = require("firebase-admin/auth");
@@ -41,8 +42,9 @@ for (const mate of [joost, menno]) {
   await db.doc(`friendships/${mate}/friends/${tim}`).set({ since: Timestamp.now() });
 }
 
-// A tiny valid JPEG (1x1) so getPhotoOnce has bytes to return.
-const jpeg = Buffer.from("/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q==", "base64");
+// A recognisable test photo (border, diagonals, disc) so the photo-viewer frame
+// shows at a glance whether the image is fitted, cropped or scaled.
+const jpeg = readFileSync(new URL("./seed-photo.jpg", import.meta.url));
 const now = new Date();
 const mk = async (id, owner, ownerName, drink, minutesAgo, extra) => {
   const created = new Date(now.getTime() - minutesAgo * 60_000);

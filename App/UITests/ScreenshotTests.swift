@@ -30,6 +30,16 @@ final class ScreenshotTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["joost"].waitForExistence(timeout: 15), "mate's drinks missing")
         snap("08-home-populated")
 
+        // The view-once photo (functions emulator serves getPhotoOnce). The seed
+        // photo has a border, diagonals and a disc: any scaling is visible.
+        let photo = app.buttons["home.photo"]
+        XCTAssertTrue(photo.waitForExistence(timeout: 10), "view-once chip missing")
+        photo.tap()
+        sleep(4)
+        snap("08g-photo-viewer")
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        sleep(1)
+
         app.tabBars.buttons["Map"].tap()
         XCTAssertTrue(app.navigationBars.element.waitForExistence(timeout: 5))
         sleep(3) // map tiles + pin framing

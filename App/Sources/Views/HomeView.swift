@@ -497,6 +497,7 @@ struct HomeView: View {
             .contentShape(Rectangle())
             .accessibilityLabel("View photo once")
             .accessibilityHint("You can only look at this photo one time")
+            .accessibilityIdentifier("home.photo")
         case .seen:
             StatusPill(text: "Seen")
                 .accessibilityLabel("Photo already seen")

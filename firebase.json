@@ -24,6 +24,9 @@
     },
     "ui": {
       "enabled": false
+    },
+    "functions": {
+      "port": 5001
     }
   },
   "hosting": {
