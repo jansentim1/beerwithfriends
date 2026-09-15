@@ -39,13 +39,16 @@ struct ScreenshotShield: UIViewRepresentable {
             field.isSecureTextEntry = true
             field.isUserInteractionEnabled = false
             imageView.clipsToBounds = true
-            imageView.isAccessibilityElement = false
+            // Exposed so the UI test can measure where the photo actually sits.
+            imageView.isAccessibilityElement = true
+            imageView.accessibilityIdentifier = "photo.image"
+            imageView.accessibilityTraits = .image
             imageView.translatesAutoresizingMaskIntoConstraints = false
 
             // The private layout canvas is the field's first subview (iOS 15+).
             // If that ever changes, the photo shows unshielded rather than not at all.
             let host: UIView
-            if let canvas = field.subviews.first {
+            if !Self.unshielded, let canvas = field.subviews.first {
                 canvas.subviews.forEach { $0.removeFromSuperview() }
                 canvas.removeFromSuperview()
                 canvas.translatesAutoresizingMaskIntoConstraints = false
@@ -71,5 +74,16 @@ struct ScreenshotShield: UIViewRepresentable {
         }
 
         required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+        /// DEBUG-only rig switch: `-UITestUnshielded` shows the photo without the
+        /// secure canvas, so the screenshot rig can see how it is laid out (a
+        /// shielded photo is black in any screen capture, the rig's included).
+        private static var unshielded: Bool {
+            #if DEBUG
+            ProcessInfo.processInfo.arguments.contains("-UITestUnshielded")
+            #else
+            false
+            #endif
+        }
     }
 }

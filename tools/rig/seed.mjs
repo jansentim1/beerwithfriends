@@ -47,6 +47,8 @@ const jpeg = readFileSync(new URL("./seed-photo.jpg", import.meta.url));
 const now = new Date();
 const mk = async (id, owner, ownerName, drink, minutesAgo, extra) => {
   const created = new Date(now.getTime() - minutesAgo * 60_000);
+  // Re-seeding must reset the view-once state: drop the views subcollection too.
+  await db.recursiveDelete(db.doc(`beers/${id}`));
   await db.doc(`beers/${id}`).set({
     ownerUid: owner, ownerName, drink, createdAt: Timestamp.fromDate(created),
     expiresAt: Timestamp.fromDate(new Date(created.getTime() + 2 * 3600_000)),

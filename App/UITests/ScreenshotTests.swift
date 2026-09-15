@@ -13,6 +13,7 @@ final class ScreenshotTests: XCTestCase {
         app = XCUIApplication()
         app.launchArguments += ["-UseEmulators", "-UITestLogWithoutPhoto"]
         if name.contains("Populated") { app.launchArguments += ["-UITestAccount", "tim"] }
+        if env["UNSHIELDED"] == "1" { app.launchArguments += ["-UITestUnshielded"] }
         app.launch()
     }
 
@@ -32,17 +33,29 @@ final class ScreenshotTests: XCTestCase {
 
         // The view-once photo (functions emulator serves getPhotoOnce). The seed
         // photo has a border, diagonals and a disc: any scaling is visible.
+        // View-once means once: the light run uses it up, the dark run finds the
+        // chip already "seen" and skips the viewer.
         let photo = app.buttons["home.photo"]
-        XCTAssertTrue(photo.waitForExistence(timeout: 10), "view-once chip missing")
-        photo.tap()
-        // The callable, the temp file and the cover animation take a few seconds
-        // on the CI simulator: wait for the viewer's photo element itself.
-        let viewerPhoto = app.descendants(matching: .any)["Photo from joost"]
-        XCTAssertTrue(viewerPhoto.waitForExistence(timeout: 30), "photo viewer did not open")
-        sleep(1)
-        snap("08g-photo-viewer")
-        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-        XCTAssertTrue(wait(until: { !viewerPhoto.exists }, timeout: 10), "photo viewer did not close")
+        if photo.waitForExistence(timeout: 10) {
+            photo.tap()
+            // The callable, the temp file and the cover animation take a few
+            // seconds on the CI simulator: wait for the viewer's photo element.
+            let viewerPhoto = app.descendants(matching: .any)["Photo from joost"]
+            XCTAssertTrue(viewerPhoto.waitForExistence(timeout: 30), "photo viewer did not open")
+            sleep(1)
+            // The photo element must sit inside the screen: a scaled secure canvas
+            // would report a frame wider than the screen (the "zoomed in" report).
+            let image = app.images["photo.image"]
+            XCTAssertTrue(image.waitForExistence(timeout: 5), "photo image element missing")
+            let screen = app.frame, frame = image.frame
+            print("PHOTO-FRAME image=\(frame) screen=\(screen)")
+            XCTAssertEqual(frame.width, screen.width, accuracy: 2, "photo not screen-wide: \(frame)")
+            XCTAssertLessThanOrEqual(frame.height, screen.height + 2, "photo taller than the screen: \(frame)")
+            XCTAssertGreaterThanOrEqual(frame.minX, -2, "photo starts off-screen: \(frame)")
+            snap(env["UNSHIELDED"] == "1" ? "08g-photo-viewer-unshielded" : "08g-photo-viewer")
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+            XCTAssertTrue(wait(until: { !viewerPhoto.exists }, timeout: 10), "photo viewer did not close")
+        }
 
         app.tabBars.buttons["Map"].tap()
         XCTAssertTrue(app.navigationBars.element.waitForExistence(timeout: 5))

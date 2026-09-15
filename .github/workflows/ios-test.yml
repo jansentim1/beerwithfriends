@@ -104,11 +104,20 @@ jobs:
             CODE_SIGNING_REQUIRED=NO 2>&1 | tee test-light.log | grep -E 'Test Case|error:|failed|passed' || true
           grep -q 'TEST EXECUTE SUCCEEDED\|\*\* TEST SUCCEEDED \*\*' test-light.log
 
-      - name: UI walkthrough (dark)
+      - name: Re-seed (fresh view-once photo for the dark pass)
+        if: always()
+        env:
+          FIRESTORE_EMULATOR_HOST: 127.0.0.1:8085
+          FIREBASE_AUTH_EMULATOR_HOST: 127.0.0.1:9099
+          FIREBASE_STORAGE_EMULATOR_HOST: 127.0.0.1:9199
+        run: node tools/rig/seed.mjs
+
+      - name: UI walkthrough (dark, photo unshielded)
         if: always()
         env:
           TEST_RUNNER_SCREENSHOT_DIR: ${{ github.workspace }}/screens
           TEST_RUNNER_SCREENSHOT_SUFFIX: -dark
+          TEST_RUNNER_UNSHIELDED: "1"
         run: |
           set -o pipefail
           xcrun simctl ui "${{ steps.sim.outputs.udid }}" appearance dark
