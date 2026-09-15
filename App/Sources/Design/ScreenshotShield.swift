@@ -7,47 +7,69 @@ import UIKit
 /// niet gescreenshot kunnen worden"). The screenshot receipt to the owner still
 /// fires from `UIApplication.userDidTakeScreenshotNotification`.
 ///
-/// Relies on the text field's private layout canvas being its first subview,
-/// which has held since iOS 15 and is what every "screen shield" library does;
-/// if the canvas is ever missing, the image simply shows unshielded.
+/// The canvas is lifted OUT of the text field into a plain container view, the
+/// way the screen-shield libraries do it: left inside, the field's own layout
+/// keeps re-sizing the canvas to its text rect and the photo came out scaled
+/// (testers, build 22: "foto's zijn ingezoomd"). The canvas keeps its secure
+/// rendering wherever it lives, as long as the field stays alive.
 struct ScreenshotShield: UIViewRepresentable {
     let image: UIImage
     var contentMode: UIView.ContentMode = .scaleAspectFit
 
-    func makeUIView(context: Context) -> UIView {
-        let field = UITextField()
-        field.isSecureTextEntry = true
-        field.isUserInteractionEnabled = false
-        field.backgroundColor = .clear
-        field.translatesAutoresizingMaskIntoConstraints = false
-
-        let imageView = UIImageView(image: image)
-        imageView.contentMode = contentMode
-        imageView.clipsToBounds = true
-        imageView.translatesAutoresizingMaskIntoConstraints = false
-        imageView.isAccessibilityElement = false
-
-        guard let canvas = field.subviews.first else {
-            return imageView
-        }
-        canvas.subviews.forEach { $0.removeFromSuperview() }
-        canvas.translatesAutoresizingMaskIntoConstraints = false
-        canvas.addSubview(imageView)
-        NSLayoutConstraint.activate([
-            canvas.leadingAnchor.constraint(equalTo: field.leadingAnchor),
-            canvas.trailingAnchor.constraint(equalTo: field.trailingAnchor),
-            canvas.topAnchor.constraint(equalTo: field.topAnchor),
-            canvas.bottomAnchor.constraint(equalTo: field.bottomAnchor),
-            imageView.leadingAnchor.constraint(equalTo: canvas.leadingAnchor),
-            imageView.trailingAnchor.constraint(equalTo: canvas.trailingAnchor),
-            imageView.topAnchor.constraint(equalTo: canvas.topAnchor),
-            imageView.bottomAnchor.constraint(equalTo: canvas.bottomAnchor),
-        ])
-        return field
+    func makeUIView(context: Context) -> ShieldContainer {
+        let container = ShieldContainer()
+        container.imageView.image = image
+        container.imageView.contentMode = contentMode
+        return container
     }
 
-    func updateUIView(_ uiView: UIView, context: Context) {
-        let imageView = uiView as? UIImageView ?? uiView.subviews.first?.subviews.first as? UIImageView
-        imageView?.image = image
+    func updateUIView(_ uiView: ShieldContainer, context: Context) {
+        uiView.imageView.image = image
+        uiView.imageView.contentMode = contentMode
+    }
+
+    final class ShieldContainer: UIView {
+        /// Kept alive: the canvas belongs to it.
+        private let field = UITextField()
+        let imageView = UIImageView()
+
+        override init(frame: CGRect) {
+            super.init(frame: frame)
+            backgroundColor = .clear
+            field.isSecureTextEntry = true
+            field.isUserInteractionEnabled = false
+            imageView.clipsToBounds = true
+            imageView.isAccessibilityElement = false
+            imageView.translatesAutoresizingMaskIntoConstraints = false
+
+            // The private layout canvas is the field's first subview (iOS 15+).
+            // If that ever changes, the photo shows unshielded rather than not at all.
+            let host: UIView
+            if let canvas = field.subviews.first {
+                canvas.subviews.forEach { $0.removeFromSuperview() }
+                canvas.removeFromSuperview()
+                canvas.translatesAutoresizingMaskIntoConstraints = false
+                canvas.backgroundColor = .clear
+                addSubview(canvas)
+                NSLayoutConstraint.activate([
+                    canvas.leadingAnchor.constraint(equalTo: leadingAnchor),
+                    canvas.trailingAnchor.constraint(equalTo: trailingAnchor),
+                    canvas.topAnchor.constraint(equalTo: topAnchor),
+                    canvas.bottomAnchor.constraint(equalTo: bottomAnchor),
+                ])
+                host = canvas
+            } else {
+                host = self
+            }
+            host.addSubview(imageView)
+            NSLayoutConstraint.activate([
+                imageView.leadingAnchor.constraint(equalTo: host.leadingAnchor),
+                imageView.trailingAnchor.constraint(equalTo: host.trailingAnchor),
+                imageView.topAnchor.constraint(equalTo: host.topAnchor),
+                imageView.bottomAnchor.constraint(equalTo: host.bottomAnchor),
+            ])
+        }
+
+        required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
     }
 }

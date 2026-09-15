@@ -353,11 +353,7 @@ final class CameraCaptureViewController: UIViewController {
     private func startCamera() {
         if previewLayer == nil {
             let layer = AVCaptureVideoPreviewLayer(session: camera.session)
-            // The whole sensor frame, letterboxed like the Camera app's photo
-            // mode, so the preview, the review and the photo all show the same
-            // thing and nothing is zoomed in (Tim, 2026-09-15: the capture crop
-            // was "helemaal fout"; a filled preview reads as zoomed in).
-            layer.videoGravity = .resizeAspect
+            layer.videoGravity = .resizeAspectFill
             layer.frame = view.bounds
             view.layer.insertSublayer(layer, at: 0)
             previewLayer = layer
