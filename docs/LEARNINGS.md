@@ -48,3 +48,6 @@ compile checks (5 min, free on a public repo) beat careful reasoning about SDK s
 ## Auth emulator: accounts live in the `--project` namespace (2026-09-10)
 The Firestore and Storage emulators namespace by whatever project id the client names (the iOS app uses the plist's beerwithme-prod, and admin-SDK seeds must match). The Auth emulator does not: `getProjectIdByApiKey` returns the emulator's default project for every API-key request, so app sign-ins always land in demo-pubdates. A seed that creates users under beerwithme-prod produces EMAIL_NOT_FOUND in the app. `tools/rig/seed.mjs` uses a second admin app (projectId demo-pubdates) for Auth only. Verify sign-in with a plain curl to `accounts:signInWithPassword?key=anything` before blaming the app.
 
+## Rig: one project id for app, seed and emulators (2026-09-15)
+The functions emulator serves callables only under `/<its --project>/<region>/<name>`, and the Firestore triggers it registers are for that project too. The iOS SDK builds callable URLs from the plist's project id. So in emulator mode the app now configures Firebase with `demo-pubdates` (EmulatorConfig.configureFirebase), the seed writes to `demo-pubdates`, and the emulators start with `--project demo-pubdates`. That supersedes the 2026-09-10 auth-namespace workaround: no more split admin apps.
+

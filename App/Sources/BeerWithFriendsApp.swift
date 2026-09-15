@@ -13,7 +13,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
-        FirebaseApp.configure()
+        EmulatorConfig.configureFirebase()
         EmulatorConfig.applyIfRequested()
         Theme.installNavigationBarAppearance()
         // Set here, not on permission grant: a notification action tapped on a

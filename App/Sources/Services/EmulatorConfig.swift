@@ -1,4 +1,5 @@
 import FirebaseAuth
+import FirebaseCore
 import FirebaseFirestore
 import FirebaseFunctions
 import FirebaseStorage
@@ -17,8 +18,30 @@ enum EmulatorConfig {
     }
 
     static let host = "127.0.0.1"
+    /// The one namespace the whole rig shares: the app (this), the seed
+    /// (tools/rig/seed.mjs), and the emulators' `--project`. The functions
+    /// emulator only routes callables under its own project id, and the Auth
+    /// emulator maps every API-key request to it, so the app must not carry the
+    /// production project id from the plist while it talks to the emulators.
+    static let demoProject = "demo-pubdates"
 
-    /// Call right after `FirebaseApp.configure()`, before any service is touched.
+    /// Replaces `FirebaseApp.configure()`: the plist's options, with the project
+    /// re-pointed at the demo namespace when the emulators are requested.
+    static func configureFirebase() {
+        #if DEBUG
+        if isEnabled,
+           let path = Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist"),
+           let options = FirebaseOptions(contentsOfFile: path) {
+            options.projectID = demoProject
+            options.storageBucket = "\(demoProject).appspot.com"
+            FirebaseApp.configure(options: options)
+            return
+        }
+        #endif
+        FirebaseApp.configure()
+    }
+
+    /// Call right after `configureFirebase()`, before any service is touched.
     static func applyIfRequested() {
         #if DEBUG
         guard isEnabled else { return }

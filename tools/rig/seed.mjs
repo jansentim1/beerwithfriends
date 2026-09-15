@@ -14,13 +14,12 @@ const { getStorage } = require("firebase-admin/storage");
 for (const v of ["FIRESTORE_EMULATOR_HOST", "FIREBASE_AUTH_EMULATOR_HOST", "FIREBASE_STORAGE_EMULATOR_HOST"]) {
   if (!process.env[v]) { console.error(`refusing to run: ${v} not set (emulators only)`); process.exit(1); }
 }
-// Firestore and Storage namespace by the project id the app's plist names
-// (beerwithme-prod). The Auth emulator is different: every SDK request carries
-// an API key, and the emulator maps ANY key to its default project (the
-// `--project` it was started with), so the accounts must live there.
-initializeApp({ projectId: "beerwithme-prod", storageBucket: "beerwithme-prod.firebasestorage.app" });
-const authApp = initializeApp({ projectId: process.env.AUTH_EMULATOR_PROJECT ?? "demo-pubdates" }, "auth");
-const auth = getAuth(authApp); const db = getFirestore();
+// One namespace for everything: the app, launched with -UseEmulators, configures
+// Firebase with this demo project id (see EmulatorConfig), the functions emulator
+// serves it, and the Auth emulator maps every API-key request to it.
+const PROJECT = process.env.RIG_PROJECT ?? "demo-pubdates";
+initializeApp({ projectId: PROJECT, storageBucket: `${PROJECT}.appspot.com` });
+const auth = getAuth(); const db = getFirestore();
 
 async function user(email, username) {
   const u = await auth.createUser({ email, password: "pubdates1", emailVerified: true }).catch(async (e) => {
