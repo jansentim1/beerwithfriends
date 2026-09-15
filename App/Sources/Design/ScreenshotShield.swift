@@ -14,7 +14,10 @@ import UIKit
 /// rendering wherever it lives, as long as the field stays alive.
 struct ScreenshotShield: UIViewRepresentable {
     let image: UIImage
-    var contentMode: UIView.ContentMode = .scaleAspectFit
+    /// Fill, like a story: the live preview fills the screen, so the photo is
+    /// shown with the same framing rather than fitted between black bars (Tim,
+    /// build 25: "now the picture zooms out").
+    var contentMode: UIView.ContentMode = .scaleAspectFill
 
     func makeUIView(context: Context) -> ShieldContainer {
         let container = ShieldContainer()

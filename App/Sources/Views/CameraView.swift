@@ -147,7 +147,9 @@ final class CameraCaptureViewController: UIViewController {
         shutterCore.translatesAutoresizingMaskIntoConstraints = false
         shutterButton.addSubview(shutterCore)
 
-        previewImageView.contentMode = .scaleAspectFit
+        // Fill, matching the live preview's framing: no jump from preview to review.
+        previewImageView.contentMode = .scaleAspectFill
+        previewImageView.clipsToBounds = true
         previewImageView.backgroundColor = .black
         previewImageView.isHidden = true
         previewImageView.isAccessibilityElement = true

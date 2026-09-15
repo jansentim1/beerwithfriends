@@ -48,6 +48,7 @@ struct PhotoViewerView: View {
                         .accessibilityLabel("Loading photo")
                 case .image(let image):
                     ScreenshotShield(image: image)
+                        .ignoresSafeArea()
                         .accessibilityLabel("Photo from \(ownerName)")
                 case .failed:
                     VStack(spacing: 12) {

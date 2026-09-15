@@ -50,7 +50,7 @@ final class ScreenshotTests: XCTestCase {
             let screen = app.frame, frame = image.frame
             print("PHOTO-FRAME image=\(frame) screen=\(screen)")
             XCTAssertEqual(frame.width, screen.width, accuracy: 2, "photo not screen-wide: \(frame)")
-            XCTAssertLessThanOrEqual(frame.height, screen.height + 2, "photo taller than the screen: \(frame)")
+            XCTAssertGreaterThanOrEqual(frame.height, screen.height * 0.9, "photo does not fill the screen: \(frame)")
             XCTAssertGreaterThanOrEqual(frame.minX, -2, "photo starts off-screen: \(frame)")
             snap(env["UNSHIELDED"] == "1" ? "08g-photo-viewer-unshielded" : "08g-photo-viewer")
             app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
