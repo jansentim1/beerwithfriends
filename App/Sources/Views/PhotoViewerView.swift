@@ -69,7 +69,17 @@ struct PhotoViewerView: View {
             .opacity(contentOpacity)
         }
         .overlay(alignment: .top) {
+            // A filled photo can be light where the header sits: a soft scrim
+            // keeps the white name, pill and close circle legible on any photo.
             header
+                .padding(.bottom, 56)
+                .background(
+                    LinearGradient(
+                        colors: [.black.opacity(0.45), .black.opacity(0)],
+                        startPoint: .top, endPoint: .bottom
+                    )
+                    .ignoresSafeArea(edges: .top)
+                )
                 .opacity(contentOpacity)
         }
         .offset(y: max(0, dragOffset))
