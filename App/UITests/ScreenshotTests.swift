@@ -35,10 +35,14 @@ final class ScreenshotTests: XCTestCase {
         let photo = app.buttons["home.photo"]
         XCTAssertTrue(photo.waitForExistence(timeout: 10), "view-once chip missing")
         photo.tap()
-        sleep(4)
+        // The callable, the temp file and the cover animation take a few seconds
+        // on the CI simulator: wait for the viewer's photo element itself.
+        let viewerPhoto = app.descendants(matching: .any)["Photo from joost"]
+        XCTAssertTrue(viewerPhoto.waitForExistence(timeout: 30), "photo viewer did not open")
+        sleep(1)
         snap("08g-photo-viewer")
         app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-        sleep(1)
+        XCTAssertTrue(wait(until: { !viewerPhoto.exists }, timeout: 10), "photo viewer did not close")
 
         app.tabBars.buttons["Map"].tap()
         XCTAssertTrue(app.navigationBars.element.waitForExistence(timeout: 5))
