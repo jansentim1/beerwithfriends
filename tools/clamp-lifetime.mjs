@@ -1,6 +1,5 @@
 #!/usr/bin/env node
-// One-off after the 2 h lifetime shipped (2026-09-11): drinks logged before it
-// still carry a 24 h expiry. Clamp every beer's expiresAt to createdAt + 2 h, so
+// After a lifetime change: drinks logged before it still carry the old expiry. Clamp every beer's expiresAt to createdAt + 2 h, so
 // the feed/map queries drop them now and the hourly cleanup deletes them.
 // Dry run by default; `--yes` writes. Runs against beerwithme-prod with ADC.
 import { createRequire } from "node:module";
@@ -9,7 +8,7 @@ const { initializeApp } = require("firebase-admin/app");
 const { getFirestore, Timestamp } = require("firebase-admin/firestore");
 initializeApp({ projectId: "beerwithme-prod" });
 const db = getFirestore();
-const LIFETIME_MS = 2 * 3600_000;
+const LIFETIME_MS = 3600_000;
 const write = process.argv.includes("--yes");
 const snap = await db.collection("beers").get();
 let clamped = 0;

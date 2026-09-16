@@ -1,6 +1,6 @@
 # PubDates Privacy Policy
 
-_Last updated: 2026-09-04_
+_Last updated: 2026-09-16_
 
 PubDates is a small app for telling friends you are having a beer. This policy explains
 what the app stores, why, and how to get rid of it. It is written to be read, not to be
@@ -12,8 +12,8 @@ scrolled past.
 |---|---|---|
 | Apple account identifier (from Sign in with Apple) | To sign you in. We never see your email or password; Sign in with Apple gives us an opaque user id. | Firebase Authentication |
 | Username and display name | So friends can find and recognise you. | Firestore `users/{uid}`, `usernames/{name}` |
-| Beer logs (timestamps, cheers count) | The feed. Each entry expires two hours after it was logged (or as soon as you log your next drink) and is then deleted by a scheduled job. | Firestore `beers/{beerId}` |
-| Photos taken in the app | Optional, attached to a beer log. Stored for at most two hours. Each friend can view a photo exactly once; the server enforces this. | Firebase Storage `photos/{beerId}.jpg` |
+| Beer logs (timestamps, cheers count) | The feed. Each entry expires one hour after it was logged (or as soon as you log your next drink) and is then deleted by a scheduled job. | Firestore `beers/{beerId}` |
+| Photos taken in the app | Optional, attached to a beer log. Stored for at most one hour. Each friend can view a photo exactly once; the server enforces this. | Firebase Storage `photos/{beerId}.jpg` |
 | View and screenshot receipts | So the photo owner can see who viewed their photo and whether a screenshot was attempted (the photo itself is blanked in screenshots and recordings). Deleted with the drink. | Firestore under `beers/{beerId}` |
 | Friend list, friend requests, blocks | To decide whose beers you see and who can see yours. | Firestore |
 | Push notification token | To send "X is having a beer" and "Y cheersed you" notifications. Stored in a private subcollection only you and the server can read. Removed on sign-out. | Firestore `users/{uid}/private/push` |
@@ -29,11 +29,11 @@ identifiers. Location is only used, on your phone, to name a place when you opt 
 
 - No advertising, no tracking, no selling or sharing of data with third parties.
 - No analytics SDKs. The only third party is Google Firebase, which hosts the backend.
-- Photos are never shown to anyone except friends you have accepted, once each, for two hours.
+- Photos are never shown to anyone except friends you have accepted, once each, for one hour.
 
 ## Retention
 
-- Beer logs and photos: deleted automatically two hours after logging, or when you log your next drink.
+- Beer logs and photos: deleted automatically one hour after logging, or when you log your next drink.
 - Everything else: kept until you delete your account.
 
 ## Deleting your account

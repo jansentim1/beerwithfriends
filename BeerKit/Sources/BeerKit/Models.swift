@@ -38,12 +38,13 @@ public struct BeerLog: Codable, Equatable, Identifiable, Sendable {
         self.replies = replies; self.drink = drink; self.placeCoordinate = placeCoordinate
     }
     /// How long a glass takes to empty (Tim: "beers are empty in 15 minutes").
-    /// The row itself stays in the feed until `expiresAt` (2 h), glass empty.
+    /// The row itself stays in the feed until `expiresAt` (1 h), glass empty.
     public static let drinkDuration: TimeInterval = 15 * 60
-    /// How long a drink stays in the feed and on the map (Tim, 2026-09-11:
-    /// "2 hours max"). The server clamps anything longer and the hourly
+    /// How long a drink stays in the feed and on the map: one hour (Tim and
+    /// Gijs, 2026-09-16: "laten we uurtje doen"; two hours left a glass standing
+    /// empty for 1:45). The server clamps anything longer and the hourly
     /// cleanup deletes what has expired.
-    public static let lifetime: TimeInterval = 2 * 3600
+    public static let lifetime: TimeInterval = 3600
     /// 1.0 when just poured, 0.0 fifteen minutes later.
     public func fillLevel(now: Date) -> Double {
         let elapsed = now.timeIntervalSince(createdAt)

@@ -54,7 +54,7 @@ export async function cleanupExpiredCore(db: Firestore, deletePhoto: PhotoDelete
   // Data minimization (Task 5 review outcome): once every friend has used their
   // one view, getPhotoOnce stamps `allViewedAt`. After a 10-minute grace period
   // (so the last viewer's ~60s signed URL stays valid), delete the Storage
-  // object early — the beer doc itself lives on until the 2 h expiry, but
+  // object early — the beer doc itself lives on until the 1 h expiry, but
   // `hasPhoto` flips to false so clients stop offering the photo chip.
   const cutoff = Timestamp.fromDate(new Date(now.getTime() - EARLY_PHOTO_DELETE_MS));
   const fullyViewed = await db.collection("beers")
@@ -135,13 +135,13 @@ export async function changeUsernameCore(db: Firestore, uid: string, raw: string
 
 export const DRINK_COOLDOWN_MS = 60_000;
 /** How long a drink stays in the feed and on the map (mirrors BeerLog.lifetime). */
-export const DRINK_LIFETIME_MS = 2 * 3600_000;
+export const DRINK_LIFETIME_MS = 3600_000;
 
 /**
  * One live drink per person (Tim, 2026-09-11: "only one update per person
  * should stay in the main overview, so it overwrites"): a surviving new drink
  * deletes the owner's older ones, photos included. And every drink lives at
- * most two hours — older clients still send a 24 h expiry, so it is clamped
+ * most one hour — older clients still send a longer expiry, so it is clamped
  * here rather than rejected by the rules. Returns how many drinks were replaced.
  */
 export async function supersedeOlderDrinks(db: Firestore, deletePhoto: PhotoDeleter, beerId: string, ownerUid: string, createdAt: Date): Promise<number> {
@@ -186,7 +186,7 @@ export function normalizeDisplayName(raw: string): string | null {
 /**
  * Changes the nickname on the profile and on every group member doc that
  * mirrors it (users/{uid}/groups lists them). Drinks keep the name they were
- * logged with; they are gone within two hours anyway.
+ * logged with; they are gone within the hour anyway.
  */
 export async function changeDisplayNameCore(db: Firestore, uid: string, raw: string): Promise<string> {
   const displayName = normalizeDisplayName(raw);

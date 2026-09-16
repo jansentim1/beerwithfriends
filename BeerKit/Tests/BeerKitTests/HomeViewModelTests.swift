@@ -168,8 +168,8 @@ func waitForFeed(_ vm: HomeViewModel) async {
         let svc = FakeBeerService()
         let vm = HomeViewModel(service: svc, now: { Date(timeIntervalSince1970: 200_000) })
         let running = await startAndWaitForSubscription(vm, svc)
-        let expired = makeBeer("expired", createdAt: 190_000, owner: "u3")   // expires at 197_200 < now
-        let older = makeBeer("older", createdAt: 195_000, owner: "u4")
+        let expired = makeBeer("expired", createdAt: 190_000, owner: "u3")   // expires at 193_600 < now
+        let older = makeBeer("older", createdAt: 197_000, owner: "u4")
         let newer = makeBeer("newer", createdAt: 199_000)
         // Same owner as `newer`, so it is superseded: one row per person.
         let replaced = makeBeer("replaced", createdAt: 198_000)

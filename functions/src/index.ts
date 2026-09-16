@@ -89,7 +89,7 @@ export const onBeerCreated = onDocumentCreated("beers/{beerId}", async (event) =
   } catch (e) {
     console.error("cooldown check failed, continuing with fanout", e);
   }
-  // One live drink per person, two hours max: older ones go, a long expiry is
+  // One live drink per person, one hour max: older ones go, a long expiry is
   // clamped. Fail open as well — the client hides superseded rows itself.
   try {
     await supersedeOlderDrinks(getFirestore(), storagePhotoDeleter, event.params.beerId, beer.ownerUid, createdAt);

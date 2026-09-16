@@ -11,7 +11,7 @@ import SwiftUI
 ///
 /// Layout follows docs/design/direction.md: large title "PubDates" collapsing on
 /// scroll, then the hero — a row of drawn glasses, one tap each (all inside the
-/// scroll view, so the title collapses natively), then the last two hours of
+/// scroll view, so the title collapses natively), then the last hour of
 /// drinks as plain rows.
 /// Every row carries the glass that was picked, draining over its first 15 minutes.
 struct HomeView: View {
@@ -22,6 +22,8 @@ struct HomeView: View {
 
     private let profile: UserProfile
     private let friendService: any FriendServicing
+    /// nil until known; drives which empty state shows. Refreshed with the feed.
+    @State private var hasMates: Bool?
     private let screenshotReporter: @Sendable (String) async -> Void
 
     /// True while the camera owns the screen. It is opened by a glass tap, never
@@ -109,7 +111,7 @@ struct HomeView: View {
                             }
                         } else {
                             // No eyebrow above the feed: the relative time on every row
-                            // already says these are the last two hours.
+                            // already says these are the last hour.
                             Section {
                                 ForEach(rows) { beer in
                                     feedRow(beer, now: context.date)
@@ -146,6 +148,11 @@ struct HomeView: View {
         // stream's teardown itself, so no sleep is needed here.
         .task(id: feedEpoch) {
             await viewModel.start()
+        }
+        // Which silence to show. Refreshed with the feed (pull, foreground), so
+        // adding a mate on the Mates tab flips the empty state when you come back.
+        .task(id: feedEpoch) {
+            if let mates = try? await friendService.friends() { hasMates = !mates.isEmpty }
         }
         .onChange(of: scenePhase) { oldPhase, newPhase in
             // Coming back to the foreground restarts the stream (re-snapshots the
@@ -329,7 +336,28 @@ struct HomeView: View {
 
     // MARK: - Empty state
 
+    /// Two different silences (Gijs, 2026-09-16, a screenshot of "Nobody to hear
+    /// you yet" with a full mates list): no mates yet, or mates who are simply
+    /// not drinking right now. Only the first one asks you to add someone.
+    @ViewBuilder
     private var emptyState: some View {
+        if hasMates == true {
+            VStack(spacing: 10) {
+                Text("Quiet round")
+                    .font(Theme.displayTitle2)
+                Text("Nobody's drinking right now. Tap a glass and your mates hear it.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+            .frame(maxWidth: .infinity)
+            .accessibilityElement(children: .combine)
+        } else {
+            noMatesState
+        }
+    }
+
+    private var noMatesState: some View {
         VStack(spacing: 10) {
             Text("Nobody to hear you yet")
                 .font(Theme.displayTitle2)

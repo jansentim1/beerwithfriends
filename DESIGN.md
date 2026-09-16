@@ -1,6 +1,6 @@
 ---
 name: PubDates
-description: A row of drawn glasses; tap one and your mates hear it; each glass empties in 15 minutes, the row stays two hours.
+description: A row of drawn glasses; tap one and your mates hear it; each glass empties in 15 minutes, the row stays an hour.
 colors:
   pint-amber: "#E68A00"
   pint-amber-dark: "#FFA733"
@@ -173,7 +173,7 @@ components:
 
 **Creative North Star: "The Row of Glasses"**
 
-PubDates is a native iOS consumer app played straight at the craft level of Instagram, Pinterest and Tikkie: system backgrounds, system type, system navigation, one committed accent. What owns the screen is a horizontal row of seven drawn glasses under the large title. Every glass rests empty (the label under it names the drink); tapping one fills it to the brim, opens the camera, and the new row springs in at the top of the feed with the same glass full. Over the next 15 minutes that glass drains, on the feed row and on the map pin; the row stays two hours, and it is the only row that person has: a new drink replaces the old one. The feed is who is drinking right now, not a timeline to scroll; the camera is the last cell beside the row, not a competing control.
+PubDates is a native iOS consumer app played straight at the craft level of Instagram, Pinterest and Tikkie: system backgrounds, system type, system navigation, one committed accent. What owns the screen is a horizontal row of seven drawn glasses under the large title. Every glass rests empty (the label under it names the drink); tapping one fills it to the brim, opens the camera, and the new row springs in at the top of the feed with the same glass full. Over the next 15 minutes that glass drains, on the feed row and on the map pin; the row stays an hour, and it is the only row that person has: a new drink replaces the old one. The feed is who is drinking right now, not a timeline to scroll; the camera is the last cell beside the row, not a competing control.
 
 The material is flat and tonal. Nothing casts a shadow; depth comes from the grouped ground against a surface card, from amber washes that lift a control without lifting it off the page, and from system material blur over the map and the camera. Corners are large and continuous (20 pt hero, 16 pt card, 12 pt on the favourite tile, capsules on every pill). Dark mode is first class: the accent, the wash, every liquid and the foam are re-tuned per scheme rather than dimmed, and the glasses read as the same drinks on white and on black.
 
@@ -292,7 +292,7 @@ Motion belongs with the shapes it moves. `Theme.pour` (cubic-bezier 0.22, 1, 0.3
 ### Drink glass (`DrinkGlassView`, signature)
 The object the whole app is built around: never an image, always drawn, so it can fill on tap and empty in fifteen minutes.
 - **Anatomy:** glass body at 5% label; liquid clipped to the silhouette; a foam band on pils and special beer (cream, 7% of the height, sitting below the surface, gone in the last sliver of a drain); three static bubbles in the flute; a 55% label outline at 2.8% of the height with round caps; stems, feet and straw stroked only.
-- **Level:** 0 is empty, 1 is the brim. Unlogged glasses rest at 0 (Tim: "all glasses should be empty unless filled"). A logged drink starts at 1 and drains linearly to 0 over 15 minutes; the row and the pin stay for two hours.
+- **Level:** 0 is empty, 1 is the brim. Unlogged glasses rest at 0 (Tim: "all glasses should be empty unless filled"). A logged drink starts at 1 and drains linearly to 0 over 15 minutes; the row and the pin stay for an hour.
 - **Sizes:** 72 pt in the picker (in a 56 × 72 frame), 44 pt on a feed row inside a 56 pt Amber Wash disc, 32 pt on a callout row, 22 pt on a map pin.
 - **Accessibility:** decorative by itself; the containing row carries the label ("Tim is having Wine, glass 60 percent").
 

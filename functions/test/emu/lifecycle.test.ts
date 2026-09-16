@@ -213,7 +213,7 @@ describe("supersedeOlderDrinks", () => {
     expect((await db.doc("beers/new").get()).exists).toBe(true);
     expect((await db.doc("beers/newer").get()).exists).toBe(true);
   });
-  it("clamps a 24 h expiry to the two-hour lifetime and leaves a short one alone", async () => {
+  it("clamps a 24 h expiry to the one-hour lifetime and leaves a short one alone", async () => {
     const t0 = new Date("2026-09-11T20:00:00Z");
     await db.doc("beers/long").set({ ...base, ...at(t0) });
     await supersedeOlderDrinks(db, deletePhoto, "long", "u1", t0);
