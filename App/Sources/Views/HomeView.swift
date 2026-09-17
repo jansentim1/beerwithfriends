@@ -653,10 +653,11 @@ struct HomeView: View {
         .frame(minHeight: 44)
         .contentShape(Rectangle())
         .accessibilityLabel(
-            isDisabled
+            hasCheersed
                 ? "Cheersed, \(beer.cheersCount) so far"
                 : "Cheers, \(beer.cheersCount) so far"
         )
+        .accessibilityHint(hasCheersed ? "See who cheersed" : "")
     }
 
     // MARK: - Actions
