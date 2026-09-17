@@ -56,7 +56,13 @@ const mk = async (id, owner, ownerName, drink, minutesAgo, extra) => {
   });
 };
 await getStorage().bucket().file("photos/seed-wine.jpg").save(jpeg, { contentType: "image/jpeg" });
-await mk("seed-wine", joost, "joost", "wine", 4, { hasPhoto: true, photoPath: "photos/seed-wine.jpg", place: "Café De Zon", placeCoordinate: new GeoPoint(52.37, 4.895), cheersCount: 2 });
+await mk("seed-wine", joost, "joost", "wine", 4, {
+  hasPhoto: true, photoPath: "photos/seed-wine.jpg", place: "Café De Zon",
+  placeCoordinate: new GeoPoint(52.37, 4.895), cheersCount: 2,
+  // Who cheersed, for the reactions sheet (server-written in production).
+  cheersBy: { [tim]: "Tim", [menno]: "Menno" },
+  replies: { [tim]: "onmyway" }, replyNames: { [tim]: "Tim" },
+});
 await mk("seed-pils", menno, "menno", "pils", 40, { place: "Amsterdam", placeCoordinate: new GeoPoint(52.373, 4.9), replies: { [tim]: "onmyway" } });
 await mk("seed-mine", tim, "tim", "special", 9, {});
 

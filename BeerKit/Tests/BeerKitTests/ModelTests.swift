@@ -34,6 +34,33 @@ import Testing
         #expect(shown.map(\.id) == ["b1", "a2"])
     }
 
+    @Test func reactionsListCheersThenRepliesSortedByName() {
+        let beer = BeerLog(
+            id: "b1", ownerUid: "me", ownerName: "Me",
+            createdAt: Date(timeIntervalSince1970: 0),
+            expiresAt: Date(timeIntervalSince1970: 3600), hasPhoto: false, cheersCount: 3,
+            replies: ["u4": .onMyWay, "u5": .jealous],
+            cheersBy: ["u2": "Menno", "u1": "daan", "u3": "Joost"],
+            replyNames: ["u4": "Gijs"]   // u5's name never mirrored
+        )
+        let r = beer.reactions
+        #expect(r.cheers.map(\.name) == ["daan", "Joost", "Menno"])   // case-insensitive
+        #expect(r.cheers.allSatisfy { $0.reply == nil })
+        #expect(r.replies.map(\.name) == ["a mate", "Gijs"])          // fallback sorts as its name
+        #expect(r.replies.map(\.reply) == [.jealous, .onMyWay])
+        #expect(r.cheersCount == 3)
+        #expect(!r.isEmpty)
+    }
+
+    @Test func reactionsAreEmptyWithoutMirrors() {
+        let beer = BeerLog(id: "b1", ownerUid: "me", ownerName: "Me",
+                           createdAt: Date(timeIntervalSince1970: 0),
+                           expiresAt: Date(timeIntervalSince1970: 3600), hasPhoto: false,
+                           cheersCount: 2)   // counter ahead of the names
+        #expect(beer.reactions.isEmpty)
+        #expect(beer.reactions.cheersCount == 0)
+    }
+
     @Test func displayNameNormalizes() {
         #expect(DisplayName.normalize("  Timmy   J\n") == "Timmy J")
         #expect(DisplayName.normalize("   ") == nil)

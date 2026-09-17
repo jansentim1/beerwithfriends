@@ -170,6 +170,31 @@ export async function supersedeOlderDrinks(db: Firestore, deletePhoto: PhotoDele
   return replaced;
 }
 
+/**
+ * The name to show in the "who cheersed" sheet. Mirrored onto the beer doc at
+ * reaction time so the feed needs no extra reads (Tim, 2026-09-16: "i want to
+ * see who liked"). A later nickname change does not rewrite it; the drink is
+ * gone within the hour anyway, same rule as `ownerName`.
+ */
+export async function reactorName(db: Firestore, uid: string): Promise<string> {
+  const u = await db.doc(`users/${uid}`).get();
+  return (u.get("displayName") as string | undefined) || (u.get("usernameLower") as string | undefined) || "a mate";
+}
+
+/** Records who cheersed on the beer doc: `cheersBy.{uid} = display name`. */
+export async function mirrorCheersName(db: Firestore, beerId: string, uid: string): Promise<string> {
+  const name = await reactorName(db, uid);
+  await db.doc(`beers/${beerId}`).update({ [`cheersBy.${uid}`]: name });
+  return name;
+}
+
+/** Records who replied on the beer doc: `replyNames.{uid} = display name`. */
+export async function mirrorReplyName(db: Firestore, beerId: string, uid: string): Promise<string> {
+  const name = await reactorName(db, uid);
+  await db.doc(`beers/${beerId}`).update({ [`replyNames.${uid}`]: name });
+  return name;
+}
+
 export class DisplayNameError extends Error {
   constructor(public code: "INVALID" | "NO_PROFILE") { super(code); }
 }

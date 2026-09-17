@@ -1,4 +1,4 @@
-import { changeUsernameCore, UsernameError, enforceDrinkCooldown, supersedeOlderDrinks, changeDisplayNameCore, DisplayNameError, DRINK_LIFETIME_MS } from "../../src/lifecycle";
+import { changeUsernameCore, UsernameError, enforceDrinkCooldown, supersedeOlderDrinks, changeDisplayNameCore, DisplayNameError, DRINK_LIFETIME_MS, mirrorCheersName, mirrorReplyName } from "../../src/lifecycle";
 import { describe, it, expect, beforeEach } from "vitest";
 import { Timestamp } from "firebase-admin/firestore";
 import { initTestDb, seedUser, seedFriends, clearDb } from "./helpers";
@@ -242,6 +242,29 @@ describe("changeDisplayNameCore", () => {
     await expect(changeDisplayNameCore(db, "u1", "x".repeat(31))).rejects.toMatchObject({ code: "INVALID" });
     await expect(changeDisplayNameCore(db, "nobody", "Tim")).rejects.toMatchObject({ code: "NO_PROFILE" });
     expect(new DisplayNameError("INVALID").code).toBe("INVALID");
+  });
+});
+
+describe("reaction name mirrors", () => {
+  const beer = { ownerUid: "u1", ownerName: "Tim", hasPhoto: false, photoPath: "", cheersCount: 0 };
+  beforeEach(async () => {
+    await db.doc("beers/b1").set({ ...beer, createdAt: Timestamp.now(), expiresAt: Timestamp.now() });
+  });
+  it("writes the display name for a cheers and a reply", async () => {
+    await seedUser(db, "u2", "joost");
+    await db.doc("users/u2").update({ displayName: "Joost" });
+    expect(await mirrorCheersName(db, "b1", "u2")).toBe("Joost");
+    expect(await mirrorReplyName(db, "b1", "u2")).toBe("Joost");
+    const doc = await db.doc("beers/b1").get();
+    expect(doc.get("cheersBy")).toEqual({ u2: "Joost" });
+    expect(doc.get("replyNames")).toEqual({ u2: "Joost" });
+  });
+  it("falls back to the username, then to a placeholder", async () => {
+    await seedUser(db, "u3", "menno");
+    await db.doc("users/u3").update({ displayName: "" });   // never set one
+    expect(await mirrorCheersName(db, "b1", "u3")).toBe("menno");
+    expect(await mirrorCheersName(db, "b1", "ghost")).toBe("a mate");
+    expect((await db.doc("beers/b1").get()).get("cheersBy")).toEqual({ u3: "menno", ghost: "a mate" });
   });
 });
 

@@ -57,6 +57,16 @@ final class ScreenshotTests: XCTestCase {
             XCTAssertTrue(wait(until: { !viewerPhoto.exists }, timeout: 10), "photo viewer did not close")
         }
 
+        // Who cheersed: joost's wine carries two cheers and a reply in the seed.
+        let cheers = app.buttons["home.cheersList"].firstMatch
+        if cheers.waitForExistence(timeout: 5) {
+            cheers.tap()
+            XCTAssertTrue(app.staticTexts["Menno"].waitForExistence(timeout: 10), "cheers names missing")
+            snap("08h-cheers-sheet")
+            app.buttons["reactions.done"].tap()
+            sleep(1)
+        }
+
         app.tabBars.buttons["Map"].tap()
         XCTAssertTrue(app.navigationBars.element.waitForExistence(timeout: 5))
         sleep(3) // map tiles + pin framing

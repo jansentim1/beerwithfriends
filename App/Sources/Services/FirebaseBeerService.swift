@@ -145,7 +145,10 @@ final class FirebaseBeerService: BeerServicing, @unchecked Sendable {
             place: data["place"] as? String,
             replies: replies,
             drink: (data["drink"] as? String).flatMap(DrinkKind.init(rawValue:)) ?? .pils,
-            placeCoordinate: (data["placeCoordinate"] as? GeoPoint).map { Coordinate(latitude: $0.latitude, longitude: $0.longitude) }
+            placeCoordinate: (data["placeCoordinate"] as? GeoPoint).map { Coordinate(latitude: $0.latitude, longitude: $0.longitude) },
+            // Server-written names for the reactions sheet; absent on old docs.
+            cheersBy: data["cheersBy"] as? [String: String] ?? [:],
+            replyNames: data["replyNames"] as? [String: String] ?? [:]
         )
     }
 

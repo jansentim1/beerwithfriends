@@ -12,7 +12,7 @@ import { fanoutBeerCreated, notifyCheers, notifyReply, Pusher, ReplyKind } from 
 import { sendApns, deadTokens } from "./apns";
 import { loadApnsKey } from "./apnsKey";
 import { createGroupCore, joinGroupCore, leaveGroupCore, countDrinkForGroups, GroupError } from "./groups";
-import { mirrorFriendship, severOnBlock, cleanupExpiredCore, deleteAccountCore, changeUsernameCore, changeDisplayNameCore, enforceDrinkCooldown, supersedeOlderDrinks, UsernameError, DisplayNameError, PhotoDeleter } from "./lifecycle";
+import { mirrorFriendship, severOnBlock, cleanupExpiredCore, deleteAccountCore, changeUsernameCore, changeDisplayNameCore, enforceDrinkCooldown, supersedeOlderDrinks, mirrorCheersName, mirrorReplyName, UsernameError, DisplayNameError, PhotoDeleter } from "./lifecycle";
 
 // Colocated with Firestore + Storage (europe-west4); see .firebaserc / tools/deploy.sh.
 setGlobalOptions({ region: "europe-west4" });
@@ -106,6 +106,9 @@ export const onCheersCreated = onDocumentCreated("beers/{beerId}/cheers/{uid}", 
   const db = getFirestore();
   const beerRef = db.doc(`beers/${event.params.beerId}`);
   await beerRef.update({ cheersCount: FieldValue.increment(1) });
+  // Who cheersed, by name, for the reactions sheet. Never blocks the push.
+  await mirrorCheersName(db, event.params.beerId, event.params.uid)
+    .catch((e) => console.error("cheers name mirror failed", e));
   const beer = await beerRef.get();
   if (beer.exists) await notifyCheers(db, push, beer.get("ownerUid"), event.params.uid);
 });
@@ -179,6 +182,8 @@ export const onReplyCreated = onDocumentCreated("beers/{beerId}/replies/{uid}", 
   const beerRef = db.doc(`beers/${event.params.beerId}`);
   // Mirror into the beer doc (admin-only field) so the feed shows reply pills.
   await beerRef.update({ [`replies.${event.params.uid}`]: kind });
+  await mirrorReplyName(db, event.params.beerId, event.params.uid)
+    .catch((e) => console.error("reply name mirror failed", e));
   const beer = await beerRef.get();
   if (beer.exists) await notifyReply(db, push, beer.get("ownerUid"), event.params.uid, kind);
 });

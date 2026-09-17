@@ -31,6 +31,9 @@ struct HomeView: View {
     /// dat je altijd een foto moet toevoegen").
     @State private var showCamera = false
     @State private var photoViewer: PhotoViewerItem?
+    /// The drink whose cheers list is open. Re-read from the live feed while the
+    /// sheet is up, so a cheers landing now shows up in it.
+    @State private var reactionsBeerId: String?
     /// Bumped to restart the feed stream (scene re-activation, pull-to-refresh):
     /// `observeFeed()` snapshots the friend list at subscribe time, so a restart
     /// is how new friends' beers show up (parked v1 limitation, Task 9 note).
@@ -175,6 +178,11 @@ struct HomeView: View {
                 Task { await viewModel.logBeer(photoJPEG: data, drink: drink, myUid: profile.id) }
             }
             .ignoresSafeArea()
+        }
+        .sheet(isPresented: reactionsBinding) {
+            if let beer = viewModel.feed.first(where: { $0.id == reactionsBeerId }) {
+                ReactionsSheet(beer: beer, ownerLabel: beer.ownerUid == profile.id ? "You" : beer.ownerName)
+            }
         }
         .fullScreenCover(item: $photoViewer) { item in
             PhotoViewerView(
@@ -334,6 +342,22 @@ struct HomeView: View {
         }
     }
 
+    // MARK: - Reactions
+
+    private func openReactions(_ beer: BeerLog) {
+        Haptics.light()
+        reactionsBeerId = beer.id
+    }
+
+    /// A drink that expires while its sheet is open closes it rather than
+    /// freezing a row that no longer exists.
+    private var reactionsBinding: Binding<Bool> {
+        Binding(
+            get: { reactionsBeerId != nil && viewModel.feed.contains { $0.id == reactionsBeerId } },
+            set: { if !$0 { reactionsBeerId = nil } }
+        )
+    }
+
     // MARK: - Empty state
 
     /// Two different silences (Gijs, 2026-09-16, a screenshot of "Nobody to hear
@@ -448,6 +472,11 @@ struct HomeView: View {
                 replyButton(for: beer, kind: .onMyWay)
                 replyButton(for: beer, kind: .jealous)
                 Button {
+                    openReactions(beer)
+                } label: {
+                    Label("Who cheersed", systemImage: "person.2")
+                }
+                Button {
                     reportTarget = beer
                     showReportDialog = true
                 } label: {
@@ -555,8 +584,16 @@ struct HomeView: View {
         ForEach(ReplyKind.allCases, id: \.self) { kind in
             let count = beer.replyCount(kind)
             if count > 0 {
-                StatusPill(text: "\(kind.emoji) \(count)")
-                    .accessibilityLabel(Self.replyLabel(kind, count: count))
+                Button {
+                    openReactions(beer)
+                } label: {
+                    StatusPill(text: "\(kind.emoji) \(count)")
+                }
+                .buttonStyle(.plain)
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+                .accessibilityLabel(Self.replyLabel(kind, count: count))
+                .accessibilityHint("See who reacted")
             }
         }
     }
@@ -576,8 +613,18 @@ struct HomeView: View {
     private func reactionControl(for beer: BeerLog, isMine: Bool) -> some View {
         if isMine {
             if beer.cheersCount > 0 {
-                StatusPill(text: "🍻 \(beer.cheersCount)")
-                    .accessibilityLabel("\(beer.cheersCount) cheers")
+                // The tally is the way in to the names.
+                Button {
+                    openReactions(beer)
+                } label: {
+                    StatusPill(text: "🍻 \(beer.cheersCount)")
+                }
+                .buttonStyle(.plain)
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+                .accessibilityLabel("\(beer.cheersCount) cheers")
+                .accessibilityHint("See who cheersed")
+                .accessibilityIdentifier("home.cheersList")
             }
         } else {
             cheersButton(for: beer)
@@ -585,10 +632,16 @@ struct HomeView: View {
     }
 
     private func cheersButton(for beer: BeerLog) -> some View {
-        let isDisabled = viewModel.cheersedBeerIds.contains(beer.id)
+        // Cheersed already? The pill keeps its quiet look but changes job: it
+        // opens the names instead of being a control that does nothing.
+        let hasCheersed = viewModel.cheersedBeerIds.contains(beer.id)
         return Button {
-            Haptics.light()
-            Task { await viewModel.cheers(beer) }
+            if hasCheersed {
+                openReactions(beer)
+            } else {
+                Haptics.light()
+                Task { await viewModel.cheers(beer) }
+            }
         } label: {
             HStack(spacing: 4) {
                 Text("🍻")
@@ -596,8 +649,7 @@ struct HomeView: View {
                     .monospacedDigit()
             }
         }
-        .buttonStyle(PillButtonStyle(emphasis: isDisabled ? .quiet : .tinted))
-        .disabled(isDisabled)
+        .buttonStyle(PillButtonStyle(emphasis: hasCheersed ? .quiet : .tinted))
         .frame(minHeight: 44)
         .contentShape(Rectangle())
         .accessibilityLabel(

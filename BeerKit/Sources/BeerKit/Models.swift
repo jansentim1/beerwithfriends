@@ -28,14 +28,33 @@ public struct BeerLog: Codable, Equatable, Identifiable, Sendable {
     public var drink: DrinkKind
     /// The bar's or city's coordinate (never the device fix); only with `place`.
     public var placeCoordinate: Coordinate?
+    /// Who cheersed, by uid → the name to show. Server-maintained next to
+    /// `cheersCount`, so the reactions sheet opens without another read.
+    public var cheersBy: [String: String]
+    /// Who quick-replied, by uid → the name to show. Mirrors `replies`.
+    public var replyNames: [String: String]
     public init(id: String, ownerUid: String, ownerName: String, createdAt: Date,
                 expiresAt: Date, hasPhoto: Bool, cheersCount: Int = 0, place: String? = nil,
                 replies: [String: ReplyKind] = [:], drink: DrinkKind = .pils,
-                placeCoordinate: Coordinate? = nil) {
+                placeCoordinate: Coordinate? = nil, cheersBy: [String: String] = [:],
+                replyNames: [String: String] = [:]) {
         self.id = id; self.ownerUid = ownerUid; self.ownerName = ownerName
         self.createdAt = createdAt; self.expiresAt = expiresAt
         self.hasPhoto = hasPhoto; self.cheersCount = cheersCount; self.place = place
         self.replies = replies; self.drink = drink; self.placeCoordinate = placeCoordinate
+        self.cheersBy = cheersBy; self.replyNames = replyNames
+    }
+
+    /// The reactions sheet's content: everyone who cheersed, then everyone who
+    /// quick-replied, each sorted by name (the doc mirrors carry no order, and
+    /// a drink lives an hour — recency adds nothing worth a read).
+    public var reactions: Reactions {
+        Reactions(
+            cheers: cheersBy.map { Reactor(id: $0.key, name: $0.value, reply: nil) }
+                .sorted { $0.sortKey < $1.sortKey },
+            replies: replies.map { Reactor(id: $0.key, name: replyNames[$0.key] ?? "a mate", reply: $0.value) }
+                .sorted { $0.sortKey < $1.sortKey }
+        )
     }
     /// How long a glass takes to empty (Tim: "beers are empty in 15 minutes").
     /// The row itself stays in the feed until `expiresAt` (1 h), glass empty.
@@ -144,4 +163,30 @@ public enum DrinkKind: String, Codable, CaseIterable, Sendable {
         case .whisky: return "a whisky"
         }
     }
+}
+
+/// One mate in the reactions sheet: who they are, what they left.
+public struct Reactor: Equatable, Identifiable, Sendable {
+    public var id: String          // uid
+    public var name: String
+    /// nil for a cheers, the kind for a quick reply.
+    public var reply: ReplyKind?
+    public init(id: String, name: String, reply: ReplyKind?) {
+        self.id = id; self.name = name; self.reply = reply
+    }
+    /// Case-insensitive name, then uid so the order never wobbles between reads.
+    var sortKey: String { name.lowercased() + "\u{0}" + id }
+}
+
+/// What a drink's row has collected: cheers first, quick replies after.
+public struct Reactions: Equatable, Sendable {
+    public var cheers: [Reactor]
+    public var replies: [Reactor]
+    public init(cheers: [Reactor], replies: [Reactor]) {
+        self.cheers = cheers; self.replies = replies
+    }
+    public var isEmpty: Bool { cheers.isEmpty && replies.isEmpty }
+    /// The count the sheet shows: the names it can actually list, which can lag
+    /// `cheersCount` by one function run.
+    public var cheersCount: Int { cheers.count }
 }
