@@ -45,7 +45,7 @@ struct DrinkGlassView: View {
             ZStack {
                 LiquidShape(kind: kind, level: fill)
                     .fill(DrinkGlassPalette.liquid(kind))
-                if kind == .pils || kind == .special {
+                if kind.hasHead {
                     FoamShape(kind: kind, level: fill)
                         .fill(DrinkGlassPalette.foam)
                 }
@@ -336,6 +336,21 @@ extension View {
     }
 }
 
+// MARK: - Head
+
+extension DrinkKind {
+    /// Which drinks carry a foam band. A stout's head is the whole point of the
+    /// drawing, so it is thicker than the others (see `FoamShape`).
+    var hasHead: Bool {
+        switch self {
+        case .pils, .pint, .special, .stout: return true
+        case .wine, .bubbles, .cocktail, .whisky: return false
+        }
+    }
+    /// Head thickness as a fraction of the glass height.
+    var headThickness: CGFloat { self == .stout ? 0.12 : 0.07 }
+}
+
 // MARK: - Shapes
 
 /// The silhouette that holds liquid (bowl only — stems and feet are decoration).
@@ -377,11 +392,10 @@ private struct FoamShape: Shape {
         set { level = newValue }
     }
     func path(in rect: CGRect) -> Path {
-        // No head on a glass that is barely wet: the last seconds of a drain
-        // deeper than a pils.
+        // No head on a glass that is barely wet: the last seconds of a drain.
         guard level > 0.05 else { return Path() }
         let surface = DrinkGlassGeometry.surfaceY(kind, level: level, in: rect)
-        let thickness = max(2, rect.height * 0.07)
+        let thickness = max(2, rect.height * kind.headThickness)
         // The band sits entirely BELOW the surface: riding it half-out leaves a
         // white sliver hanging in the empty glass at low fills.
         let band = CGRect(x: rect.minX, y: surface,
@@ -430,7 +444,9 @@ private enum DrinkGlassGeometry {
     static func widthRatio(_ kind: DrinkKind) -> CGFloat {
         switch kind {
         case .pils: return 0.56
+        case .pint: return 0.62
         case .special: return 0.66
+        case .stout: return 0.60
         case .wine: return 0.60
         case .bubbles: return 0.42
         case .cocktail: return 0.64
@@ -443,7 +459,9 @@ private enum DrinkGlassGeometry {
     static func bowl(_ kind: DrinkKind) -> (top: CGFloat, bottom: CGFloat) {
         switch kind {
         case .pils: return (0.02, 0.97)
+        case .pint: return (0.03, 0.96)
         case .special: return (0.05, 0.55)
+        case .stout: return (0.03, 0.96)
         case .wine: return (0.04, 0.52)
         case .bubbles: return (0.03, 0.57)
         case .cocktail: return (0.06, 0.52)
@@ -475,6 +493,35 @@ private enum DrinkGlassGeometry {
             path.addQuadCurve(to: p(0.72, 0.97, rect), control: p(0.79, 0.97, rect))
             path.addLine(to: p(0.28, 0.97, rect))
             path.addQuadCurve(to: p(0.20, 0.92, rect), control: p(0.21, 0.97, rect))
+            path.closeSubpath()
+        case .pint:
+            // Nonic: straight sides with the bulge a hand's width down — the
+            // British pint, and nothing like the tapered pils beside it.
+            path.move(to: p(0.10, 0.03, rect))
+            path.addLine(to: p(0.90, 0.03, rect))
+            path.addLine(to: p(0.90, 0.24, rect))
+            path.addQuadCurve(to: p(0.82, 0.36, rect), control: p(0.91, 0.32, rect))
+            path.addLine(to: p(0.80, 0.90, rect))
+            path.addQuadCurve(to: p(0.72, 0.96, rect), control: p(0.79, 0.96, rect))
+            path.addLine(to: p(0.28, 0.96, rect))
+            path.addQuadCurve(to: p(0.20, 0.90, rect), control: p(0.21, 0.96, rect))
+            path.addLine(to: p(0.18, 0.36, rect))
+            path.addQuadCurve(to: p(0.10, 0.24, rect), control: p(0.09, 0.32, rect))
+            path.closeSubpath()
+        case .stout:
+            // Tulip pint: waisted low, flaring to the rim. The shape says stout
+            // before the colour does.
+            path.move(to: p(0.12, 0.03, rect))
+            path.addLine(to: p(0.88, 0.03, rect))
+            path.addCurve(to: p(0.76, 0.52, rect),
+                          control1: p(0.86, 0.22, rect), control2: p(0.76, 0.36, rect))
+            path.addLine(to: p(0.79, 0.90, rect))
+            path.addQuadCurve(to: p(0.71, 0.96, rect), control: p(0.78, 0.96, rect))
+            path.addLine(to: p(0.29, 0.96, rect))
+            path.addQuadCurve(to: p(0.21, 0.90, rect), control: p(0.22, 0.96, rect))
+            path.addLine(to: p(0.24, 0.52, rect))
+            path.addCurve(to: p(0.12, 0.03, rect),
+                          control1: p(0.24, 0.36, rect), control2: p(0.14, 0.22, rect))
             path.closeSubpath()
         case .special:
             // Chalice: a wide, shallow bowl on a short stem. Deliberately NOT a
@@ -528,7 +575,7 @@ private enum DrinkGlassGeometry {
     static func decorationPath(_ kind: DrinkKind, in rect: CGRect) -> Path {
         var path = Path()
         switch kind {
-        case .pils, .whisky:
+        case .pils, .pint, .stout, .whisky:
             break // nothing under the glass
         case .special:
             addStem(&path, in: rect, top: 0.55, halfWidth: 0.055, footWidth: 0.46, footY: 0.94)
@@ -569,7 +616,9 @@ private enum DrinkGlassPalette {
     static func liquid(_ kind: DrinkKind) -> Color {
         switch kind {
         case .pils: return Theme.accent          // pint amber, the house colour
+        case .pint: return pint
         case .special: return special
+        case .stout: return stout
         case .wine: return wine
         case .bubbles: return bubbles
         case .cocktail: return cocktail
@@ -577,6 +626,10 @@ private enum DrinkGlassPalette {
         }
     }
 
+    /// Copper: an ale, a shade deeper than the house pils.
+    static let pint = paired(light: (0.80, 0.46, 0.05), dark: (0.91, 0.58, 0.14))
+    /// Near-black with a red cast, so it is a drink and not a hole.
+    static let stout = paired(light: (0.16, 0.09, 0.06), dark: (0.24, 0.14, 0.09))
     /// Deep amber: a dubbel or a bock.
     static let special = paired(light: (0.55, 0.22, 0.03), dark: (0.72, 0.33, 0.08))
     /// Burgundy, lifted in dark mode so it never reads as a hole in the glass.

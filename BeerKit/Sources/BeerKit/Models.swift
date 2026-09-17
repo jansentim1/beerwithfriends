@@ -130,12 +130,17 @@ public struct Coordinate: Codable, Equatable, Sendable {
 
 /// What is in the glass. Raw values are the wire format (rules-pinned).
 public enum DrinkKind: String, Codable, CaseIterable, Sendable {
-    case pils, special, wine, bubbles, cocktail, whisky
+    // Beers first, in the order you'd meet them at a bar: the small one, the
+    // big one, the interesting one, the dark one. Gijs, 2026-09-17: "je kan
+    // pils, speciaal bier, maar geen pint, of stout".
+    case pils, pint, special, stout, wine, bubbles, cocktail, whisky
 
     public var label: String {
         switch self {
         case .pils: return "Pils"
+        case .pint: return "Pint"
         case .special: return "Special beer"
+        case .stout: return "Stout"
         case .wine: return "Wine"
         case .bubbles: return "Bubbles"
         case .cocktail: return "Cocktail"
@@ -145,7 +150,9 @@ public enum DrinkKind: String, Codable, CaseIterable, Sendable {
     public var emoji: String {
         switch self {
         case .pils: return "🍺"
+        case .pint: return "🍺"
         case .special: return "🍻"
+        case .stout: return "🍺"
         case .wine: return "🍷"
         case .bubbles: return "🥂"
         case .cocktail: return "🍸"
@@ -156,7 +163,9 @@ public enum DrinkKind: String, Codable, CaseIterable, Sendable {
     public var pushPhrase: String {
         switch self {
         case .pils: return "a pils"
+        case .pint: return "a pint"
         case .special: return "a special beer"
+        case .stout: return "a stout"
         case .wine: return "a glass of wine"
         case .bubbles: return "bubbles"
         case .cocktail: return "a cocktail"

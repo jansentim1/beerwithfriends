@@ -15,8 +15,8 @@ async function targetFor(db: Firestore, uid: string): Promise<PushTarget | undef
 type BeerDoc = { ownerUid: string; ownerName: string; hasPhoto: boolean; place?: string; drink?: string };
 
 const drinkPhrase: Record<string, string> = {
-  pils: "a pils 🍺", special: "a special beer 🍻", wine: "a glass of wine 🍷", bubbles: "bubbles 🥂",
-  cocktail: "a cocktail 🍸", whisky: "a whisky 🥃",
+  pils: "a pils 🍺", pint: "a pint 🍺", special: "a special beer 🍻", stout: "a stout 🍺",
+  wine: "a glass of wine 🍷", bubbles: "bubbles 🥂", cocktail: "a cocktail 🍸", whisky: "a whisky 🥃",
 };
 
 export async function fanoutBeerCreated(db: Firestore, push: Pusher, beerId: string, beer: BeerDoc) {
