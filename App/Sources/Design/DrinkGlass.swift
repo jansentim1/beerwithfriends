@@ -343,7 +343,7 @@ extension DrinkKind {
     /// drawing, so it is thicker than the others (see `FoamShape`).
     var hasHead: Bool {
         switch self {
-        case .pils, .pint, .special, .stout: return true
+        case .pils, .pint, .stein, .special, .stout: return true
         case .wine, .bubbles, .cocktail, .whisky: return false
         }
     }
@@ -445,6 +445,7 @@ private enum DrinkGlassGeometry {
         switch kind {
         case .pils: return 0.56
         case .pint: return 0.62
+        case .stein: return 0.78          // the handle rides outside the body
         case .special: return 0.66
         case .stout: return 0.66
         case .wine: return 0.60
@@ -460,6 +461,7 @@ private enum DrinkGlassGeometry {
         switch kind {
         case .pils: return (0.02, 0.97)
         case .pint: return (0.03, 0.96)
+        case .stein: return (0.05, 0.95)
         case .special: return (0.05, 0.55)
         case .stout: return (0.03, 0.96)
         case .wine: return (0.04, 0.52)
@@ -510,6 +512,16 @@ private enum DrinkGlassGeometry {
             path.addLine(to: p(0.16, 0.40, rect))
             path.addQuadCurve(to: p(0.03, 0.30, rect), control: p(0.06, 0.39, rect))
             path.addQuadCurve(to: p(0.14, 0.22, rect), control: p(0.03, 0.24, rect))
+            path.closeSubpath()
+        case .stein:
+            // The mug: a straight, heavy barrel taking the left two-thirds of
+            // the box, with the handle drawn beside it (see `decorationPath`).
+            path.move(to: p(0.08, 0.05, rect))
+            path.addLine(to: p(0.64, 0.05, rect))
+            path.addLine(to: p(0.64, 0.88, rect))
+            path.addQuadCurve(to: p(0.56, 0.95, rect), control: p(0.64, 0.95, rect))
+            path.addLine(to: p(0.16, 0.95, rect))
+            path.addQuadCurve(to: p(0.08, 0.88, rect), control: p(0.08, 0.95, rect))
             path.closeSubpath()
         case .stout:
             // Tulip pint: waisted low, flaring to the rim. The shape says stout
@@ -581,6 +593,14 @@ private enum DrinkGlassGeometry {
         switch kind {
         case .pils, .pint, .stout, .whisky:
             break // nothing under the glass
+        case .stein:
+            // The handle: a squared-off C hung off the mug's right wall, the
+            // one drink whose decoration sits beside the glass, not under it.
+            path.move(to: p(0.64, 0.24, rect))
+            path.addLine(to: p(0.86, 0.30, rect))
+            path.addQuadCurve(to: p(0.92, 0.46, rect), control: p(0.93, 0.36, rect))
+            path.addQuadCurve(to: p(0.84, 0.62, rect), control: p(0.91, 0.58, rect))
+            path.addLine(to: p(0.64, 0.70, rect))
         case .special:
             addStem(&path, in: rect, top: 0.55, halfWidth: 0.055, footWidth: 0.46, footY: 0.94)
         case .wine:
@@ -621,6 +641,7 @@ private enum DrinkGlassPalette {
         switch kind {
         case .pils: return Theme.accent          // pint amber, the house colour
         case .pint: return pint
+        case .stein: return Theme.accent      // a mug of the house pils
         case .special: return special
         case .stout: return stout
         case .wine: return wine

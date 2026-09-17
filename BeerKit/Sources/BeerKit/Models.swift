@@ -133,12 +133,13 @@ public enum DrinkKind: String, Codable, CaseIterable, Sendable {
     // Beers first, in the order you'd meet them at a bar: the small one, the
     // big one, the interesting one, the dark one. Gijs, 2026-09-17: "je kan
     // pils, speciaal bier, maar geen pint, of stout".
-    case pils, pint, special, stout, wine, bubbles, cocktail, whisky
+    case pils, pint, stein, special, stout, wine, bubbles, cocktail, whisky
 
     public var label: String {
         switch self {
         case .pils: return "Pils"
         case .pint: return "Pint"
+        case .stein: return "Stein"
         case .special: return "Special beer"
         case .stout: return "Stout"
         case .wine: return "Wine"
@@ -151,6 +152,7 @@ public enum DrinkKind: String, Codable, CaseIterable, Sendable {
         switch self {
         case .pils: return "🍺"
         case .pint: return "🍺"
+        case .stein: return "🍻"
         case .special: return "🍻"
         case .stout: return "🍺"
         case .wine: return "🍷"
@@ -164,6 +166,7 @@ public enum DrinkKind: String, Codable, CaseIterable, Sendable {
         switch self {
         case .pils: return "a pils"
         case .pint: return "a pint"
+        case .stein: return "a stein"
         case .special: return "a special beer"
         case .stout: return "a stout"
         case .wine: return "a glass of wine"

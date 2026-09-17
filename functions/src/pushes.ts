@@ -15,7 +15,7 @@ async function targetFor(db: Firestore, uid: string): Promise<PushTarget | undef
 type BeerDoc = { ownerUid: string; ownerName: string; hasPhoto: boolean; place?: string; drink?: string };
 
 const drinkPhrase: Record<string, string> = {
-  pils: "a pils 🍺", pint: "a pint 🍺", special: "a special beer 🍻", stout: "a stout 🍺",
+  pils: "a pils 🍺", pint: "a pint 🍺", stein: "a stein 🍻", special: "a special beer 🍻", stout: "a stout 🍺",
   wine: "a glass of wine 🍷", bubbles: "bubbles 🥂", cocktail: "a cocktail 🍸", whisky: "a whisky 🥃",
 };
 

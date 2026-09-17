@@ -173,7 +173,7 @@ components:
 
 **Creative North Star: "The Row of Glasses"**
 
-PubDates is a native iOS consumer app played straight at the craft level of Instagram, Pinterest and Tikkie: system backgrounds, system type, system navigation, one committed accent. What owns the screen is a horizontal row of eight drawn glasses under the large title. Every glass rests empty (the label under it names the drink); tapping one fills it to the brim, opens the camera, and the new row springs in at the top of the feed with the same glass full. Over the next 15 minutes that glass drains, on the feed row and on the map pin; the row stays an hour, and it is the only row that person has: a new drink replaces the old one. The feed is who is drinking right now, not a timeline to scroll; the camera is the last cell beside the row, not a competing control.
+PubDates is a native iOS consumer app played straight at the craft level of Instagram, Pinterest and Tikkie: system backgrounds, system type, system navigation, one committed accent. What owns the screen is a horizontal row of nine drawn glasses under the large title. Every glass rests empty (the label under it names the drink); tapping one fills it to the brim, opens the camera, and the new row springs in at the top of the feed with the same glass full. Over the next 15 minutes that glass drains, on the feed row and on the map pin; the row stays an hour, and it is the only row that person has: a new drink replaces the old one. The feed is who is drinking right now, not a timeline to scroll; the camera is the last cell beside the row, not a competing control.
 
 The material is flat and tonal. Nothing casts a shadow; depth comes from the grouped ground against a surface card, from amber washes that lift a control without lifting it off the page, and from system material blur over the map and the camera. Corners are large and continuous (20 pt hero, 16 pt card, 12 pt on the favourite tile, capsules on every pill). Dark mode is first class: the accent, the wash, every liquid and the foam are re-tuned per scheme rather than dimmed, and the glasses read as the same drinks on white and on black.
 
@@ -206,6 +206,7 @@ Content colours: each drink is an explicit, scheme-aware liquid, lifted in dark 
 - **Bubbles** (`liquid-bubbles`, `liquid-bubbles-dark`): pale gold, with three static white (75%) bubbles standing in the flute.
 - **Cocktail** (`liquid-cocktail`, `liquid-cocktail-dark`): pale green in a martini cone.
 - **Whisky** (`liquid-whisky`, `liquid-whisky-dark`): caramel in a tumbler.
+- **Stein** (`pint-amber`): the house pils in a straight mug, the one glass whose decoration is a handle beside the body rather than a stem under it.
 - **Pint** (`liquid-pint`): copper, a shade deeper than the house pils, in a nonic glass (straight sides, a bulge a hand's width down).
 - **Stout** (`liquid-stout`): near-black with a red cast in a waisted tulip pint, under a head half again as thick as the other beers' (0.12 of the glass against 0.07).
 - **Foam** (`foam`, `foam-dark`): cream rather than pure white, the head on a pils or a special beer, so it reads on both grounds.
@@ -244,7 +245,7 @@ Content colours: each drink is an explicit, scheme-aware liquid, lifted in dark 
 - **Body** (`.body`): onboarding copy, text fields, Settings rows, camera-denied copy.
 - **Secondary** (`.subheadline`): relative time and place on a row, usernames, empty-state explanations, the drink name in a callout; semibold inside pills.
 - **Footnote** (`.footnote`): "Tap a glass to log it", field hints, the sign-in reassurance, the once-a-day note, the version footer, callout times.
-- **Label** (`.caption`): captions under the eight glasses and the camera cell (regular, secondary, one line, 0.7 minimum scale, Amber Ink on the favourite); semibold in status pills; semibold, uppercase, 0.6 pt tracking in the Mates eyebrows.
+- **Label** (`.caption`): captions under the nine glasses and the camera cell (regular, secondary, one line, 0.7 minimum scale, Amber Ink on the favourite); semibold in status pills; semibold, uppercase, 0.6 pt tracking in the Mates eyebrows.
 
 ### Named Rules
 **The Rounded-Names Rule.** SF Rounded is reserved for things that name or command: wordmark, large titles, empty-state and sheet headlines, the profile name, the hero label, initials, the pin count. Row text, copy, hints, captions and pills stay in SF Pro Text so the rounded face keeps its meaning.
@@ -298,7 +299,7 @@ The object the whole app is built around: never an image, always drawn, so it ca
 - **Accessibility:** decorative by itself; the containing row carries the label ("Tim is having Wine, glass 60 percent").
 
 ### Glass row (`DrinkPickerView`, signature)
-Eight glasses in canonical order — the beers first, small to dark (pils, pint, special beer, stout), then wine, bubbles, cocktail, whisky — one tap each, in a horizontal `ScrollView` with view-aligned paging.
+Nine glasses in canonical order — the beers first, small to dark (pils, pint, stein, special beer, stout), then wine, bubbles, cocktail, whisky — one tap each, in a horizontal `ScrollView` with view-aligned paging.
 - **Cell:** glass over a caption, 66 pt minimum width, 6/2 pt padding, plain button style (the glass is the button, no tint on top). The last picked kind sits on a 12 pt Amber Wash tile with its caption in Amber Ink; other captions are secondary.
 - **Tap:** `.success` haptic, the glass pours full on `pour`, the kind is handed off, and the glass then stays full, emptying with the drink over fifteen minutes. Taps within a minute of a log shake the glass instead (warning haptic). While a photo uploads the whole row dims to 50%.
 - **Accessory:** the camera cell wears the same vertical chrome (6 pt inside, 4 pt on the scroll view) so "Photo" shares the captions' baseline. In the build it is pinned outside the scroll so it never leaves the first viewport.
