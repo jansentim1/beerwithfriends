@@ -446,7 +446,7 @@ private enum DrinkGlassGeometry {
         case .pils: return 0.56
         case .pint: return 0.62
         case .special: return 0.66
-        case .stout: return 0.60
+        case .stout: return 0.66
         case .wine: return 0.60
         case .bubbles: return 0.42
         case .cocktail: return 0.64
@@ -497,31 +497,35 @@ private enum DrinkGlassGeometry {
         case .pint:
             // Nonic: straight sides with the bulge a hand's width down — the
             // British pint, and nothing like the tapered pils beside it.
-            path.move(to: p(0.10, 0.03, rect))
-            path.addLine(to: p(0.90, 0.03, rect))
-            path.addLine(to: p(0.90, 0.24, rect))
-            path.addQuadCurve(to: p(0.82, 0.36, rect), control: p(0.91, 0.32, rect))
+            path.move(to: p(0.16, 0.03, rect))
+            path.addLine(to: p(0.84, 0.03, rect))
+            path.addLine(to: p(0.86, 0.22, rect))
+            // The nonic's ledge: out to the widest point, then a step back in.
+            path.addQuadCurve(to: p(0.97, 0.30, rect), control: p(0.97, 0.24, rect))
+            path.addQuadCurve(to: p(0.84, 0.40, rect), control: p(0.94, 0.39, rect))
             path.addLine(to: p(0.80, 0.90, rect))
-            path.addQuadCurve(to: p(0.72, 0.96, rect), control: p(0.79, 0.96, rect))
-            path.addLine(to: p(0.28, 0.96, rect))
+            path.addQuadCurve(to: p(0.71, 0.96, rect), control: p(0.79, 0.96, rect))
+            path.addLine(to: p(0.29, 0.96, rect))
             path.addQuadCurve(to: p(0.20, 0.90, rect), control: p(0.21, 0.96, rect))
-            path.addLine(to: p(0.18, 0.36, rect))
-            path.addQuadCurve(to: p(0.10, 0.24, rect), control: p(0.09, 0.32, rect))
+            path.addLine(to: p(0.16, 0.40, rect))
+            path.addQuadCurve(to: p(0.03, 0.30, rect), control: p(0.06, 0.39, rect))
+            path.addQuadCurve(to: p(0.14, 0.22, rect), control: p(0.03, 0.24, rect))
             path.closeSubpath()
         case .stout:
             // Tulip pint: waisted low, flaring to the rim. The shape says stout
             // before the colour does.
-            path.move(to: p(0.12, 0.03, rect))
-            path.addLine(to: p(0.88, 0.03, rect))
-            path.addCurve(to: p(0.76, 0.52, rect),
-                          control1: p(0.86, 0.22, rect), control2: p(0.76, 0.36, rect))
-            path.addLine(to: p(0.79, 0.90, rect))
-            path.addQuadCurve(to: p(0.71, 0.96, rect), control: p(0.78, 0.96, rect))
-            path.addLine(to: p(0.29, 0.96, rect))
-            path.addQuadCurve(to: p(0.21, 0.90, rect), control: p(0.22, 0.96, rect))
-            path.addLine(to: p(0.24, 0.52, rect))
-            path.addCurve(to: p(0.12, 0.03, rect),
-                          control1: p(0.24, 0.36, rect), control2: p(0.14, 0.22, rect))
+            path.move(to: p(0.04, 0.03, rect))
+            path.addLine(to: p(0.96, 0.03, rect))
+            // A hard flare down to a narrow waist, then out again to the base.
+            path.addCurve(to: p(0.70, 0.56, rect),
+                          control1: p(0.93, 0.26, rect), control2: p(0.70, 0.34, rect))
+            path.addLine(to: p(0.76, 0.90, rect))
+            path.addQuadCurve(to: p(0.68, 0.96, rect), control: p(0.75, 0.96, rect))
+            path.addLine(to: p(0.32, 0.96, rect))
+            path.addQuadCurve(to: p(0.24, 0.90, rect), control: p(0.25, 0.96, rect))
+            path.addLine(to: p(0.30, 0.56, rect))
+            path.addCurve(to: p(0.04, 0.03, rect),
+                          control1: p(0.30, 0.34, rect), control2: p(0.07, 0.26, rect))
             path.closeSubpath()
         case .special:
             // Chalice: a wide, shallow bowl on a short stem. Deliberately NOT a
