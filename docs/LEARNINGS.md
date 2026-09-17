@@ -51,3 +51,8 @@ The Firestore and Storage emulators namespace by whatever project id the client 
 ## Rig: one project id for app, seed and emulators (2026-09-15)
 The functions emulator serves callables only under `/<its --project>/<region>/<name>`, and the Firestore triggers it registers are for that project too. The iOS SDK builds callable URLs from the plist's project id. So in emulator mode the app now configures Firebase with `demo-pubdates` (EmulatorConfig.configureFirebase), the seed writes to `demo-pubdates`, and the emulators start with `--project demo-pubdates`. That supersedes the 2026-09-10 auth-namespace workaround: no more split admin apps.
 
+## Draw glass silhouettes locally, not on the rig (2026-09-17)
+Tuning a bezier through the screenshot rig costs ~6 minutes a round and the crop is small. `tools/glassdraw.py` mirrors `DrinkGlassGeometry.bowlPath`'s unit box (0…1, y down) and its move/line/quad/curve commands in Pillow, so a shape can be judged in a second and only the settled numbers go to Swift. Two shapes that looked fine in code (a nonic "bulge" and a tulip "waist") rendered as a bolt and an hourglass; both were obvious at the first local render.
+
+Also: a Python edit that replaces `s[s.index(a):s.index(b)]` silently truncates the file when the slice is assigned back wrong. It shipped a DrinkGlass.swift of 726 lines that began mid-`switch`. Prefer exact `str.replace(old, new, 1)` with an `assert old in s`, and check `head -2` of the file after any structural edit.
+
