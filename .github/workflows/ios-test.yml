@@ -44,8 +44,13 @@ jobs:
           java -version 2>&1 | head -1
           npm ci --prefix functions --silent && npm --prefix functions run build
           npx -y firebase-tools@latest emulators:start --only auth,firestore,storage,functions --project demo-pubdates > emulators.log 2>&1 &
-          for i in $(seq 1 60); do
-            if curl -s http://127.0.0.1:8085 >/dev/null && curl -s http://127.0.0.1:9099 >/dev/null; then echo "emulators up after ${i}s"; break; fi
+          # Every port the seed and the app touch, storage and functions
+          # included — storage comes up last and the seed uploads to it.
+          for i in $(seq 1 90); do
+            if curl -s http://127.0.0.1:8085 >/dev/null \
+              && curl -s http://127.0.0.1:9099 >/dev/null \
+              && curl -s http://127.0.0.1:9199 >/dev/null \
+              && curl -s http://127.0.0.1:5001 >/dev/null; then echo "emulators up after $((i * 2))s"; break; fi
             sleep 2
           done
           tail -5 emulators.log
