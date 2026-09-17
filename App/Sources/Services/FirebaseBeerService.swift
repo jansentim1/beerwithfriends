@@ -56,6 +56,10 @@ final class FirebaseBeerService: BeerServicing, @unchecked Sendable {
             "cheersCount": 0,
         ]
         data["drink"] = beer.drink.rawValue
+        // Text as well as pixels: VoiceOver needs it, nothing else reads it.
+        if let caption = beer.caption, !caption.isEmpty {
+            data["caption"] = String(caption.prefix(Caption.maxLength))
+        }
         if let place = beer.place, !place.isEmpty {
             data["place"] = String(place.prefix(BeerLog.placeMaxLength))
             if let c = beer.placeCoordinate {
@@ -148,7 +152,8 @@ final class FirebaseBeerService: BeerServicing, @unchecked Sendable {
             placeCoordinate: (data["placeCoordinate"] as? GeoPoint).map { Coordinate(latitude: $0.latitude, longitude: $0.longitude) },
             // Server-written names for the reactions sheet; absent on old docs.
             cheersBy: data["cheersBy"] as? [String: String] ?? [:],
-            replyNames: data["replyNames"] as? [String: String] ?? [:]
+            replyNames: data["replyNames"] as? [String: String] ?? [:],
+            caption: data["caption"] as? String
         )
     }
 

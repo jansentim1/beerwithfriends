@@ -162,7 +162,8 @@ public final class HomeViewModel: ObservableObject {
     /// Returns false (and logs nothing) while the cooldown after the previous
     /// drink is still running; the picker shakes instead.
     @discardableResult
-    public func logBeer(photoJPEG: Data?, drink: DrinkKind = .pils, myUid: String? = nil) async -> Bool {
+    public func logBeer(photoJPEG: Data?, drink: DrinkKind = .pils, caption: String? = nil,
+                        myUid: String? = nil) async -> Bool {
         if let myUid, cooldownRemaining(myUid: myUid) > 0 { return false }
         if photoJPEG != nil {
             guard !isUploadingPhoto else { return false }
@@ -171,6 +172,7 @@ public final class HomeViewModel: ObservableObject {
         defer { if photoJPEG != nil { isUploadingPhoto = false } }
 
         var beer = service.newBeerLog(hasPhoto: photoJPEG != nil, drink: drink)
+        beer.caption = caption
         pendingIds.insert(beer.id)
         upsert(beer)
         // Opt-in place lookup runs AFTER the row is visible; beers are immutable

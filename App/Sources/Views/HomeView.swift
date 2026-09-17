@@ -173,13 +173,16 @@ struct HomeView: View {
         // camera dismisses itself on both "Use photo" and Cancel, so `onDismiss`
         // is where a cancelled round is undone.
         .fullScreenCover(isPresented: $showCamera, onDismiss: cameraDismissed) {
-            CameraView { data in
+            CameraView { data, caption in
                 // Consuming `pendingDrink` here is also how `cameraDismissed()`
                 // tells a used camera from a cancelled one.
                 let drink = pendingDrink ?? .pils
                 pendingDrink = nil
                 pourReset += 1 // the logged row takes the glass from here
-                Task { await viewModel.logBeer(photoJPEG: data, drink: drink, myUid: profile.id) }
+                Task {
+                    await viewModel.logBeer(photoJPEG: data, drink: drink,
+                                            caption: caption, myUid: profile.id)
+                }
             }
             .ignoresSafeArea()
         }
@@ -192,6 +195,7 @@ struct HomeView: View {
             PhotoViewerView(
                 url: item.url,
                 ownerName: item.ownerName,
+                caption: item.caption,
                 beerId: item.id,
                 // Explicit @Sendable wrapper: passing the stored property through
                 // the SwiftUI content closure drops the attribute (compiler warning).
@@ -683,7 +687,8 @@ struct HomeView: View {
                 photoViewer = PhotoViewerItem(
                     id: beer.id,
                     url: url,
-                    ownerName: beer.ownerUid == profile.id ? "You" : beer.ownerName
+                    ownerName: beer.ownerUid == profile.id ? "You" : beer.ownerName,
+                    caption: beer.caption
                 )
             }
         }
@@ -735,6 +740,7 @@ private struct PhotoViewerItem: Identifiable {
     let id: String // beerId
     let url: URL
     let ownerName: String
+    let caption: String?
 }
 
 extension Notification.Name {

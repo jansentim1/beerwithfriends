@@ -1,4 +1,5 @@
 import AVFoundation
+import BeerKit
 import SwiftUI
 import UIKit
 
@@ -10,15 +11,17 @@ import UIKit
 /// flip button; shutter → retake / use-photo review. Returns a JPEG downscaled
 /// to ≤ 1080px on the long edge at 0.8 quality via `onCapture`, then dismisses.
 struct CameraView: UIViewControllerRepresentable {
-    let onCapture: (Data) -> Void
+    /// The JPEG (caption already drawn into it) and the caption as text, which
+    /// travels separately so VoiceOver can read a captioned photo.
+    let onCapture: (Data, String?) -> Void
     @Environment(\.dismiss) private var dismiss
 
     func makeUIViewController(context: Context) -> CameraCaptureViewController {
         let controller = CameraCaptureViewController()
         let onCapture = self.onCapture
         let dismiss = self.dismiss
-        controller.onUsePhoto = { data in
-            onCapture(data)
+        controller.onUsePhoto = { data, caption in
+            onCapture(data, caption)
             dismiss()
         }
         controller.onCancel = { dismiss() }
@@ -34,7 +37,7 @@ struct CameraView: UIViewControllerRepresentable {
 /// centred above the home indicator, glass circles for cancel and flip, and a
 /// Retake / Use-photo pair in review. See docs/design/direction.md, screen 3.
 final class CameraCaptureViewController: UIViewController {
-    var onUsePhoto: ((Data) -> Void)?
+    var onUsePhoto: ((Data, String?) -> Void)?
     var onCancel: (() -> Void)?
 
     private let camera = CameraSessionController()
@@ -44,6 +47,9 @@ final class CameraCaptureViewController: UIViewController {
     private var pendingDelegate: PhotoCaptureDelegate?
     private var capturedImage: UIImage?
     private let shutterHaptic = UIImpactFeedbackGenerator(style: .medium)
+    /// Where the strip sits, 0…1 down the photo. Dragged, then remembered for
+    /// the next shot in this session.
+    private var captionCentre: CGFloat = CaptionLayout.defaultCentre
 
     // MARK: Metrics and palette
 
@@ -78,6 +84,13 @@ final class CameraCaptureViewController: UIViewController {
     private let retakeButton = UIButton(type: .system)
     private let retakeBackdrop = UIVisualEffectView(effect: UIBlurEffect(style: .systemUltraThinMaterialDark))
     private let usePhotoButton = UIButton(type: .system)
+    // Caption ("van die snapchat stroken"): a flat band you type on and drag.
+    private let captionStrip = UIView()
+    private let captionTextView = UITextView()
+    private let captionButton = UIButton(type: .system)
+    private let captionBackdrop = UIVisualEffectView(effect: UIBlurEffect(style: .systemUltraThinMaterialDark))
+    private var captionCentreConstraint: NSLayoutConstraint?
+    private var captionBottomConstraint: NSLayoutConstraint?
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -108,6 +121,7 @@ final class CameraCaptureViewController: UIViewController {
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         previewLayer?.frame = view.bounds
+        layoutCaption()
     }
 
     override func viewWillDisappear(_ animated: Bool) {
@@ -179,6 +193,8 @@ final class CameraCaptureViewController: UIViewController {
         usePhotoButton.isHidden = true
         usePhotoButton.addTarget(self, action: #selector(usePhotoTapped), for: .touchUpInside)
 
+        buildCaption()
+
         for control in [previewImageView, cancelBackdrop, flipBackdrop, shutterButton, retakeBackdrop, usePhotoButton] {
             control.translatesAutoresizingMaskIntoConstraints = false
             view.addSubview(control)
@@ -200,6 +216,20 @@ final class CameraCaptureViewController: UIViewController {
             flipBackdrop.trailingAnchor.constraint(equalTo: safe.trailingAnchor, constant: -16),
             flipBackdrop.widthAnchor.constraint(equalToConstant: Self.glassDiameter),
             flipBackdrop.heightAnchor.constraint(equalToConstant: Self.glassDiameter),
+
+            // The caption button takes the flip button's corner in review.
+            captionBackdrop.topAnchor.constraint(equalTo: safe.topAnchor, constant: 12),
+            captionBackdrop.trailingAnchor.constraint(equalTo: safe.trailingAnchor, constant: -16),
+            captionBackdrop.widthAnchor.constraint(equalToConstant: Self.glassDiameter),
+            captionBackdrop.heightAnchor.constraint(equalToConstant: Self.glassDiameter),
+
+            captionStrip.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            captionStrip.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+
+            captionTextView.leadingAnchor.constraint(equalTo: captionStrip.leadingAnchor, constant: 20),
+            captionTextView.trailingAnchor.constraint(equalTo: captionStrip.trailingAnchor, constant: -20),
+            captionTextView.topAnchor.constraint(equalTo: captionStrip.topAnchor, constant: 12),
+            captionTextView.bottomAnchor.constraint(equalTo: captionStrip.bottomAnchor, constant: -12),
 
             shutterButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             shutterButton.bottomAnchor.constraint(equalTo: safe.bottomAnchor, constant: -24),
@@ -276,13 +306,103 @@ final class CameraCaptureViewController: UIViewController {
         ])
     }
 
+    // MARK: - Caption
+
+    private func buildCaption() {
+        captionStrip.backgroundColor = UIColor.black.withAlphaComponent(CaptionLayout.stripOpacity)
+        captionStrip.isHidden = true
+        captionStrip.translatesAutoresizingMaskIntoConstraints = false
+
+        captionTextView.backgroundColor = .clear
+        captionTextView.textColor = .white
+        captionTextView.tintColor = Self.accent
+        captionTextView.font = .systemFont(ofSize: 20, weight: .semibold)
+        captionTextView.textAlignment = .center
+        captionTextView.isScrollEnabled = false
+        captionTextView.textContainerInset = .zero
+        captionTextView.textContainer.lineFragmentPadding = 0
+        captionTextView.returnKeyType = .done
+        captionTextView.delegate = self
+        captionTextView.accessibilityIdentifier = "camera.caption"
+        captionTextView.accessibilityLabel = "Caption"
+        captionTextView.translatesAutoresizingMaskIntoConstraints = false
+
+        var config = UIButton.Configuration.plain()
+        config.title = "Aa"
+        config.baseForegroundColor = .white
+        config.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
+            var out = incoming
+            out.font = .systemFont(ofSize: 17, weight: .bold)
+            return out
+        }
+        captionButton.configuration = config
+        captionButton.accessibilityLabel = "Add a caption"
+        captionButton.accessibilityIdentifier = "camera.captionButton"
+        captionButton.addTarget(self, action: #selector(captionTapped), for: .touchUpInside)
+        embed(captionButton, in: captionBackdrop, cornerRadius: Self.glassDiameter / 2)
+        captionBackdrop.isHidden = true
+        captionBackdrop.translatesAutoresizingMaskIntoConstraints = false
+
+        view.addSubview(captionStrip)
+        captionStrip.addSubview(captionTextView)
+        view.addSubview(captionBackdrop)
+
+        // Position: centred on `captionCentre`, except while the keyboard is up,
+        // when the strip rides just above it.
+        let centre = captionStrip.centerYAnchor.constraint(equalTo: view.topAnchor)
+        captionCentreConstraint = centre
+        centre.isActive = true
+        captionBottomConstraint = captionStrip.bottomAnchor.constraint(
+            equalTo: view.keyboardLayoutGuide.topAnchor, constant: -16
+        )
+
+        captionStrip.addGestureRecognizer(
+            UIPanGestureRecognizer(target: self, action: #selector(captionDragged(_:)))
+        )
+        // Tapping the photo types on it, the way a snap does.
+        let tap = UITapGestureRecognizer(target: self, action: #selector(captionTapped))
+        previewImageView.isUserInteractionEnabled = true
+        previewImageView.addGestureRecognizer(tap)
+    }
+
+    private func layoutCaption() {
+        captionCentreConstraint?.constant = view.bounds.height * captionCentre
+    }
+
+    @objc private func captionTapped() {
+        guard !previewImageView.isHidden else { return }
+        captionStrip.isHidden = false
+        captionTextView.becomeFirstResponder()
+    }
+
+    @objc private func captionDragged(_ gesture: UIPanGestureRecognizer) {
+        guard view.bounds.height > 0 else { return }
+        let delta = gesture.translation(in: view).y / view.bounds.height
+        gesture.setTranslation(.zero, in: view)
+        let half = captionStrip.bounds.height / max(1, view.bounds.height) / 2
+        captionCentre = min(max(captionCentre + delta, half), 1 - half)
+        layoutCaption()
+    }
+
+    /// The caption as it will be stored and drawn, or nil when it is empty.
+    private var caption: String? { Caption.normalize(captionTextView.text ?? "") }
+
     private func setMode(reviewing: Bool) {
         previewImageView.isHidden = !reviewing
         retakeBackdrop.isHidden = !reviewing
         usePhotoButton.isHidden = !reviewing
         shutterButton.isHidden = reviewing
         flipBackdrop.isHidden = reviewing
+        captionBackdrop.isHidden = !reviewing
         previewLayer?.isHidden = reviewing
+        if !reviewing {
+            // Leaving review drops the caption with the shot it belonged to.
+            captionTextView.resignFirstResponder()
+            captionTextView.text = ""
+            captionStrip.isHidden = true
+            captionCentre = CaptionLayout.defaultCentre
+            layoutCaption()
+        }
     }
 
     private func showPermissionDenied() {
@@ -407,11 +527,14 @@ final class CameraCaptureViewController: UIViewController {
     }
 
     @objc private func usePhotoTapped() {
-        guard let image = capturedImage, let jpeg = Self.downscaledJPEG(image) else {
+        captionTextView.resignFirstResponder()
+        guard let image = capturedImage,
+              let jpeg = Self.downscaledJPEG(image, caption: caption, centre: captionCentre)
+        else {
             retakeTapped() // corrupt capture — fall back to live view
             return
         }
-        onUsePhoto?(jpeg)
+        onUsePhoto?(jpeg, caption)
     }
 
     @objc private func openSettingsTapped() {
@@ -433,9 +556,14 @@ final class CameraCaptureViewController: UIViewController {
     }
 
     /// Max 1080px long edge, JPEG quality 0.8 — comfortably under the 5 MB
-    /// storage-rules cap while staying crisp on a phone screen.
+    /// storage-rules cap while staying crisp on a phone screen. The caption is
+    /// drawn into the pixels here, so it travels with the photo: view-once, the
+    /// screenshot shield and the expiry all keep working untouched, and nothing
+    /// new has to be served alongside it.
     private static func downscaledJPEG(
-        _ image: UIImage, maxLongEdge: CGFloat = 1080, quality: CGFloat = 0.8
+        _ image: UIImage, caption: String? = nil,
+        centre: CGFloat = CaptionLayout.defaultCentre,
+        maxLongEdge: CGFloat = 1080, quality: CGFloat = 0.8
     ) -> Data? {
         let pixelWidth = image.size.width * image.scale
         let pixelHeight = image.size.height * image.scale
@@ -446,10 +574,72 @@ final class CameraCaptureViewController: UIViewController {
                                 height: (pixelHeight * scale).rounded(.down))
         let format = UIGraphicsImageRendererFormat.default()
         format.scale = 1 // render in pixels, not points
-        let resized = UIGraphicsImageRenderer(size: targetSize, format: format).image { _ in
+        let resized = UIGraphicsImageRenderer(size: targetSize, format: format).image { context in
             image.draw(in: CGRect(origin: .zero, size: targetSize))
+            guard let caption else { return }
+            draw(caption: caption, centre: centre, in: targetSize, context: context.cgContext)
         }
         return resized.jpegData(compressionQuality: quality)
+    }
+
+    /// The same band the review screen shows, at the photo's own scale: one
+    /// `CaptionLayout` decides both, so what you typed on is what gets uploaded.
+    private static func draw(caption: String, centre: CGFloat, in size: CGSize, context: CGContext) {
+        let lines = caption.components(separatedBy: "\n").count
+        let layout = CaptionLayout(lineCount: lines, centre: centre)
+        let strip = layout.stripRect(in: size)
+        context.setFillColor(UIColor.black.withAlphaComponent(CaptionLayout.stripOpacity).cgColor)
+        context.fill(strip)
+
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.alignment = .center
+        paragraph.lineBreakMode = .byWordWrapping
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: layout.fontSize(in: size), weight: .semibold),
+            .foregroundColor: UIColor.white,
+            .paragraphStyle: paragraph,
+        ]
+        let inset = layout.horizontalInset(in: size)
+        let textBox = strip.insetBy(dx: inset, dy: 0)
+        let attributed = NSAttributedString(string: caption, attributes: attributes)
+        let height = attributed.boundingRect(
+            with: CGSize(width: textBox.width, height: .greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading], context: nil
+        ).height
+        attributed.draw(in: CGRect(x: textBox.minX, y: strip.midY - height / 2,
+                                   width: textBox.width, height: height))
+    }
+}
+
+// MARK: - Caption editing
+
+extension CameraCaptureViewController: UITextViewDelegate {
+    func textViewDidBeginEditing(_ textView: UITextView) {
+        // The strip rides above the keyboard while you type, then goes back to
+        // wherever you had dragged it.
+        captionCentreConstraint?.isActive = false
+        captionBottomConstraint?.isActive = true
+        UIView.animate(withDuration: 0.2) { self.view.layoutIfNeeded() }
+    }
+
+    func textView(_ textView: UITextView, shouldChangeTextIn range: NSRange, replacementText text: String) -> Bool {
+        if text == "\n" {
+            textView.resignFirstResponder()
+            return false
+        }
+        let current = textView.text ?? ""
+        guard let r = Range(range, in: current) else { return true }
+        let proposed = current.replacingCharacters(in: r, with: text)
+        return proposed == Caption.clampWhileTyping(proposed)
+    }
+
+    func textViewDidEndEditing(_ textView: UITextView) {
+        captionBottomConstraint?.isActive = false
+        captionCentreConstraint?.isActive = true
+        layoutCaption()
+        // No text, no strip.
+        captionStrip.isHidden = Caption.normalize(textView.text ?? "") == nil
+        UIView.animate(withDuration: 0.2) { self.view.layoutIfNeeded() }
     }
 }
 

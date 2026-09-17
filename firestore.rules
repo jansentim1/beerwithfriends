@@ -93,7 +93,12 @@ service cloud.firestore {
       allow read: if signedIn() && (resource.data.ownerUid == me()
         || isFriendOf(resource.data.ownerUid));
       allow create: if signedIn()
-        && request.resource.data.keys().hasOnly(['ownerUid','ownerName','createdAt','expiresAt','hasPhoto','photoPath','cheersCount','place','placeCoordinate','drink'])
+        && request.resource.data.keys().hasOnly(['ownerUid','ownerName','createdAt','expiresAt','hasPhoto','photoPath','cheersCount','place','placeCoordinate','drink','caption'])
+        // Optional caption, drawn onto the photo and kept as text for VoiceOver.
+        && (!('caption' in request.resource.data)
+          || (request.resource.data.caption is string
+            && request.resource.data.caption.size() >= 1
+            && request.resource.data.caption.size() <= 80))
         // Optional opt-in place name (bar or city).
         && (!('place' in request.resource.data)
           || (request.resource.data.place is string

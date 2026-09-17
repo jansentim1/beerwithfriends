@@ -126,6 +126,15 @@ describe("firestore rules: beers", () => {
     await assertFails(setDoc(doc(me, "beers/bp5"), { ...validBeer("owner"), lat: 52.3 }));
   });
 
+  it("beer create: optional caption is a short string", async () => {
+    const me = fs("owner");
+    await assertSucceeds(setDoc(doc(me, "beers/bc1"), { ...validBeer("owner"), caption: "eindelijk vrijdag" }));
+    await assertSucceeds(setDoc(doc(me, "beers/bc2"), { ...validBeer("owner"), caption: "x".repeat(80) }));
+    await assertFails(setDoc(doc(me, "beers/bc3"), { ...validBeer("owner"), caption: "x".repeat(81) }));
+    await assertFails(setDoc(doc(me, "beers/bc4"), { ...validBeer("owner"), caption: "" }));
+    await assertFails(setDoc(doc(me, "beers/bc5"), { ...validBeer("owner"), caption: 42 }));
+  });
+
   it("beer create rejects immortal or malformed lifetimes", async () => {
     const me = fs("owner");
     // expiresAt beyond the 25h cap

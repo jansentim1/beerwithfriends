@@ -33,16 +33,21 @@ public struct BeerLog: Codable, Equatable, Identifiable, Sendable {
     public var cheersBy: [String: String]
     /// Who quick-replied, by uid → the name to show. Mirrors `replies`.
     public var replyNames: [String: String]
+    /// The caption drawn onto the photo. Stored as text as well so VoiceOver
+    /// can read it — the pixels alone would make a captioned photo unreadable.
+    /// Deliberately NOT shown in the feed or the push (Tim, 2026-09-17: the
+    /// caption is a surprise inside the photo).
+    public var caption: String?
     public init(id: String, ownerUid: String, ownerName: String, createdAt: Date,
                 expiresAt: Date, hasPhoto: Bool, cheersCount: Int = 0, place: String? = nil,
                 replies: [String: ReplyKind] = [:], drink: DrinkKind = .pils,
                 placeCoordinate: Coordinate? = nil, cheersBy: [String: String] = [:],
-                replyNames: [String: String] = [:]) {
+                replyNames: [String: String] = [:], caption: String? = nil) {
         self.id = id; self.ownerUid = ownerUid; self.ownerName = ownerName
         self.createdAt = createdAt; self.expiresAt = expiresAt
         self.hasPhoto = hasPhoto; self.cheersCount = cheersCount; self.place = place
         self.replies = replies; self.drink = drink; self.placeCoordinate = placeCoordinate
-        self.cheersBy = cheersBy; self.replyNames = replyNames
+        self.cheersBy = cheersBy; self.replyNames = replyNames; self.caption = caption
     }
 
     /// Has this drink run out for a viewer who first saw it at `seenAt`?

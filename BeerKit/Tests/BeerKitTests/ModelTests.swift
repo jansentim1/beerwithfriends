@@ -92,6 +92,37 @@ import Testing
         #expect(beer.reactions.cheersCount == 0)
     }
 
+    @Test func captionNormalizes() {
+        #expect(Caption.normalize("  eindelijk vrijdag 🍻  ") == "eindelijk vrijdag 🍻")
+        #expect(Caption.normalize("   \n  \n ") == nil)
+        #expect(Caption.normalize("") == nil)
+        // Blank lines top and bottom go; a break in the middle is kept.
+        #expect(Caption.normalize("\na\n\nb\n") == "a\n\nb")
+        // Caps: three lines, eighty characters.
+        #expect(Caption.normalize("a\nb\nc\nd") == "a\nb\nc")
+        #expect(Caption.normalize(String(repeating: "x", count: 100))?.count == 80)
+        #expect(Caption.clampWhileTyping("a\nb\nc\nd") == "a\nb\nc")
+        #expect(Caption.clampWhileTyping(String(repeating: "x", count: 90)).count == 80)
+    }
+
+    @Test func captionLayoutStaysOnThePhoto() {
+        let size = CGSize(width: 810, height: 1080)
+        // Dragged off the top: the strip is pushed back fully onto the photo.
+        let high = CaptionLayout(lineCount: 1, centre: -0.5)
+        #expect(high.stripTop >= 0)
+        let low = CaptionLayout(lineCount: 3, centre: 1.5)
+        #expect(low.stripTop + low.stripHeight <= 1.0001)
+        // More lines, taller strip; the type size does not change.
+        let one = CaptionLayout(lineCount: 1, centre: 0.5)
+        let three = CaptionLayout(lineCount: 3, centre: 0.5)
+        #expect(three.stripHeight > one.stripHeight)
+        #expect(three.fontSize(in: size) == one.fontSize(in: size))
+        // Full width, and the type scales with the photo.
+        #expect(one.stripRect(in: size).width == size.width)
+        #expect(one.fontSize(in: size) > one.fontSize(in: CGSize(width: 405, height: 540)))
+        #expect(CaptionLayout.stripOpacity == 0.5)
+    }
+
     @Test func displayNameNormalizes() {
         #expect(DisplayName.normalize("  Timmy   J\n") == "Timmy J")
         #expect(DisplayName.normalize("   ") == nil)

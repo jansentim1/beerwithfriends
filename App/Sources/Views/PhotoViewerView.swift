@@ -12,6 +12,8 @@ import UIKit
 struct PhotoViewerView: View {
     let url: URL
     let ownerName: String
+    /// Drawn into the photo already; carried as text so VoiceOver can read it.
+    var caption: String?
     let beerId: String
     let screenshotReporter: @Sendable (String) async -> Void
     let onDismiss: () -> Void
@@ -49,7 +51,9 @@ struct PhotoViewerView: View {
                 case .image(let image):
                     ScreenshotShield(image: image)
                         .ignoresSafeArea()
-                        .accessibilityLabel("Photo from \(ownerName)")
+                        .accessibilityLabel(
+                            caption.map { "Photo from \(ownerName): \($0)" } ?? "Photo from \(ownerName)"
+                        )
                 case .failed:
                     VStack(spacing: 12) {
                         Image(systemName: "photo.badge.exclamationmark")
