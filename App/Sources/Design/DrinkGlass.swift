@@ -1,22 +1,3 @@
-        case .pint:
-            // Nonic: a straight-sided pint with the ledge a hand's width down.
-            // Drawn with straight edges — a curved bulge reads as a bubble
-            // stuck to the glass at 44 pt, not as the step it is.
-            path.move(to: p(0.14, 0.03, rect))
-            path.addLine(to: p(0.86, 0.03, rect))
-            path.addLine(to: p(0.86, 0.22, rect))
-            path.addLine(to: p(0.93, 0.27, rect))   // out to the ledge
-            path.addLine(to: p(0.91, 0.36, rect))
-            path.addLine(to: p(0.82, 0.40, rect))   // and back in under it
-            path.addLine(to: p(0.78, 0.90, rect))
-            path.addQuadCurve(to: p(0.70, 0.96, rect), control: p(0.77, 0.96, rect))
-            path.addLine(to: p(0.30, 0.96, rect))
-            path.addQuadCurve(to: p(0.22, 0.90, rect), control: p(0.23, 0.96, rect))
-            path.addLine(to: p(0.18, 0.40, rect))
-            path.addLine(to: p(0.09, 0.36, rect))
-            path.addLine(to: p(0.07, 0.27, rect))
-            path.addLine(to: p(0.14, 0.22, rect))
-            path.closeSubpath()
 import BeerKit
 import SwiftUI
 import UIKit
@@ -518,19 +499,22 @@ private enum DrinkGlassGeometry {
         case .pint:
             // Nonic: straight sides with the bulge a hand's width down — the
             // British pint, and nothing like the tapered pils beside it.
-            path.move(to: p(0.16, 0.03, rect))
-            path.addLine(to: p(0.84, 0.03, rect))
+            // Straight edges: a curved bulge reads as a bubble stuck to the
+            // glass at 44 pt rather than as the step a nonic actually has.
+            path.move(to: p(0.14, 0.03, rect))
+            path.addLine(to: p(0.86, 0.03, rect))
             path.addLine(to: p(0.86, 0.22, rect))
-            // The nonic's ledge: out to the widest point, then a step back in.
-            path.addQuadCurve(to: p(0.97, 0.30, rect), control: p(0.97, 0.24, rect))
-            path.addQuadCurve(to: p(0.84, 0.40, rect), control: p(0.94, 0.39, rect))
-            path.addLine(to: p(0.80, 0.90, rect))
-            path.addQuadCurve(to: p(0.71, 0.96, rect), control: p(0.79, 0.96, rect))
-            path.addLine(to: p(0.29, 0.96, rect))
-            path.addQuadCurve(to: p(0.20, 0.90, rect), control: p(0.21, 0.96, rect))
-            path.addLine(to: p(0.16, 0.40, rect))
-            path.addQuadCurve(to: p(0.03, 0.30, rect), control: p(0.06, 0.39, rect))
-            path.addQuadCurve(to: p(0.14, 0.22, rect), control: p(0.03, 0.24, rect))
+            path.addLine(to: p(0.93, 0.27, rect))
+            path.addLine(to: p(0.91, 0.36, rect))
+            path.addLine(to: p(0.82, 0.40, rect))
+            path.addLine(to: p(0.78, 0.90, rect))
+            path.addQuadCurve(to: p(0.70, 0.96, rect), control: p(0.77, 0.96, rect))
+            path.addLine(to: p(0.30, 0.96, rect))
+            path.addQuadCurve(to: p(0.22, 0.90, rect), control: p(0.23, 0.96, rect))
+            path.addLine(to: p(0.18, 0.40, rect))
+            path.addLine(to: p(0.09, 0.36, rect))
+            path.addLine(to: p(0.07, 0.27, rect))
+            path.addLine(to: p(0.14, 0.22, rect))
             path.closeSubpath()
         case .stein:
             // The mug: a straight, heavy barrel taking the left two-thirds of
@@ -543,8 +527,10 @@ private enum DrinkGlassGeometry {
             path.addQuadCurve(to: p(0.08, 0.88, rect), control: p(0.08, 0.95, rect))
             path.closeSubpath()
         case .stout:
-            // Tulip pint: a wide rim easing into a gently waisted body. Keep
-            // the waist shallow — deeper and it reads as a vase, not a beer.
+            // Tulip pint: waisted low, flaring to the rim. The shape says stout
+            // before the colour does.
+            // A wide rim easing into a gently waisted body. Keep the waist
+            // shallow: deeper and it reads as a vase rather than a beer.
             path.move(to: p(0.08, 0.03, rect))
             path.addLine(to: p(0.92, 0.03, rect))
             path.addCurve(to: p(0.76, 0.46, rect),
