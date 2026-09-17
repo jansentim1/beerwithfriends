@@ -41,7 +41,7 @@ final class ScreenshotTests: XCTestCase {
             // The callable, the temp file and the cover animation take a few
             // seconds on the CI simulator: wait for the viewer's photo element.
             let viewerPhoto = app.descendants(matching: .any)["Photo from joost"]
-            XCTAssertTrue(viewerPhoto.waitForExistence(timeout: 30), "photo viewer did not open")
+            XCTAssertTrue(viewerPhoto.waitForExistence(timeout: 60), "photo viewer did not open")
             sleep(1)
             // The photo element must sit inside the screen: a scaled secure canvas
             // would report a frame wider than the screen (the "zoomed in" report).

@@ -58,6 +58,18 @@ jobs:
         run: |
           node tools/rig/seed.mjs
 
+      # The first callable of a run pays the functions runtime's cold start,
+      # which can outlast the UI test's wait. Pay it here instead.
+      - name: Warm the functions emulator
+        run: |
+          for i in 1 2 3; do
+            curl -s -m 60 -o /dev/null -X POST \
+              -H 'Content-Type: application/json' -d '{"data":{}}' \
+              http://127.0.0.1:5001/demo-pubdates/europe-west4/getPhotoOnce && break
+            sleep 5
+          done
+          echo "functions warm"
+
       - name: Pick a simulator
         id: sim
         run: |
