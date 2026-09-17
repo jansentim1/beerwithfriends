@@ -55,6 +55,8 @@ struct HomeView: View {
     /// Anchor for the feed's minute tick. Stable across re-renders, unlike a
     /// fresh `.now` in the body, so the schedule never restarts.
     @State private var glassClock = Date()
+    /// Drives the seen clock from outside the render pass (see `tickSeenClock`).
+    private let seenClock = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
     /// True for 1.5 s after a locked tap: the footnote goes amber so the reason
     /// the tap did nothing is where the eye already is.
     @State private var lockedNudge = false
@@ -93,9 +95,6 @@ struct HomeView: View {
                 // runs, the same tick goes to 1 s so "next in Ns" counts down —
                 // and drops back to 60 s the moment it is over.
                 TimelineView(.periodic(from: glassClock, by: isLocked ? 1 : 60)) { context in
-                    // Same tick, two jobs: retire rows whose two hours are up,
-                    // and start the clock on rows that are on screen now.
-                    let _ = markSeenAndRefresh(at: context.date)
                     List {
                         Section {
                             heroRow(now: context.date)
@@ -156,6 +155,9 @@ struct HomeView: View {
         .task(id: feedEpoch) {
             await viewModel.start()
         }
+        // Rows on screen start their two hours; rows whose two hours are up go.
+        .onReceive(seenClock) { _ in tickSeenClock() }
+        .onChange(of: viewModel.feed.count) { _, _ in viewModel.markVisibleAsSeen() }
         // Which silence to show. Refreshed with the feed (pull, foreground), so
         // adding a mate on the Mates tab flips the empty state when you come back.
         .task(id: feedEpoch) {
@@ -350,14 +352,13 @@ struct HomeView: View {
         }
     }
 
-    /// The seen clock, driven off the same minute tick as the draining glasses.
-    /// Marking happens after the refresh, so a row gets its full two hours from
-    /// the first tick it is actually on screen for.
-    @discardableResult
-    private func markSeenAndRefresh(at date: Date) -> Bool {
+    /// The seen clock. Deliberately NOT driven from inside the `TimelineView`
+    /// body: touching the view model while a body is being evaluated re-enters
+    /// the render loop, which hangs the accessibility snapshot (and the UI
+    /// tests with it). A timer outside the body is an event, not a render.
+    private func tickSeenClock() {
         viewModel.refreshVisibility()
         viewModel.markVisibleAsSeen()
-        return true
     }
 
     // MARK: - Reactions
