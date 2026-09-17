@@ -8,7 +8,7 @@ const { initializeApp } = require("firebase-admin/app");
 const { getFirestore, Timestamp } = require("firebase-admin/firestore");
 initializeApp({ projectId: "beerwithme-prod" });
 const db = getFirestore();
-const LIFETIME_MS = 3600_000;
+const LIFETIME_MS = 24 * 3600_000;
 const write = process.argv.includes("--yes");
 const snap = await db.collection("beers").get();
 let clamped = 0;

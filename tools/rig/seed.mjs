@@ -51,7 +51,7 @@ const mk = async (id, owner, ownerName, drink, minutesAgo, extra) => {
   await db.recursiveDelete(db.doc(`beers/${id}`));
   await db.doc(`beers/${id}`).set({
     ownerUid: owner, ownerName, drink, createdAt: Timestamp.fromDate(created),
-    expiresAt: Timestamp.fromDate(new Date(created.getTime() + 3600_000)),
+    expiresAt: Timestamp.fromDate(new Date(created.getTime() + 24 * 3600_000)),
     hasPhoto: false, photoPath: "", cheersCount: 0, ...extra,
   });
 };

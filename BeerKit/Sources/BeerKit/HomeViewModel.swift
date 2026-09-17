@@ -14,6 +14,9 @@ public final class HomeViewModel: ObservableObject {
 
     private let service: any BeerServicing
     private let placeProvider: (any PlaceProviding)?
+    /// When each drink first reached this person's feed; the feed is filtered
+    /// against it, so an unseen drink waits however long it has to.
+    private let seenStore: any SeenStoring
     private let now: () -> Date
     private let retryDelay: (Int) -> Duration
     private var observation: Task<Void, Never>?
@@ -29,11 +32,13 @@ public final class HomeViewModel: ObservableObject {
     public init(
         service: any BeerServicing,
         placeProvider: (any PlaceProviding)? = nil,
+        seenStore: any SeenStoring = InMemorySeenStore(),
         now: @escaping () -> Date = { Date() },
         retryDelay: @escaping (Int) -> Duration = { attempt in .seconds(min(2 << attempt, 30)) }
     ) {
         self.service = service
         self.placeProvider = placeProvider
+        self.seenStore = seenStore
         self.now = now
         self.retryDelay = retryDelay
     }
@@ -95,9 +100,36 @@ public final class HomeViewModel: ObservableObject {
         for beer in feed where pendingIds.contains(beer.id) && !present.contains(beer.id) {
             merged.append(beer)
         }
-        // One row per person (their newest), alive ones only, newest first.
-        feed = BeerLog.latestPerOwner(merged, now: now())
+        latest = merged
+        seenStore.forget(idsNotIn: Set(merged.map(\.id)))
+        rebuild()
+    }
+
+    /// The last snapshot, unfiltered: the feed is derived from it and from the
+    /// seen clock, and the clock moves without a new snapshot arriving.
+    private var latest: [BeerLog] = []
+
+    /// One row per person (their newest), the ones still live for this viewer,
+    /// newest first. Call after a snapshot or after the seen clock moves.
+    private func rebuild() {
+        let seen = seenStore.seenAt(ids: latest.map(\.id))
+        feed = BeerLog.latestPerOwner(latest, now: now(), seenAt: seen)
         loadCheersState(for: feed.map(\.id))
+    }
+
+    /// Everything on screen now counts as seen, starting its two hours. Called
+    /// from the view on every tick, so a row you scrolled past while the app was
+    /// open is seen — which is what "seen" means here.
+    public func markVisibleAsSeen() {
+        let ids = feed.map(\.id)
+        guard !ids.isEmpty else { return }
+        seenStore.markSeen(ids: ids, at: now())
+    }
+
+    /// Re-filters against the clock: drops rows whose two hours just ran out.
+    public func refreshVisibility() {
+        guard !latest.isEmpty else { return }
+        rebuild()
     }
 
     private func loadCheersState(for ids: [String]) {

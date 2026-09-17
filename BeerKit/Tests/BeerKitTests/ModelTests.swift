@@ -11,10 +11,41 @@ import Testing
         let data = try JSONEncoder().encode(log)
         #expect(try JSONDecoder().decode(BeerLog.self, from: data) == log)
     }
-    @Test func expiryIsOneHour() {
+    @Test func expiryIsTheOneDayHardCap() {
         let created = Date(timeIntervalSince1970: 0)
-        #expect(BeerLog.expiry(from: created) == created.addingTimeInterval(3600))
-        #expect(BeerLog.lifetime == 3600)
+        #expect(BeerLog.expiry(from: created) == created.addingTimeInterval(24 * 3600))
+        #expect(BeerLog.lifetime == 24 * 3600)
+        #expect(BeerLog.seenLifetime == 2 * 3600)
+    }
+
+    @Test func anUnseenDrinkStaysAndASeenOneFadesAfterTwoHours() {
+        let t0 = Date(timeIntervalSince1970: 0)
+        let beer = BeerLog(id: "b", ownerUid: "u", ownerName: "u", createdAt: t0,
+                           expiresAt: BeerLog.expiry(from: t0), hasPhoto: false)
+        // Never seen: still there twenty hours on.
+        #expect(!beer.hasFaded(seenAt: nil, now: t0.addingTimeInterval(20 * 3600)))
+        // Seen at t0: gone at two hours, there at one.
+        #expect(!beer.hasFaded(seenAt: t0, now: t0.addingTimeInterval(3600)))
+        #expect(beer.hasFaded(seenAt: t0, now: t0.addingTimeInterval(2 * 3600)))
+        // Seen late still gets its full two hours, but never past the hard cap.
+        let late = t0.addingTimeInterval(23 * 3600)
+        #expect(!beer.hasFaded(seenAt: late, now: late.addingTimeInterval(1800)))
+        #expect(beer.hasFaded(seenAt: late, now: t0.addingTimeInterval(24 * 3600)))
+    }
+
+    @Test func latestPerOwnerHonoursTheSeenClock() {
+        let t0 = Date(timeIntervalSince1970: 0)
+        func b(_ id: String, _ owner: String, at s: TimeInterval) -> BeerLog {
+            BeerLog(id: id, ownerUid: owner, ownerName: owner,
+                    createdAt: t0.addingTimeInterval(s),
+                    expiresAt: t0.addingTimeInterval(s + 24 * 3600), hasPhoto: false)
+        }
+        let now = t0.addingTimeInterval(5 * 3600)
+        let logs = [b("seen", "a", at: 0), b("unseen", "b", at: 60)]
+        // a's drink was seen three hours ago, b's never.
+        let shown = BeerLog.latestPerOwner(logs, now: now,
+                                           seenAt: ["seen": t0.addingTimeInterval(2 * 3600)])
+        #expect(shown.map(\.id) == ["unseen"])
     }
 
     @Test func latestPerOwnerKeepsOneLiveDrinkPerPerson() {

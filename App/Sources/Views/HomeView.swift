@@ -77,7 +77,8 @@ struct HomeView: View {
         // unless the user turned "Share where I'm drinking" on in Settings.
         _viewModel = StateObject(wrappedValue: HomeViewModel(
             service: beerService,
-            placeProvider: LocationPlaceProvider.shared
+            placeProvider: LocationPlaceProvider.shared,
+            seenStore: DefaultsSeenStore()
         ))
     }
 
@@ -92,6 +93,9 @@ struct HomeView: View {
                 // runs, the same tick goes to 1 s so "next in Ns" counts down —
                 // and drops back to 60 s the moment it is over.
                 TimelineView(.periodic(from: glassClock, by: isLocked ? 1 : 60)) { context in
+                    // Same tick, two jobs: retire rows whose two hours are up,
+                    // and start the clock on rows that are on screen now.
+                    let _ = markSeenAndRefresh(at: context.date)
                     List {
                         Section {
                             heroRow(now: context.date)
@@ -100,9 +104,9 @@ struct HomeView: View {
                                 .listRowBackground(Color.clear)
                         }
 
-                        // The listener's query is pinned to subscription time, so a
-                        // row that expires while the screen is open leaves on the
-                        // minute tick rather than on the next snapshot.
+                        // The view model already filtered against the seen clock
+                        // on this tick; the hard expiry is re-checked here so a
+                        // row cannot outlive it between ticks.
                         let rows = viewModel.feed.filter { $0.expiresAt > context.date }
                         if rows.isEmpty {
                             Section {
@@ -340,6 +344,16 @@ struct HomeView: View {
             try? await Task.sleep(for: .seconds(1.5))
             if lockedNudgeToken == token { lockedNudge = false }
         }
+    }
+
+    /// The seen clock, driven off the same minute tick as the draining glasses.
+    /// Marking happens after the refresh, so a row gets its full two hours from
+    /// the first tick it is actually on screen for.
+    @discardableResult
+    private func markSeenAndRefresh(at date: Date) -> Bool {
+        viewModel.refreshVisibility()
+        viewModel.markVisibleAsSeen()
+        return true
     }
 
     // MARK: - Reactions

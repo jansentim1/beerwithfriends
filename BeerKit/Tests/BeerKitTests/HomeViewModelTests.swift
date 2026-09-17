@@ -168,7 +168,7 @@ func waitForFeed(_ vm: HomeViewModel) async {
         let svc = FakeBeerService()
         let vm = HomeViewModel(service: svc, now: { Date(timeIntervalSince1970: 200_000) })
         let running = await startAndWaitForSubscription(vm, svc)
-        let expired = makeBeer("expired", createdAt: 190_000, owner: "u3")   // expires at 193_600 < now
+        let expired = makeBeer("expired", createdAt: 100_000, owner: "u3")   // expires a day later, still < now
         let older = makeBeer("older", createdAt: 197_000, owner: "u4")
         let newer = makeBeer("newer", createdAt: 199_000)
         // Same owner as `newer`, so it is superseded: one row per person.
@@ -418,3 +418,58 @@ final class FakePlaces: PlaceProviding, @unchecked Sendable {
         #expect(v == nil)
     }
 }
+
+@Suite struct SeenClockTests {
+    /// A row on screen starts its two hours; two hours later it leaves, without
+    /// any new snapshot arriving.
+    @Test @MainActor func seenRowsFadeOnTheNextRefresh() async {
+        let svc = FakeBeerService()
+        var clock = Date(timeIntervalSince1970: 1_000_000)
+        let store = InMemorySeenStore()
+        let vm = HomeViewModel(service: svc, seenStore: store, now: { clock })
+        let running = await startAndWaitForSubscription(vm, svc)
+
+        let mine = makeBeer("a", createdAt: 999_000, owner: "u2")
+        let theirs = makeBeer("b", createdAt: 999_500, owner: "u3")
+        svc.feedContinuation?.yield([mine, theirs])
+        await Task.yield(); await Task.yield()
+        #expect(vm.feed.count == 2)
+
+        // Only "b" is marked seen; "a" is never looked at.
+        store.markSeen(ids: ["b"], at: clock)
+        clock = clock.addingTimeInterval(2 * 3600 + 1)
+        vm.refreshVisibility()
+        #expect(vm.feed.map(\.id) == ["a"])
+        running.cancel(); await running.value
+    }
+
+    @Test @MainActor func markVisibleKeepsTheFirstTimeSeen() async {
+        let svc = FakeBeerService()
+        var clock = Date(timeIntervalSince1970: 1_000_000)
+        let store = InMemorySeenStore()
+        let vm = HomeViewModel(service: svc, seenStore: store, now: { clock })
+        let running = await startAndWaitForSubscription(vm, svc)
+        svc.feedContinuation?.yield([makeBeer("a", createdAt: 999_000, owner: "u2")])
+        await Task.yield(); await Task.yield()
+
+        vm.markVisibleAsSeen()
+        let first = store.all["a"]
+        clock = clock.addingTimeInterval(600)
+        vm.markVisibleAsSeen()          // still on screen ten minutes later
+        #expect(store.all["a"] == first)   // the clock did not restart
+        running.cancel(); await running.value
+    }
+
+    @Test @MainActor func forgettingDropsIdsThatLeftTheSnapshot() async {
+        let svc = FakeBeerService()
+        let clock = Date(timeIntervalSince1970: 1_000_000)
+        let store = InMemorySeenStore(["gone": clock])
+        let vm = HomeViewModel(service: svc, seenStore: store, now: { clock })
+        let running = await startAndWaitForSubscription(vm, svc)
+        svc.feedContinuation?.yield([makeBeer("a", createdAt: 999_000, owner: "u2")])
+        await Task.yield(); await Task.yield()
+        #expect(store.all["gone"] == nil)
+        running.cancel(); await running.value
+    }
+}
+

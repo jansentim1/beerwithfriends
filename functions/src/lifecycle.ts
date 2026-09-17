@@ -54,7 +54,7 @@ export async function cleanupExpiredCore(db: Firestore, deletePhoto: PhotoDelete
   // Data minimization (Task 5 review outcome): once every friend has used their
   // one view, getPhotoOnce stamps `allViewedAt`. After a 10-minute grace period
   // (so the last viewer's ~60s signed URL stays valid), delete the Storage
-  // object early — the beer doc itself lives on until the 1 h expiry, but
+  // object early — the beer doc itself lives on until its expiry, but
   // `hasPhoto` flips to false so clients stop offering the photo chip.
   const cutoff = Timestamp.fromDate(new Date(now.getTime() - EARLY_PHOTO_DELETE_MS));
   const fullyViewed = await db.collection("beers")
@@ -134,14 +134,20 @@ export async function changeUsernameCore(db: Firestore, uid: string, raw: string
 }
 
 export const DRINK_COOLDOWN_MS = 60_000;
-/** How long a drink stays in the feed and on the map (mirrors BeerLog.lifetime). */
-export const DRINK_LIFETIME_MS = 3600_000;
+/**
+ * The hard cap on a drink's life, mirroring `BeerLog.lifetime`: a day, after
+ * which the drink and its photo are deleted whether anyone saw them or not.
+ * How long a drink stays in a given person's FEED is a client-side clock (two
+ * hours from when they first saw it — `BeerLog.seenLifetime`); the server has
+ * no business knowing who has looked at what.
+ */
+export const DRINK_LIFETIME_MS = 24 * 3600_000;
 
 /**
  * One live drink per person (Tim, 2026-09-11: "only one update per person
  * should stay in the main overview, so it overwrites"): a surviving new drink
  * deletes the owner's older ones, photos included. And every drink lives at
- * most one hour — older clients still send a longer expiry, so it is clamped
+ * most a day — a client sending anything longer is clamped
  * here rather than rejected by the rules. Returns how many drinks were replaced.
  */
 export async function supersedeOlderDrinks(db: Firestore, deletePhoto: PhotoDeleter, beerId: string, ownerUid: string, createdAt: Date): Promise<number> {
@@ -211,7 +217,7 @@ export function normalizeDisplayName(raw: string): string | null {
 /**
  * Changes the nickname on the profile and on every group member doc that
  * mirrors it (users/{uid}/groups lists them). Drinks keep the name they were
- * logged with; they are gone within the hour anyway.
+ * logged with; they are gone within the day anyway.
  */
 export async function changeDisplayNameCore(db: Firestore, uid: string, raw: string): Promise<string> {
   const displayName = normalizeDisplayName(raw);

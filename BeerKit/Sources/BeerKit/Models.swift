@@ -45,6 +45,14 @@ public struct BeerLog: Codable, Equatable, Identifiable, Sendable {
         self.cheersBy = cheersBy; self.replyNames = replyNames
     }
 
+    /// Has this drink run out for a viewer who first saw it at `seenAt`?
+    /// Never seen (`nil`) means no: that is the whole point.
+    public func hasFaded(seenAt: Date?, now: Date) -> Bool {
+        if expiresAt <= now { return true }
+        guard let seenAt else { return false }
+        return now.timeIntervalSince(seenAt) >= Self.seenLifetime
+    }
+
     /// The reactions sheet's content: everyone who cheersed, then everyone who
     /// quick-replied, each sorted by name (the doc mirrors carry no order, and
     /// a drink lives an hour — recency adds nothing worth a read).
@@ -59,11 +67,17 @@ public struct BeerLog: Codable, Equatable, Identifiable, Sendable {
     /// How long a glass takes to empty (Tim: "beers are empty in 15 minutes").
     /// The row itself stays in the feed until `expiresAt` (1 h), glass empty.
     public static let drinkDuration: TimeInterval = 15 * 60
-    /// How long a drink stays in the feed and on the map: one hour (Tim and
-    /// Gijs, 2026-09-16: "laten we uurtje doen"; two hours left a glass standing
-    /// empty for 1:45). The server clamps anything longer and the hourly
-    /// cleanup deletes what has expired.
-    public static let lifetime: TimeInterval = 3600
+    /// Two clocks, because a drink nobody saw is not the same as a drink
+    /// everybody saw (Tim, 2026-09-17: "if you have seen them they go away in
+    /// two hours but ones you have never seen don't go away").
+    ///
+    /// `seenLifetime` is the one you feel: two hours after a drink first shows
+    /// up in YOUR feed it leaves YOUR feed. Until then it stays, however long
+    /// that takes — which is what makes it worth opening the app.
+    public static let seenLifetime: TimeInterval = 2 * 3600
+    /// The hard cap the server enforces, so nothing is ephemeral in name only:
+    /// every drink and its photo are deleted a day after logging, seen or not.
+    public static let lifetime: TimeInterval = 24 * 3600
     /// 1.0 when just poured, 0.0 fifteen minutes later.
     public func fillLevel(now: Date) -> Double {
         let elapsed = now.timeIntervalSince(createdAt)
@@ -74,12 +88,14 @@ public struct BeerLog: Codable, Equatable, Identifiable, Sendable {
     public static func expiry(from createdAt: Date) -> Date { createdAt.addingTimeInterval(lifetime) }
 
     /// What the feed and the map show: one drink per person, the newest, and
-    /// only while it is alive (Tim: "only one update per person should stay in
-    /// the main overview, so it overwrites"). Newest first. The server deletes
-    /// superseded drinks too; this keeps the screens right before it has.
-    public static func latestPerOwner(_ logs: [BeerLog], now: Date) -> [BeerLog] {
+    /// only while it is still live for this viewer (Tim: "only one update per
+    /// person should stay in the main overview, so it overwrites"). Newest
+    /// first. The server deletes superseded drinks too; this keeps the screens
+    /// right before it has.
+    public static func latestPerOwner(_ logs: [BeerLog], now: Date,
+                                      seenAt: [String: Date] = [:]) -> [BeerLog] {
         var newest: [String: BeerLog] = [:]
-        for log in logs where log.expiresAt > now {
+        for log in logs where !log.hasFaded(seenAt: seenAt[log.id], now: now) {
             if let current = newest[log.ownerUid], current.createdAt >= log.createdAt { continue }
             newest[log.ownerUid] = log
         }
