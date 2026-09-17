@@ -72,7 +72,11 @@ final class ScreenshotTests: XCTestCase {
         sleep(3) // map tiles + pin framing
         snap("08b-map-pins")
 
+        // The tab bar can swallow a tap while the map is still settling.
         app.tabBars.buttons["Groups"].tap()
+        if !app.staticTexts["De Kroeg"].waitForExistence(timeout: 8) {
+            app.tabBars.buttons["Groups"].tap()
+        }
         XCTAssertTrue(app.staticTexts["De Kroeg"].waitForExistence(timeout: 10), "groups missing")
         snap("08c-groups-populated")
         app.staticTexts["De Kroeg"].firstMatch.tap()

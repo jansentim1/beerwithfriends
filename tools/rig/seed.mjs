@@ -64,7 +64,10 @@ await mk("seed-wine", joost, "joost", "wine", 4, {
   replies: { [tim]: "onmyway" }, replyNames: { [tim]: "Tim" },
 });
 await mk("seed-pils", menno, "menno", "pils", 40, { place: "Amsterdam", placeCoordinate: new GeoPoint(52.373, 4.9), replies: { [tim]: "onmyway" } });
-await mk("seed-mine", tim, "tim", "special", 9, {});
+await mk("seed-mine", tim, "tim", "special", 9, {
+  cheersCount: 2, cheersBy: { [joost]: "Joost", [menno]: "Menno" },
+  replies: { [menno]: "jealous" }, replyNames: { [menno]: "Menno" },
+});
 
 const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Amsterdam", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
 const group = async (id, name, code, members, todayCount, totalCount) => {
