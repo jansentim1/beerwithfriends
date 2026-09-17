@@ -1,3 +1,22 @@
+        case .pint:
+            // Nonic: a straight-sided pint with the ledge a hand's width down.
+            // Drawn with straight edges — a curved bulge reads as a bubble
+            // stuck to the glass at 44 pt, not as the step it is.
+            path.move(to: p(0.14, 0.03, rect))
+            path.addLine(to: p(0.86, 0.03, rect))
+            path.addLine(to: p(0.86, 0.22, rect))
+            path.addLine(to: p(0.93, 0.27, rect))   // out to the ledge
+            path.addLine(to: p(0.91, 0.36, rect))
+            path.addLine(to: p(0.82, 0.40, rect))   // and back in under it
+            path.addLine(to: p(0.78, 0.90, rect))
+            path.addQuadCurve(to: p(0.70, 0.96, rect), control: p(0.77, 0.96, rect))
+            path.addLine(to: p(0.30, 0.96, rect))
+            path.addQuadCurve(to: p(0.22, 0.90, rect), control: p(0.23, 0.96, rect))
+            path.addLine(to: p(0.18, 0.40, rect))
+            path.addLine(to: p(0.09, 0.36, rect))
+            path.addLine(to: p(0.07, 0.27, rect))
+            path.addLine(to: p(0.14, 0.22, rect))
+            path.closeSubpath()
 import BeerKit
 import SwiftUI
 import UIKit
@@ -447,7 +466,7 @@ private enum DrinkGlassGeometry {
         case .pint: return 0.62
         case .stein: return 0.78          // the handle rides outside the body
         case .special: return 0.66
-        case .stout: return 0.66
+        case .stout: return 0.62
         case .wine: return 0.60
         case .bubbles: return 0.42
         case .cocktail: return 0.64
@@ -524,20 +543,19 @@ private enum DrinkGlassGeometry {
             path.addQuadCurve(to: p(0.08, 0.88, rect), control: p(0.08, 0.95, rect))
             path.closeSubpath()
         case .stout:
-            // Tulip pint: waisted low, flaring to the rim. The shape says stout
-            // before the colour does.
-            path.move(to: p(0.04, 0.03, rect))
-            path.addLine(to: p(0.96, 0.03, rect))
-            // A hard flare down to a narrow waist, then out again to the base.
-            path.addCurve(to: p(0.70, 0.56, rect),
-                          control1: p(0.93, 0.26, rect), control2: p(0.70, 0.34, rect))
-            path.addLine(to: p(0.76, 0.90, rect))
-            path.addQuadCurve(to: p(0.68, 0.96, rect), control: p(0.75, 0.96, rect))
-            path.addLine(to: p(0.32, 0.96, rect))
-            path.addQuadCurve(to: p(0.24, 0.90, rect), control: p(0.25, 0.96, rect))
-            path.addLine(to: p(0.30, 0.56, rect))
-            path.addCurve(to: p(0.04, 0.03, rect),
-                          control1: p(0.30, 0.34, rect), control2: p(0.07, 0.26, rect))
+            // Tulip pint: a wide rim easing into a gently waisted body. Keep
+            // the waist shallow — deeper and it reads as a vase, not a beer.
+            path.move(to: p(0.08, 0.03, rect))
+            path.addLine(to: p(0.92, 0.03, rect))
+            path.addCurve(to: p(0.76, 0.46, rect),
+                          control1: p(0.90, 0.20, rect), control2: p(0.77, 0.32, rect))
+            path.addLine(to: p(0.79, 0.90, rect))
+            path.addQuadCurve(to: p(0.71, 0.96, rect), control: p(0.78, 0.96, rect))
+            path.addLine(to: p(0.29, 0.96, rect))
+            path.addQuadCurve(to: p(0.21, 0.90, rect), control: p(0.22, 0.96, rect))
+            path.addLine(to: p(0.24, 0.46, rect))
+            path.addCurve(to: p(0.08, 0.03, rect),
+                          control1: p(0.23, 0.32, rect), control2: p(0.10, 0.20, rect))
             path.closeSubpath()
         case .special:
             // Chalice: a wide, shallow bowl on a short stem. Deliberately NOT a
