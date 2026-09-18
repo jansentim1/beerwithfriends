@@ -255,7 +255,7 @@ final class AppState: ObservableObject {
                 case .cheers:
                     try? await service.cheers(beerId: item.beerId)
                 case .reply(let kind):
-                    try? await service.reply(beerId: item.beerId, kind: kind)
+                    try? await service.reply(beerId: item.beerId, reaction: kind.emoji)
                 }
             }
         }

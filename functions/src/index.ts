@@ -8,7 +8,7 @@ import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
 import { getMessaging } from "firebase-admin/messaging";
 import { getPhotoOnceCore, PhotoError, PhotoErrorCode } from "./photo";
-import { fanoutBeerCreated, notifyCheers, notifyReply, Pusher, ReplyKind } from "./pushes";
+import { fanoutBeerCreated, notifyCheers, notifyReply, Pusher, reactionValue } from "./pushes";
 import { sendApns, deadTokens } from "./apns";
 import { loadApnsKey } from "./apnsKey";
 import { createGroupCore, joinGroupCore, leaveGroupCore, countDrinkForGroups, GroupError } from "./groups";
@@ -177,15 +177,15 @@ export const leaveGroup = onCall(async (req) => {
 
 export const onReplyCreated = onDocumentCreated("beers/{beerId}/replies/{uid}", async (event) => {
   const db = getFirestore();
-  const kind = event.data?.get("kind") as ReplyKind | undefined;
-  if (!kind) return;
+  const reaction = reactionValue(event.data?.data() ?? {});
+  if (!reaction) return;
   const beerRef = db.doc(`beers/${event.params.beerId}`);
-  // Mirror into the beer doc (admin-only field) so the feed shows reply pills.
-  await beerRef.update({ [`replies.${event.params.uid}`]: kind });
+  // Mirror into the beer doc (admin-only field) so the feed shows the pills.
+  await beerRef.update({ [`replies.${event.params.uid}`]: reaction });
   await mirrorReplyName(db, event.params.beerId, event.params.uid)
     .catch((e) => console.error("reply name mirror failed", e));
   const beer = await beerRef.get();
-  if (beer.exists) await notifyReply(db, push, beer.get("ownerUid"), event.params.uid, kind);
+  if (beer.exists) await notifyReply(db, push, beer.get("ownerUid"), event.params.uid, reaction);
 });
 
 const storagePhotoDeleter: PhotoDeleter = async (path) => {

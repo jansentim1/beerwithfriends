@@ -44,11 +44,11 @@ final class FakeBeerService: BeerServicing, @unchecked Sendable {
         if let cheersError { throw cheersError }
         cheersed.append(beerId)
     }
-    var replies: [(String, ReplyKind)] = []
+    var replies: [(String, String)] = []
     var replyError: Error?
-    func reply(beerId: String, kind: ReplyKind) async throws {
+    func reply(beerId: String, reaction: String) async throws {
         if let replyError { throw replyError }
-        replies.append((beerId, kind))
+        replies.append((beerId, reaction))
     }
     func fetchPhotoOnce(beerId: String) async throws -> URL { try photoResult.get() }
     func viewedBeerIds() async throws -> Set<String> {
@@ -301,11 +301,11 @@ final class FakePlaces: PlaceProviding, @unchecked Sendable {
         let running = await startAndWaitForSubscription(vm, svc)
         svc.feedContinuation?.yield([makeBeer("b1", createdAt: 400)])
         await waitForFeed(vm)
-        await vm.reply(vm.feed[0], kind: .onMyWay, myUid: "me")
-        await vm.reply(vm.feed[0], kind: .jealous, myUid: "me")     // second reply ignored
-        #expect(vm.feed[0].replies["me"] == .onMyWay)
-        #expect(svc.replies.map(\.1) == [.onMyWay])
-        #expect(vm.feed[0].replyCount(.onMyWay) == 1)
+        await vm.reply(vm.feed[0], reaction: "🔥", myUid: "me")
+        await vm.reply(vm.feed[0], reaction: "lekker", myUid: "me")  // second reaction ignored
+        #expect(vm.feed[0].replies["me"] == "🔥")
+        #expect(svc.replies.map(\.1) == ["🔥"])
+        #expect(vm.feed[0].reactionTallies.map(\.reaction) == ["🔥"])
         running.cancel(); await running.value
     }
     @Test @MainActor func replyFailureRollsBack() async {
@@ -315,7 +315,7 @@ final class FakePlaces: PlaceProviding, @unchecked Sendable {
         let running = await startAndWaitForSubscription(vm, svc)
         svc.feedContinuation?.yield([makeBeer("b1", createdAt: 400)])
         await waitForFeed(vm)
-        await vm.reply(vm.feed[0], kind: .jealous, myUid: "me")
+        await vm.reply(vm.feed[0], reaction: "😩", myUid: "me")
         #expect(vm.feed[0].replies.isEmpty)
         #expect(vm.errorMessage != nil)
         running.cancel(); await running.value

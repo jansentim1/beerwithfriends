@@ -22,8 +22,10 @@ public struct BeerLog: Codable, Equatable, Identifiable, Sendable {
     public var cheersCount: Int
     /// Optional, opt-in: the bar or city the beer was logged at (never coordinates).
     public var place: String?
-    /// Quick replies by uid, maintained server-side from `beers/{id}/replies/{uid}`.
-    public var replies: [String: ReplyKind]
+    /// Reactions by uid — an emoji or a few words — maintained server-side from
+    /// `beers/{id}/replies/{uid}`. Free-form since 2026-09-18; older docs carry
+    /// one of the two fixed kinds and decode to its emoji.
+    public var replies: [String: String]
     /// What is in the glass. Old docs without the field decode as `.pils`.
     public var drink: DrinkKind
     /// The bar's or city's coordinate (never the device fix); only with `place`.
@@ -40,7 +42,7 @@ public struct BeerLog: Codable, Equatable, Identifiable, Sendable {
     public var caption: String?
     public init(id: String, ownerUid: String, ownerName: String, createdAt: Date,
                 expiresAt: Date, hasPhoto: Bool, cheersCount: Int = 0, place: String? = nil,
-                replies: [String: ReplyKind] = [:], drink: DrinkKind = .pils,
+                replies: [String: String] = [:], drink: DrinkKind = .pils,
                 placeCoordinate: Coordinate? = nil, cheersBy: [String: String] = [:],
                 replyNames: [String: String] = [:], caption: String? = nil) {
         self.id = id; self.ownerUid = ownerUid; self.ownerName = ownerName
@@ -88,7 +90,13 @@ public struct BeerLog: Codable, Equatable, Identifiable, Sendable {
         let elapsed = now.timeIntervalSince(createdAt)
         return min(1, max(0, 1 - elapsed / Self.drinkDuration))
     }
-    public func replyCount(_ kind: ReplyKind) -> Int { replies.values.filter { $0 == kind }.count }
+    /// Each distinct reaction with its tally, most-used first, then
+    /// alphabetically so the row never reshuffles between two equal counts.
+    public var reactionTallies: [(reaction: String, count: Int)] {
+        Dictionary(grouping: replies.values, by: { $0 })
+            .map { (reaction: $0.key, count: $0.value.count) }
+            .sorted { ($1.count, $0.reaction) < ($0.count, $1.reaction) }
+    }
     public static let placeMaxLength = 60
     public static func expiry(from createdAt: Date) -> Date { createdAt.addingTimeInterval(lifetime) }
 
@@ -119,8 +127,10 @@ public struct FriendRequest: Codable, Equatable, Identifiable, Sendable {
     }
 }
 
-/// One-tap reactions to a mate's beer besides cheers. Raw values are the wire format
-/// (Firestore `kind`, rules-pinned) and the notification action identifiers.
+/// The two reactions a PUSH NOTIFICATION can offer, since its buttons are fixed
+/// at registration and cannot be an emoji keyboard. In the app a reaction is any
+/// emoji (see `Emoji`); these two also appear among the presets. Raw values are
+/// the notification action identifiers and the legacy Firestore `kind`.
 public enum ReplyKind: String, Codable, CaseIterable, Sendable {
     case onMyWay = "onmyway"
     case jealous = "jealous"
@@ -202,9 +212,9 @@ public enum DrinkKind: String, Codable, CaseIterable, Sendable {
 public struct Reactor: Equatable, Identifiable, Sendable {
     public var id: String          // uid
     public var name: String
-    /// nil for a cheers, the kind for a quick reply.
-    public var reply: ReplyKind?
-    public init(id: String, name: String, reply: ReplyKind?) {
+    /// nil for a cheers, the emoji for a reaction.
+    public var reply: String?
+    public init(id: String, name: String, reply: String?) {
         self.id = id; self.name = name; self.reply = reply
     }
     /// Case-insensitive name, then uid so the order never wobbles between reads.

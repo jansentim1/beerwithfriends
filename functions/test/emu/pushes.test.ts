@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Timestamp } from "firebase-admin/firestore";
 import { initTestDb, seedUser, seedFriends, clearDb } from "./helpers";
-import { fanoutBeerCreated, notifyCheers, notifyReply, Pusher, PushTarget } from "../../src/pushes";
+import { fanoutBeerCreated, notifyCheers, notifyReply, reactionValue, Pusher, PushTarget } from "../../src/pushes";
 
 const db = initTestDb();
 type Sent = { tokens: string[]; targets: PushTarget[]; title: string; body: string };
@@ -61,14 +61,30 @@ describe("notifyCheers", () => {
 });
 
 describe("notifyReply", () => {
-  it("pushes the reply copy to the beer owner", async () => {
-    await notifyReply(db, push, "owner", "friend", "onmyway");
+  it("keeps the hand-written copy for the two notification-button reactions", async () => {
+    await notifyReply(db, push, "owner", "friend", "🏃");
     expect(sent).toHaveLength(1);
     expect(sent[0].tokens).toEqual(["tok-owner"]);
     expect(sent[0].title).toBe("joost is on the way 🏃");
   });
-  it("ignores unknown kinds", async () => {
-    await notifyReply(db, push, "owner", "friend", "wave" as never);
+  it("names any other reaction, emoji or words", async () => {
+    await notifyReply(db, push, "owner", "friend", "🔥");
+    await notifyReply(db, push, "owner", "friend", "kom janne");
+    expect(sent.map((s) => s.title)).toEqual(["joost reacted 🔥", "joost reacted kom janne"]);
+  });
+  it("says nothing when the owner has no device", async () => {
+    await notifyReply(db, push, "nobody", "friend", "🔥");
     expect(sent).toHaveLength(0);
+  });
+});
+
+describe("reactionValue", () => {
+  it("prefers the reaction, falls back to a legacy kind, else nothing", () => {
+    expect(reactionValue({ reaction: "🔥" })).toBe("🔥");
+    expect(reactionValue({ kind: "onmyway" })).toBe("🏃");
+    expect(reactionValue({ kind: "jealous" })).toBe("😩");
+    expect(reactionValue({ reaction: "x".repeat(40) })).toHaveLength(24);
+    expect(reactionValue({ kind: "wave" })).toBeUndefined();
+    expect(reactionValue({})).toBeUndefined();
   });
 });

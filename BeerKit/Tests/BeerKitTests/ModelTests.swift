@@ -70,7 +70,7 @@ import Testing
             id: "b1", ownerUid: "me", ownerName: "Me",
             createdAt: Date(timeIntervalSince1970: 0),
             expiresAt: Date(timeIntervalSince1970: 3600), hasPhoto: false, cheersCount: 3,
-            replies: ["u4": .onMyWay, "u5": .jealous],
+            replies: ["u4": "🏃", "u5": "😩"],
             cheersBy: ["u2": "Menno", "u1": "daan", "u3": "Joost"],
             replyNames: ["u4": "Gijs"]   // u5's name never mirrored
         )
@@ -78,7 +78,7 @@ import Testing
         #expect(r.cheers.map(\.name) == ["daan", "Joost", "Menno"])   // case-insensitive
         #expect(r.cheers.allSatisfy { $0.reply == nil })
         #expect(r.replies.map(\.name) == ["a mate", "Gijs"])          // fallback sorts as its name
-        #expect(r.replies.map(\.reply) == [.jealous, .onMyWay])
+        #expect(r.replies.map(\.reply) == ["😩", "🏃"])
         #expect(r.cheersCount == 3)
         #expect(!r.isEmpty)
     }
@@ -90,6 +90,32 @@ import Testing
                            cheersCount: 2)   // counter ahead of the names
         #expect(beer.reactions.isEmpty)
         #expect(beer.reactions.cheersCount == 0)
+    }
+
+    @Test func reactionNormalizes() {
+        #expect(Reaction.normalize("  🔥 ") == "🔥")
+        #expect(Reaction.normalize("lekker  man\n") == "lekker man")
+        #expect(Reaction.normalize("   ") == nil)
+        #expect(Reaction.normalize(String(repeating: "x", count: 40))?.count == 24)
+        #expect(Reaction.isAllEmoji("🔥🎉"))
+        #expect(!Reaction.isAllEmoji("lekker"))
+        // Emoji stay whole; words are clipped so a row cannot be pushed apart.
+        #expect(Reaction.short("🔥") == "🔥")
+        #expect(Reaction.short("kom janne nu") == "kom janne nu")      // exactly at the limit
+        #expect(Reaction.short("kom janne nu!!") == "kom janne n…")
+        #expect(Reaction.presets.count == 6)
+    }
+
+    @Test func reactionTalliesRankByCountThenName() {
+        let beer = BeerLog(id: "b", ownerUid: "u", ownerName: "u",
+                           createdAt: Date(timeIntervalSince1970: 0),
+                           expiresAt: Date(timeIntervalSince1970: 3600), hasPhoto: false,
+                           replies: ["a": "🔥", "b": "🔥", "c": "😂", "d": "lekker"])
+        let tallies = beer.reactionTallies
+        #expect(tallies.first?.reaction == "🔥")
+        #expect(tallies.first?.count == 2)
+        // Ties fall back to the reaction itself, so the order never wobbles.
+        #expect(tallies.dropFirst().map(\.reaction) == ["lekker", "😂"])
     }
 
     @Test func captionNormalizes() {

@@ -50,17 +50,32 @@ export async function notifyCheers(db: Firestore, push: Pusher, beerOwnerUid: st
 }
 
 export type ReplyKind = "onmyway" | "jealous";
-export const replyCopy: Record<ReplyKind, { title: (name: string) => string; body: string }> = {
-  onmyway: { title: (name) => `${name} is on the way 🏃`, body: "Order one for them?" },
-  jealous: { title: (name) => `${name} is jealous 😩`, body: "Enjoy it for both of you." },
+/** The two a push notification's own buttons can send; also legacy wire values. */
+export const replyCopy: Record<ReplyKind, { title: (name: string) => string; body: string; emoji: string }> = {
+  onmyway: { title: (name) => `${name} is on the way 🏃`, body: "Order one for them?", emoji: "🏃" },
+  jealous: { title: (name) => `${name} is jealous 😩`, body: "Enjoy it for both of you.", emoji: "😩" },
 };
 
-export async function notifyReply(db: Firestore, push: Pusher, beerOwnerUid: string, replierUid: string, kind: ReplyKind) {
-  const copy = replyCopy[kind];
-  if (!copy) return;
+/** The reaction as stored: a `reaction` string, or a legacy `kind` mapped to its emoji. */
+export function reactionValue(data: { reaction?: unknown; kind?: unknown }): string | undefined {
+  if (typeof data.reaction === "string" && data.reaction.length > 0) return data.reaction.slice(0, 24);
+  if (typeof data.kind === "string" && data.kind in replyCopy) return replyCopy[data.kind as ReplyKind].emoji;
+  return undefined;
+}
+
+/**
+ * `reaction` is what the mate actually sent: an emoji, a few words, or the
+ * emoji a legacy `kind` maps to. The two fixed kinds keep their own copy since
+ * it reads better than the generic line.
+ */
+export async function notifyReply(db: Firestore, push: Pusher, beerOwnerUid: string, replierUid: string, reaction: string) {
   const [target, replier] = await Promise.all([
     targetFor(db, beerOwnerUid), db.doc(`users/${replierUid}`).get(),
   ]);
   if (!target) return;
-  await push([target], copy.title(replier.get("usernameLower")), copy.body, {});
+  const name = replier.get("usernameLower");
+  const legacy = Object.values(replyCopy).find((c) => c.emoji === reaction);
+  const title = legacy ? legacy.title(name) : `${name} reacted ${reaction}`;
+  const body = legacy ? legacy.body : "Proost!";
+  await push([target], title, body, {});
 }

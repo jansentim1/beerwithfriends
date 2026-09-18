@@ -34,6 +34,8 @@ struct HomeView: View {
     /// The drink whose cheers list is open. Re-read from the live feed while the
     /// sheet is up, so a cheers landing now shows up in it.
     @State private var reactionsBeerId: String?
+    /// The drink a reaction is being picked for.
+    @State private var reactionTarget: BeerLog?
     /// Bumped to restart the feed stream (scene re-activation, pull-to-refresh):
     /// `observeFeed()` snapshots the friend list at subscribe time, so a restart
     /// is how new friends' beers show up (parked v1 limitation, Task 9 note).
@@ -187,6 +189,13 @@ struct HomeView: View {
                 }
             }
             .ignoresSafeArea()
+        }
+        .sheet(item: $reactionTarget) { beer in
+            ReactionPickerSheet(
+                ownerName: beer.ownerUid == profile.id ? "You" : beer.ownerName
+            ) { raw in
+                Task { await viewModel.reply(beer, reaction: raw, myUid: profile.id) }
+            }
         }
         .sheet(isPresented: reactionsBinding) {
             if let beer = viewModel.feed.first(where: { $0.id == reactionsBeerId }) {
@@ -488,8 +497,7 @@ struct HomeView: View {
                 // Quick replies first: the everyday actions, above the reporting
                 // ones (long-press is the only place they live on a row — the row
                 // itself stays a two-control affair).
-                replyButton(for: beer, kind: .onMyWay)
-                replyButton(for: beer, kind: .jealous)
+                reactButton(for: beer)
                 Button {
                     openReactions(beer)
                 } label: {
@@ -582,47 +590,44 @@ struct HomeView: View {
         }
     }
 
-    /// One quick reply per mate per beer, from the row's long-press menu. Already
-    /// replied (this launch or an earlier one — the server mirrors replies onto
-    /// the beer) disables both items rather than hiding them.
-    private func replyButton(for beer: BeerLog, kind: ReplyKind) -> some View {
+    /// One reaction per mate per drink, from the row's long-press menu. Already
+    /// reacted (this launch or an earlier one — the server mirrors reactions onto
+    /// the drink) disables the item rather than hiding it.
+    private func reactButton(for beer: BeerLog) -> some View {
         Button {
-            Haptics.light()
-            Task { await viewModel.reply(beer, kind: kind, myUid: profile.id) }
+            reactionTarget = beer
         } label: {
-            Text("\(kind.label) \(kind.emoji)")
+            Label("React", systemImage: "face.smiling")
         }
         .disabled(beer.replies[profile.id] != nil)
-        .accessibilityIdentifier("home.reply.\(kind.rawValue)")
+        .accessibilityIdentifier("home.react")
     }
 
-    /// Who's on the way and who's sulking. Shown on every row, your own included:
-    /// the owner is exactly who wants to know a mate is heading over.
+    /// What came back, on every row including your own: the owner is exactly who
+    /// wants to see it. Distinct reactions, most-used first, at most three so a
+    /// popular drink cannot crowd the row; the sheet has the rest.
     @ViewBuilder
     private func replyPills(for beer: BeerLog) -> some View {
-        ForEach(ReplyKind.allCases, id: \.self) { kind in
-            let count = beer.replyCount(kind)
-            if count > 0 {
-                Button {
-                    openReactions(beer)
-                } label: {
-                    StatusPill(text: "\(kind.emoji) \(count)")
-                }
-                .buttonStyle(.plain)
-                .frame(minHeight: 44)
-                .contentShape(Rectangle())
-                .accessibilityLabel(Self.replyLabel(kind, count: count))
-                .accessibilityHint("See who reacted")
+        ForEach(beer.reactionTallies.prefix(3), id: \.reaction) { tally in
+            Button {
+                openReactions(beer)
+            } label: {
+                StatusPill(text: tally.count > 1
+                           ? "\(Reaction.short(tally.reaction)) \(tally.count)"
+                           : Reaction.short(tally.reaction))
             }
+            .buttonStyle(.plain)
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
+            .accessibilityLabel(Self.reactionLabel(tally.reaction, count: tally.count))
+            .accessibilityHint("See who reacted")
         }
     }
 
-    /// VoiceOver reads the tally, not the emoji ("2 on their way", "1 jealous").
-    private static func replyLabel(_ kind: ReplyKind, count: Int) -> String {
-        switch kind {
-        case .onMyWay: return "\(count) on their way"
-        case .jealous: return "\(count) jealous"
-        }
+    /// VoiceOver reads the tally in words, since the reaction itself may be an
+    /// emoji it would otherwise spell out ("2 reacted fire").
+    private static func reactionLabel(_ reaction: String, count: Int) -> String {
+        count == 1 ? "1 reacted \(reaction)" : "\(count) reacted \(reaction)"
     }
 
     /// Your own row carries no cheers button — you can't cheers yourself, and a

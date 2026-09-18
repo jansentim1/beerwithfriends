@@ -134,10 +134,14 @@ final class FirebaseBeerService: BeerServicing, @unchecked Sendable {
               let createdAt = data["createdAt"] as? Timestamp,
               let expiresAt = data["expiresAt"] as? Timestamp
         else { return nil }
-        // Server-maintained mirror of `beers/{id}/replies/{uid}` (uid → kind).
-        // Unknown kinds (a newer client, a future kind) are dropped, not guessed.
+        // Server-maintained mirror of `beers/{id}/replies/{uid}` (uid → reaction).
+        // Docs written before 2026-09-18 hold a fixed kind; map those to their
+        // emoji so an in-flight reaction from an older client still shows.
         let replies = (data["replies"] as? [String: String] ?? [:])
-            .compactMapValues { ReplyKind(rawValue: $0) }
+            .compactMapValues { raw -> String? in
+                if let legacy = ReplyKind(rawValue: raw) { return legacy.emoji }
+                return Reaction.normalize(raw)
+            }
         return BeerLog(
             id: document.documentID,
             ownerUid: ownerUid,
@@ -180,13 +184,13 @@ final class FirebaseBeerService: BeerServicing, @unchecked Sendable {
     // MARK: - Quick replies
 
     /// Schema pinned by rules: `beers/{beerId}/replies/{me}` = exactly
-    /// `{uid, kind, at}`, create-only and never on your own beer. The server
+    /// `{uid, reaction, at}`, create-only and never on your own beer. The server
     /// (onReplyCreated) mirrors it into `beers/{id}.replies` and pushes the owner.
-    func reply(beerId: String, kind: ReplyKind) async throws {
+    func reply(beerId: String, reaction: String) async throws {
         do {
             try await db.document("beers/\(beerId)/replies/\(uid)").setData([
                 "uid": uid,
-                "kind": kind.rawValue,
+                "reaction": reaction,
                 "at": Timestamp(date: Date()),
             ])
         } catch {

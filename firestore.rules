@@ -145,16 +145,24 @@ service cloud.firestore {
         allow update, delete: if false;
       }
 
-      // Quick replies ("on my way", "jealous"): one per mate, create-only, never
-      // on your own beer. onReplyCreated mirrors them into beers/{id}.replies.
+      // Reactions: one per mate, create-only, never on your own beer.
+      // onReplyCreated mirrors them into beers/{id}.replies. Two accepted
+      // shapes — `reaction` (any emoji or a few words, since 2026-09-18) and
+      // the legacy `kind`, so a client on an older build still works.
       match /replies/{uid} {
         allow read: if signedIn() && canReactTo(beerId);
         allow create: if signedIn() && me() == uid
           && beerOwner(beerId) != me()
-          && request.resource.data.keys().hasOnly(['uid','kind','at'])
           && request.resource.data.uid == me()
-          && request.resource.data.kind in ['onmyway', 'jealous']
           && request.resource.data.at is timestamp
+          && (
+            (request.resource.data.keys().hasOnly(['uid','reaction','at'])
+              && request.resource.data.reaction is string
+              && request.resource.data.reaction.size() >= 1
+              && request.resource.data.reaction.size() <= 24)
+            || (request.resource.data.keys().hasOnly(['uid','kind','at'])
+              && request.resource.data.kind in ['onmyway', 'jealous'])
+          )
           && canReactTo(beerId);
         allow update, delete: if false;
       }

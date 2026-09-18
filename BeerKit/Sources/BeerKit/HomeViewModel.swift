@@ -224,12 +224,13 @@ public final class HomeViewModel: ObservableObject {
 
     // MARK: - Quick replies
 
-    /// Optimistic like cheers; the server echoes the reply into `beer.replies`.
-    public func reply(_ beer: BeerLog, kind: ReplyKind, myUid: String) async {
-        guard beer.replies[myUid] == nil else { return }
-        if let i = feed.firstIndex(where: { $0.id == beer.id }) { feed[i].replies[myUid] = kind }
+    /// Optimistic like cheers; the server echoes the reaction into
+    /// `beer.replies`. One per mate per drink, as the rules enforce.
+    public func reply(_ beer: BeerLog, reaction raw: String, myUid: String) async {
+        guard beer.replies[myUid] == nil, let reaction = Reaction.normalize(raw) else { return }
+        if let i = feed.firstIndex(where: { $0.id == beer.id }) { feed[i].replies[myUid] = reaction }
         do {
-            try await service.reply(beerId: beer.id, kind: kind)
+            try await service.reply(beerId: beer.id, reaction: reaction)
         } catch CheersError.alreadyCheersed {
             // Already replied earlier (create-only): keep whatever the server has.
         } catch {
