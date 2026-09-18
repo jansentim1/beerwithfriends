@@ -20,6 +20,8 @@ import SwiftUI
 struct MapView: View {
     private let profile: UserProfile
     private let beerService: any BeerServicing
+    /// Read-only here; the feed is what starts a drink's two hours.
+    private let seenStore: any SeenStoring = DefaultsSeenStore()
 
     /// The tab keeps its own small feed copy rather than a second HomeViewModel:
     /// the map needs the snapshot and nothing else (no cheers, no photo state).
@@ -288,7 +290,11 @@ struct MapView: View {
     /// group first. `Coordinate` is already rounded to ~100 m, so two mates in
     /// the same bar land on one pin.
     private var clusters: [DrinkCluster] {
-        let located = BeerLog.latestPerOwner(beers, now: Date())
+        // The same clock the feed reads against, so a drink that has faded from
+        // the feed is not still pinned here. The map only READS it: seeing a pin
+        // must not burn the two hours on a drink you never opened the feed for.
+        let ids = beers.map(\.id)
+        let located = BeerLog.latestPerOwner(beers, now: Date(), seenAt: seenStore.seenAt(ids: ids))
             .filter { $0.placeCoordinate != nil }
         var order: [String] = []
         var grouped: [String: [BeerLog]] = [:]
