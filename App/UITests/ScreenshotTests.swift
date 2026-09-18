@@ -104,7 +104,9 @@ final class ScreenshotTests: XCTestCase {
     /// camera, so the app is launched straight into review on a drawn stand-in.
     func testCaptionStrip() throws {
         app.terminate()
-        app.launchArguments += ["-UITestReviewSample"]
+        // The seeded account, so the relaunch lands on home rather than on the
+        // username screen a fresh anonymous sign-in gets.
+        app.launchArguments += ["-UITestAccount", "tim", "-UITestReviewSample"]
         app.launch()
         let testSignIn = app.buttons["signin.test"]
         XCTAssertTrue(testSignIn.waitForExistence(timeout: 10))
