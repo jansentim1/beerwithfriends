@@ -61,12 +61,13 @@ await mk("seed-wine", joost, "joost", "wine", 4, {
   placeCoordinate: new GeoPoint(52.37, 4.895), cheersCount: 2,
   // Who cheersed, for the reactions sheet (server-written in production).
   cheersBy: { [tim]: "Tim", [menno]: "Menno" },
-  replies: { [tim]: "onmyway" }, replyNames: { [tim]: "Tim" },
+  replies: { [tim]: "🔥" }, replyNames: { [tim]: "Tim" },
 });
-await mk("seed-pils", menno, "menno", "pils", 40, { place: "Amsterdam", placeCoordinate: new GeoPoint(52.373, 4.9), replies: { [tim]: "onmyway" } });
+await mk("seed-pils", menno, "menno", "pils", 40, { place: "Amsterdam", placeCoordinate: new GeoPoint(52.373, 4.9), replies: { [tim]: "🏃" }, replyNames: { [tim]: "Tim" } });
 await mk("seed-mine", tim, "tim", "special", 9, {
   cheersCount: 2, cheersBy: { [joost]: "Joost", [menno]: "Menno" },
-  replies: { [menno]: "jealous" }, replyNames: { [menno]: "Menno" },
+  replies: { [menno]: "kom janne", [joost]: "😂" },
+  replyNames: { [menno]: "Menno", [joost]: "Joost" },
 });
 
 const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Amsterdam", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
