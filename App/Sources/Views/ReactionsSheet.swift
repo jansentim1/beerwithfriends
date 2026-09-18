@@ -62,7 +62,10 @@ struct ReactionsSheet: View {
         reactions.cheers.isEmpty ? "Reactions" : "🍻 \(reactions.cheersCount)"
     }
 
-    /// One mate: avatar, name, and — for a reply — what they said.
+    /// One mate: avatar, name, and the emoji they sent — a cheers is 🍻, a quick
+    /// reply is its own. Every row says what came back (Tim, 2026-09-18: "only
+    /// responded with emojis"), so the emoji carries it and the words are left
+    /// to VoiceOver.
     private func row(_ reactor: Reactor) -> some View {
         HStack(spacing: 12) {
             AvatarView(name: reactor.name, size: 44)
@@ -70,9 +73,9 @@ struct ReactionsSheet: View {
                 .font(.headline)
                 .lineLimit(1)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            if let reply = reactor.reply {
-                StatusPill(text: "\(reply.emoji) \(reply.label)")
-            }
+            Text(reactor.reply?.emoji ?? "🍻")
+                .font(.title3)
+                .accessibilityHidden(true)
         }
         .frame(minHeight: 44)
         .accessibilityElement(children: .ignore)
