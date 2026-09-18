@@ -73,14 +73,20 @@ struct ReactionsSheet: View {
                 .font(.headline)
                 .lineLimit(1)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            Text(reactor.reply?.emoji ?? "🍻")
-                .font(.title3)
+            // A cheers is 🍻; anything else is what that mate actually sent,
+            // emoji or words, so the sheet is where the full text lives.
+            Text(reactor.reply ?? "🍻")
+                .font(Reaction.isAllEmoji(reactor.reply ?? "🍻") ? .title3 : .subheadline)
+                .foregroundStyle(reactor.reply.map { Reaction.isAllEmoji($0) } == false
+                                 ? Color.secondary : .primary)
+                .lineLimit(2)
+                .multilineTextAlignment(.trailing)
                 .accessibilityHidden(true)
         }
         .frame(minHeight: 44)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(
-            reactor.reply.map { "\(reactor.name), \($0.label)" } ?? "\(reactor.name) cheersed"
+            reactor.reply.map { "\(reactor.name) reacted \($0)" } ?? "\(reactor.name) cheersed"
         )
     }
 
