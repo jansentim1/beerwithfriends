@@ -100,6 +100,16 @@ final class CameraCaptureViewController: UIViewController {
         overrideUserInterfaceStyle = .dark
         buildControls()
 
+        #if DEBUG
+        // The CI simulator has no camera, so the review screen — and with it the
+        // caption strip — would never be reachable. This flag drops straight
+        // into review on a drawn stand-in so the rig can photograph it.
+        if ProcessInfo.processInfo.arguments.contains("-UITestReviewSample") {
+            showReviewSample()
+            return
+        }
+        #endif
+
         switch AVCaptureDevice.authorizationStatus(for: .video) {
         case .authorized:
             startCamera()
@@ -193,12 +203,15 @@ final class CameraCaptureViewController: UIViewController {
         usePhotoButton.isHidden = true
         usePhotoButton.addTarget(self, action: #selector(usePhotoTapped), for: .touchUpInside)
 
-        buildCaption()
-
         for control in [previewImageView, cancelBackdrop, flipBackdrop, shutterButton, retakeBackdrop, usePhotoButton] {
             control.translatesAutoresizingMaskIntoConstraints = false
             view.addSubview(control)
         }
+
+        // AFTER the others: the caption sits ON the photo, and `previewImageView`
+        // fills the screen — added earlier, it covered the strip completely
+        // (Tim, build 30: "ik kan wel typen maar zie geen tekst").
+        buildCaption()
 
         let safe = view.safeAreaLayoutGuide
         NSLayoutConstraint.activate([
@@ -305,6 +318,31 @@ final class CameraCaptureViewController: UIViewController {
             button.trailingAnchor.constraint(equalTo: backdrop.contentView.trailingAnchor),
         ])
     }
+
+    #if DEBUG
+    /// Rig only: a drawn stand-in photo, straight into review with a caption
+    /// already typed, so the strip is captured rather than assumed.
+    private func showReviewSample() {
+        let size = CGSize(width: 1080, height: 1440)
+        let sample = UIGraphicsImageRenderer(size: size).image { context in
+            let colours = [UIColor(red: 0.20, green: 0.11, blue: 0.05, alpha: 1).cgColor,
+                           UIColor(red: 0.85, green: 0.55, blue: 0.16, alpha: 1).cgColor]
+            if let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
+                                         colors: colours as CFArray, locations: [0, 1]) {
+                context.cgContext.drawLinearGradient(
+                    gradient, start: .zero, end: CGPoint(x: 0, y: size.height), options: [])
+            }
+            UIColor.white.withAlphaComponent(0.85).setFill()
+            UIBezierPath(roundedRect: CGRect(x: 300, y: 380, width: 480, height: 700),
+                         cornerRadius: 40).fill()
+        }
+        capturedImage = sample
+        previewImageView.image = sample
+        setMode(reviewing: true)
+        captionTextView.text = "eindelijk vrijdag 🍻"
+        captionStrip.isHidden = false
+    }
+    #endif
 
     // MARK: - Caption
 

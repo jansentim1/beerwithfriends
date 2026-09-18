@@ -100,10 +100,33 @@ final class ScreenshotTests: XCTestCase {
         snap("08e-username-sheet")
     }
 
+    /// The camera review screen with the caption strip. The simulator has no
+    /// camera, so the app is launched straight into review on a drawn stand-in.
+    func testCaptionStrip() throws {
+        app.terminate()
+        app.launchArguments += ["-UITestReviewSample"]
+        app.launch()
+        let testSignIn = app.buttons["signin.test"]
+        XCTAssertTrue(testSignIn.waitForExistence(timeout: 10))
+        testSignIn.tap()
+        let log = app.buttons["home.log"]
+        XCTAssertTrue(log.waitForExistence(timeout: 20), "home did not appear")
+        log.tap()
+        let use = app.buttons["Use photo"]
+        XCTAssertTrue(use.waitForExistence(timeout: 15), "review screen did not appear")
+        let caption = app.textViews["camera.caption"]
+        XCTAssertTrue(caption.waitForExistence(timeout: 5), "caption strip missing")
+        XCTAssertEqual(caption.value as? String, "eindelijk vrijdag 🍻")
+        XCTAssertTrue(caption.isHittable, "caption strip is behind the photo")
+        snap("07b-review-caption")
+    }
+
     override func tearDown() {
         // Whatever is on screen when a step fails is the most useful evidence;
         // one file per test, so the second test cannot overwrite the first's.
-        snap(name.contains("Populated") ? "99-final-populated" : "99-final-walkthrough")
+        let which = name.contains("Populated") ? "populated"
+            : name.contains("Caption") ? "caption" : "walkthrough"
+        snap("99-final-\(which)")
     }
 
     func testWalkthrough() throws {
