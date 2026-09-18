@@ -56,3 +56,6 @@ Tuning a bezier through the screenshot rig costs ~6 minutes a round and the crop
 
 Also: a Python edit that replaces `s[s.index(a):s.index(b)]` silently truncates the file when the slice is assigned back wrong. It shipped a DrinkGlass.swift of 726 lines that began mid-`switch`. Prefer exact `str.replace(old, new, 1)` with an `assert old in s`, and check `head -2` of the file after any structural edit.
 
+## A full-screen subview added later covers everything before it (2026-09-18)
+The caption strip was built and added to the view hierarchy before `previewImageView`, which fills the screen — so typing worked, the keyboard came up, and nothing was visible. UIKit has no warning for this and the simulator has no camera, so the review screen was never on the rig at all. Two rules: add overlay chrome AFTER the thing it overlays (or `bringSubviewToFront`), and when a screen is unreachable in the simulator, add a DEBUG launch flag that reaches it (`-UITestReviewSample`) rather than shipping it unverified.
+
