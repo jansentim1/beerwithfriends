@@ -41,6 +41,23 @@ export async function fanoutBeerCreated(db: Firestore, push: Pusher, beerId: str
   await push(targets, title, body, { beerId });
 }
 
+/**
+ * Someone asked to be your mate. Without this a request is silent: it lands in
+ * the other person's Mates tab and they have no reason to look (three requests
+ * sat unaccepted on 2026-09-19, which is what "toevoegen gaat fout" was).
+ */
+export async function notifyFriendRequest(db: Firestore, push: Pusher, toUid: string, fromUid: string, fromName: string) {
+  // A block in either direction silences it, matching every other push.
+  const [blockedThem, blockedUs] = await Promise.all([
+    db.doc(`blocks/${toUid}/blocked/${fromUid}`).get(),
+    db.doc(`blocks/${fromUid}/blocked/${toUid}`).get(),
+  ]);
+  if (blockedThem.exists || blockedUs.exists) return;
+  const target = await targetFor(db, toUid);
+  if (!target) return;
+  await push([target], `${fromName} wants to be your mate 🍻`, "Open PubDates to accept.", {});
+}
+
 export async function notifyCheers(db: Firestore, push: Pusher, beerOwnerUid: string, cheererUid: string) {
   const [target, cheerser] = await Promise.all([
     targetFor(db, beerOwnerUid), db.doc(`users/${cheererUid}`).get(),

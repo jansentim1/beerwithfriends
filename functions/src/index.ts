@@ -8,7 +8,7 @@ import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
 import { getMessaging } from "firebase-admin/messaging";
 import { getPhotoOnceCore, PhotoError, PhotoErrorCode } from "./photo";
-import { fanoutBeerCreated, notifyCheers, notifyReply, Pusher, reactionValue } from "./pushes";
+import { fanoutBeerCreated, notifyCheers, notifyFriendRequest, notifyReply, Pusher, reactionValue } from "./pushes";
 import { sendApns, deadTokens } from "./apns";
 import { loadApnsKey } from "./apnsKey";
 import { createGroupCore, joinGroupCore, leaveGroupCore, countDrinkForGroups, GroupError } from "./groups";
@@ -191,6 +191,13 @@ export const onReplyCreated = onDocumentCreated("beers/{beerId}/replies/{uid}", 
 const storagePhotoDeleter: PhotoDeleter = async (path) => {
   await getStorage().bucket().file(path).delete({ ignoreNotFound: true });
 };
+
+export const onFriendRequestCreated = onDocumentCreated("friendRequests/{toUid}/incoming/{fromUid}", async (event) => {
+  const data = event.data?.data();
+  if (!data) return;
+  const name = (data.fromDisplayName as string | undefined) || (data.fromUsername as string | undefined) || "Someone";
+  await notifyFriendRequest(getFirestore(), push, event.params.toUid, event.params.fromUid, name);
+});
 
 export const onFriendAccepted = onDocumentCreated("friendships/{uid}/friends/{friendUid}", async (event) => {
   await mirrorFriendship(getFirestore(), event.params.uid, event.params.friendUid);

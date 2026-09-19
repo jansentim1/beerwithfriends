@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Timestamp } from "firebase-admin/firestore";
 import { initTestDb, seedUser, seedFriends, clearDb } from "./helpers";
-import { fanoutBeerCreated, notifyCheers, notifyReply, reactionValue, Pusher, PushTarget } from "../../src/pushes";
+import { fanoutBeerCreated, notifyCheers, notifyFriendRequest, notifyReply, reactionValue, Pusher, PushTarget } from "../../src/pushes";
 
 const db = initTestDb();
 type Sent = { tokens: string[]; targets: PushTarget[]; title: string; body: string };
@@ -88,3 +88,26 @@ describe("reactionValue", () => {
     expect(reactionValue({})).toBeUndefined();
   });
 });
+
+describe("notifyFriendRequest", () => {
+  it("tells the person someone wants to add them", async () => {
+    await notifyFriendRequest(db, push, "owner", "friend", "Joost");
+    expect(sent).toHaveLength(1);
+    expect(sent[0].tokens).toEqual(["tok-owner"]);
+    expect(sent[0].title).toBe("Joost wants to be your mate 🍻");
+  });
+  it("stays silent across a block in either direction", async () => {
+    await db.doc("blocks/owner/blocked/friend").set({ at: Timestamp.now() });
+    await notifyFriendRequest(db, push, "owner", "friend", "Joost");
+    expect(sent).toHaveLength(0);
+    await db.doc("blocks/owner/blocked/friend").delete();
+    await db.doc("blocks/friend/blocked/owner").set({ at: Timestamp.now() });
+    await notifyFriendRequest(db, push, "owner", "friend", "Joost");
+    expect(sent).toHaveLength(0);
+  });
+  it("says nothing when the recipient has no device", async () => {
+    await notifyFriendRequest(db, push, "nobody", "friend", "Joost");
+    expect(sent).toHaveLength(0);
+  });
+});
+
