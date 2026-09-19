@@ -391,6 +391,11 @@ struct FriendsView: View {
                 try await friendService.sendRequest(to: found.id)
                 searchStatus = "Request sent to @\(found.username) 🍻"
                 searchText = ""
+            } catch FriendRequestError.alreadyAsked {
+                // You cannot see your own outgoing requests (only the recipient
+                // can read them), so without this the retry looked like a bug.
+                searchStatus = "Already asked @\(found.username) — they just need to accept it."
+                searchText = ""
             } catch {
                 searchStatus = "Couldn't send the request — try again."
             }

@@ -41,12 +41,24 @@ final class FirebaseFriendService: FriendServicing, @unchecked Sendable {
     /// Schema pinned by rules: `friendRequests/{toUid}/incoming/{me}` = exactly
     /// `{fromUid, fromUsername, fromDisplayName, sentAt}`, strings ≤ 60 chars.
     func sendRequest(to uid: String) async throws {
-        try await db.document("friendRequests/\(uid)/incoming/\(me.id)").setData([
-            "fromUid": me.id,
-            "fromUsername": String(me.username.prefix(60)),
-            "fromDisplayName": String(me.displayName.prefix(60)),
-            "sentAt": Timestamp(date: Date()),
-        ])
+        do {
+            try await db.document("friendRequests/\(uid)/incoming/\(me.id)").setData([
+                "fromUid": me.id,
+                "fromUsername": String(me.username.prefix(60)),
+                "fromDisplayName": String(me.displayName.prefix(60)),
+                "sentAt": Timestamp(date: Date()),
+            ])
+        } catch {
+            let nsError = error as NSError
+            // Create-only: a second ask writes over an existing doc, which the
+            // rules refuse. A block refuses identically, on purpose — the
+            // caller must not be able to tell the two apart.
+            if nsError.domain == FirestoreErrorDomain,
+               nsError.code == FirestoreErrorCode.permissionDenied.rawValue {
+                throw FriendRequestError.alreadyAsked
+            }
+            throw error
+        }
     }
 
     func incomingRequests() async throws -> [FriendRequest] {

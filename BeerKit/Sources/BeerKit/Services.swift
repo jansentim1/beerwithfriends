@@ -8,6 +8,11 @@ public enum UsernameClaimError: Error, Equatable { case taken, tooSoon }
 /// create-only). The UI keeps the beer marked as cheersed.
 public enum CheersError: Error, Equatable { case alreadyCheersed }
 
+/// The server refused a mate request. Requests are create-only, so asking the
+/// same person twice is refused exactly like being blocked by them is — and the
+/// two are deliberately indistinguishable here, so a block stays private.
+public enum FriendRequestError: Error, Equatable { case alreadyAsked }
+
 /// `deleteAccount` contract: `.retryDelete` means the server erased all data but
 /// failed to delete the auth user; the client retries, then signs out locally.
 public enum AccountDeletionError: Error, Equatable { case retryDelete }
