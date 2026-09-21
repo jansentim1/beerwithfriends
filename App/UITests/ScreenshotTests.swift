@@ -171,6 +171,9 @@ final class ScreenshotTests: XCTestCase {
 
         app.tabBars.buttons["Map"].tap()
         XCTAssertTrue(app.navigationBars.element.waitForExistence(timeout: 5))
+        // The empty map carries the "put me on the map" opt-in.
+        XCTAssertTrue(app.buttons["map.sharePlace"].waitForExistence(timeout: 5),
+                      "map empty state is missing the share-place button")
         snap("05b-map")
 
         app.tabBars.buttons["Groups"].tap()

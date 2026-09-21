@@ -22,6 +22,8 @@ struct MapView: View {
     private let beerService: any BeerServicing
     /// Read-only here; the feed is what starts a drink's two hours.
     private let seenStore: any SeenStoring = DefaultsSeenStore()
+    /// The same switch as Settings → Privacy; the empty state can flip it.
+    @AppStorage(LocationPlaceProvider.sharePlaceKey) private var sharePlace = false
 
     /// The tab keeps its own small feed copy rather than a second HomeViewModel:
     /// the map needs the snapshot and nothing else (no cheers, no photo state).
@@ -132,25 +134,54 @@ struct MapView: View {
         .accessibilityHint("Shows who is drinking here")
     }
 
+    /// The map is empty far more often than it should be, because the setting
+    /// that fills it is off by default and lives three taps away in Settings
+    /// (Tim, 2026-09-21). So the card turns it on where you are standing.
     private var emptyState: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 10) {
+            // The words let pans and pinches through to the map; only the
+            // button below catches a touch.
             Text("No mates on the map yet")
                 .font(Theme.displayTitle2)
                 .multilineTextAlignment(.center)
-            Text("Mates who log a drink with ‘Share where I’m drinking’ on show up here. Turn yours on in Settings to be on theirs.")
+                .allowsHitTesting(false)
+            Text(sharePlace
+                 ? "You'll show up here when you log a drink. Mates need their own switch on to appear."
+                 : "Only drinks logged with ‘Share where I’m drinking’ on show up here.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
+                .allowsHitTesting(false)
+
+            if !sharePlace {
+                Button {
+                    Haptics.light()
+                    sharePlace = true
+                    // Exactly what the Settings switch does: ask here, where the
+                    // sentence above is the explanation.
+                    LocationPlaceProvider.shared.requestPermissionIfNeeded()
+                } label: {
+                    Text("Put me on the map")
+                }
+                .buttonStyle(PillButtonStyle(emphasis: .tinted))
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+                .accessibilityIdentifier("map.sharePlace")
+                .accessibilityHint("Turns on sharing the bar you're drinking at")
+                .padding(.top, 2)
+            }
         }
         .padding(20)
         .frame(maxWidth: 340)
         // Material, not a surface card: this one floats over the map, and the
         // blur is what keeps the streets underneath from fighting the words.
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
+        .background {
+            RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
+                .fill(.regularMaterial)
+                .allowsHitTesting(false)
+        }
         .padding(24)
-        .accessibilityElement(children: .combine)
-        // The card explains, it doesn't catch: pans and pinches still reach the map.
-        .allowsHitTesting(false)
+        .animation(Theme.quick, value: sharePlace)
     }
 
     // MARK: - Callout
