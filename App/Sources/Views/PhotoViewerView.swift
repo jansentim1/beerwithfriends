@@ -24,6 +24,10 @@ struct PhotoViewerView: View {
 
     private enum Loaded { case loading, image(UIImage), failed }
 
+    /// Raised when a screenshot is actually taken, so the black rectangle the
+    /// viewer just saved is explained rather than mysterious.
+    @State private var didScreenshot = false
+
     /// How far through a swipe-to-dismiss we are, 0…1.
     private var dragProgress: Double {
         min(max(Double(dragOffset), 0) / 400, 1)
@@ -72,6 +76,10 @@ struct PhotoViewerView: View {
             }
             .opacity(contentOpacity)
         }
+        .overlay(alignment: .bottom) {
+            screenshotNotice
+                .opacity(contentOpacity)
+        }
         .overlay(alignment: .top) {
             // A filled photo can be light where the header sits: a soft scrim
             // keeps the white name, pill and close circle legible on any photo.
@@ -111,6 +119,7 @@ struct PhotoViewerView: View {
             let report = screenshotReporter
             let id = beerId
             Task { await report(id) }
+            withAnimation(Theme.quick) { didScreenshot = true }
         }
         .statusBarHidden()
         .task {
@@ -123,6 +132,25 @@ struct PhotoViewerView: View {
             }.value
             loaded = image.map { .image($0) } ?? .failed
         }
+    }
+
+    /// Says before the fact, and again after it, that a screenshot of this screen
+    /// saves a black rectangle (Tim, 2026-09-26). Without it someone screenshots,
+    /// finds a black image later, and assumes the app is broken — and the owner
+    /// gets a receipt for an attempt the viewer never understood they made.
+    private var screenshotNotice: some View {
+        Text(didScreenshot
+             ? "That screenshot came out black — and \(ownerName) was told."
+             : "Screenshots of this photo come out black.")
+            .font(.footnote.weight(.semibold))
+            .foregroundStyle(.white)
+            .multilineTextAlignment(.center)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(.white.opacity(didScreenshot ? 0.28 : 0.18), in: Capsule())
+            .padding(.horizontal, 24)
+            .padding(.bottom, 24)
+            .accessibilityIdentifier("photo.screenshotNotice")
     }
 
     /// Whose beer this is, that it is a one-look photo, and the way out.

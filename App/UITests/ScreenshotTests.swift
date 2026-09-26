@@ -47,6 +47,8 @@ final class ScreenshotTests: XCTestCase {
             // would report a frame wider than the screen (the "zoomed in" report).
             let image = app.images["photo.image"]
             XCTAssertTrue(image.waitForExistence(timeout: 5), "photo image element missing")
+            XCTAssertTrue(app.staticTexts["photo.screenshotNotice"].exists,
+                          "photo viewer does not say screenshots come out black")
             let screen = app.frame, frame = image.frame
             print("PHOTO-FRAME image=\(frame) screen=\(screen)")
             XCTAssertEqual(frame.width, screen.width, accuracy: 2, "photo not screen-wide: \(frame)")
