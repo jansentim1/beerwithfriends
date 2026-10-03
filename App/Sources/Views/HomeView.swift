@@ -335,8 +335,14 @@ struct HomeView: View {
             // The CI simulator has no one to tap the system prompt, so emulator
             // mode skips the gate exactly as push registration does. Release
             // builds never take this branch.
-            let allowed = EmulatorConfig.isEnabled
-                || await LocationPlaceProvider.shared.requestPermission()
+            // `||` short-circuits through an autoclosure, which cannot carry an
+            // await — spell the branch out instead.
+            let allowed: Bool
+            if EmulatorConfig.isEnabled {
+                allowed = true
+            } else {
+                allowed = await LocationPlaceProvider.shared.requestPermission()
+            }
             // A second glass tapped during the pour wins; only the drink still
             // pending gets a camera.
             guard pendingDrink == kind, !showCamera else { return }
