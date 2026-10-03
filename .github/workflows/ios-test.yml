@@ -95,6 +95,7 @@ jobs:
           # No permission alerts in the walkthrough.
           xcrun simctl privacy "$UDID" grant camera com.timjansen.BeerWithFriends || true
           xcrun simctl privacy "$UDID" grant location com.timjansen.BeerWithFriends || true
+          xcrun simctl privacy "$UDID" grant location-always com.timjansen.BeerWithFriends || true
           xcrun simctl location "$UDID" set 52.37,4.90 || true
 
       - name: Build for testing

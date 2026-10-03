@@ -332,7 +332,11 @@ struct HomeView: View {
             // here — before the camera, while the pour is still running (Tim,
             // 2026-10-03: "i want people to need to accept location to post").
             // Asking after the shot would throw away a photo just taken.
-            let allowed = await LocationPlaceProvider.shared.requestPermission()
+            // The CI simulator has no one to tap the system prompt, so emulator
+            // mode skips the gate exactly as push registration does. Release
+            // builds never take this branch.
+            let allowed = EmulatorConfig.isEnabled
+                || await LocationPlaceProvider.shared.requestPermission()
             // A second glass tapped during the pour wins; only the drink still
             // pending gets a camera.
             guard pendingDrink == kind, !showCamera else { return }
