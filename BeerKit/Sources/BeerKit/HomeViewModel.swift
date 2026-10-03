@@ -178,7 +178,7 @@ public final class HomeViewModel: ObservableObject {
         // Opt-in place lookup runs AFTER the row is visible; beers are immutable
         // server-side, so the place must be known before the write.
         if let placeProvider, let place = await placeProvider.currentPlace() {
-            beer.place = String(place.name.prefix(BeerLog.placeMaxLength))
+            beer.place = BeerLog.clampPlace(place.name)
             beer.placeCoordinate = place.coordinate
             upsert(beer)
         }

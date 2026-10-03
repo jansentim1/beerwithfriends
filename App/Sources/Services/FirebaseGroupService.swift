@@ -12,7 +12,7 @@ final class FirebaseGroupService: GroupServicing, @unchecked Sendable {
     init(uid: String) { self.uid = uid }
 
     /// Two listeners merged: every group (leaderboard) and my membership mirror
-    /// (to flag `isMine` and expose the join code only for my groups).
+    /// (to flag `isMine`).
     func observeGroups() -> AsyncThrowingStream<[GroupSummary], Error> {
         let db = self.db
         let uid = self.uid
@@ -107,7 +107,11 @@ final class FirebaseGroupService: GroupServicing, @unchecked Sendable {
     }
 }
 
-/// Merges the two listeners; yields only once both have reported.
+/// Merges the two listeners; yields only once both have reported. The join code
+/// rides along on every group, mine or not: `groups/{id}` is readable by any
+/// signed-in user (code included), so dropping it client-side protected nothing
+/// and only broke one-tap join. What stays members-only is *showing* the code —
+/// the invite section in the detail sheet is gated on `isMine`.
 private final class MergeState: @unchecked Sendable {
     private let lock = NSLock()
     private var _groups: [GroupSummary]?
@@ -117,7 +121,7 @@ private final class MergeState: @unchecked Sendable {
     func merged() -> [GroupSummary]? {
         lock.withLock {
             guard let g = _groups, let m = _mine else { return nil }
-            return g.map { var s = $0; s.isMine = m.contains($0.id); if !s.isMine { s.code = nil }; return s }
+            return g.map { var s = $0; s.isMine = m.contains($0.id); return s }
         }
     }
 }

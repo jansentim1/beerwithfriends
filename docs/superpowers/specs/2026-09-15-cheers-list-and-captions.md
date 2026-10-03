@@ -52,12 +52,21 @@ function run; the sheet header uses the map's count so names and count agree).
 
 ### 2.2 Where it opens
 
-- **Your own row:** the "🍻 n" status pill becomes a quiet button (same look; 44 pt
-  target). Tap → the sheet. Hidden when n = 0, as today.
-- **A mate's row:** the cheers pill keeps its job (tap = cheers; `.light` haptic;
-  quiet once you have cheersed). Once cheersed, tapping the quiet pill opens the sheet.
-  The context menu (already there for quick replies) gets **"Who cheersed"** as its last
-  item, always available, so a mate can look before cheersing too.
+Superseded in part on 2026-10-03: the cheers pill on a mate's row no longer sends a
+cheers and no longer opens this sheet directly. It opens `ReactionPickerSheet` (cheers,
+six presets, a custom reaction), and the names are one step further in.
+
+- **Your own row:** the "🍻 n" status pill is a quiet button (same look; 44 pt target).
+  Tap → the sheet. Hidden when n = 0, as today.
+- **A mate's row:** the cheers pill (`.light` haptic; quiet once you have cheersed) opens
+  `ReactionPickerSheet` on every tap, cheersed or not — sending a cheers straight from the
+  pill made the other reactions invisible (Tim, 2026-10-03). In that sheet, **"See who
+  reacted"** opens this sheet. Because only one presentation may be in flight at a time,
+  the picker records the request and the names go up from the picker's `onDismiss`.
+  The picker reflects what you have already spent: the 🍻 tile is quiet once you have
+  cheersed, and the six presets, the custom field and Send are quiet once you have sent a
+  reaction (one per mate per drink, which is what the rules enforce), with one line of copy
+  saying so. The context menu keeps its **"React"** item, disabled in that same case.
 - **Reply pills** (🏃 n, 😩 n): tap → the same sheet, scrolled to the replies section.
 
 ### 2.3 The sheet (`ReactionsSheet`)

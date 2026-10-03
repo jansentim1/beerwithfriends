@@ -34,6 +34,10 @@ struct HomeView: View {
     /// The drink whose cheers list is open. Re-read from the live feed while the
     /// sheet is up, so a cheers landing now shows up in it.
     @State private var reactionsBeerId: String?
+    /// The drink whose names the reaction picker asked for, held until the picker
+    /// has actually gone: two sibling `.sheet`s presenting back to back is the
+    /// SwiftUI pattern where the second one silently never appears.
+    @State private var pendingReactionsBeerId: String?
     /// The drink a reaction is being picked for.
     @State private var reactionTarget: BeerLog?
     /// Bumped to restart the feed stream (scene re-activation, pull-to-refresh):
@@ -190,10 +194,11 @@ struct HomeView: View {
             }
             .ignoresSafeArea()
         }
-        .sheet(item: $reactionTarget) { beer in
+        .sheet(item: $reactionTarget, onDismiss: openPendingReactions) { beer in
             ReactionPickerSheet(
                 ownerName: beer.ownerUid == profile.id ? "You" : beer.ownerName,
                 hasCheersed: viewModel.cheersedBeerIds.contains(beer.id),
+                alreadyReacted: beer.replies[profile.id] != nil,
                 onSend: { raw in
                     if raw == Reaction.cheers {
                         Task { await viewModel.cheers(beer) }
@@ -201,7 +206,9 @@ struct HomeView: View {
                         Task { await viewModel.reply(beer, reaction: raw, myUid: profile.id) }
                     }
                 },
-                onSeeWho: { openReactions(beer) }
+                // Only the intent is recorded here; the handover waits for this
+                // sheet to be gone (see `openPendingReactions`).
+                onSeeWho: { pendingReactionsBeerId = beer.id }
             )
         }
         .sheet(isPresented: reactionsBinding) {
@@ -382,6 +389,14 @@ struct HomeView: View {
     private func openReactions(_ beer: BeerLog) {
         Haptics.light()
         reactionsBeerId = beer.id
+    }
+
+    /// Runs when the reaction picker has finished dismissing, so the names sheet
+    /// is the only presentation in flight when it goes up.
+    private func openPendingReactions() {
+        guard let id = pendingReactionsBeerId else { return }
+        pendingReactionsBeerId = nil
+        reactionsBeerId = id
     }
 
     /// A drink that expires while its sheet is open closes it rather than
@@ -663,10 +678,9 @@ struct HomeView: View {
     }
 
     private func cheersButton(for beer: BeerLog) -> some View {
-        // Cheersed already? The pill keeps its quiet look but changes job: it
-        // opens the names instead of being a control that does nothing.
-        // One tap opens everything you can send back, cheers included. Sending
-        // a cheers straight from the pill made the other reactions invisible.
+        // One tap opens everything you can send back, cheers included: sending a
+        // cheers straight from the pill made the other reactions invisible. Once
+        // cheersed the pill goes quiet, and the sheet's 🍻 tile does too.
         let hasCheersed = viewModel.cheersedBeerIds.contains(beer.id)
         return Button {
             Haptics.light()

@@ -61,7 +61,7 @@ final class FirebaseBeerService: BeerServicing, @unchecked Sendable {
             data["caption"] = String(caption.prefix(Caption.maxLength))
         }
         if let place = beer.place, !place.isEmpty {
-            data["place"] = String(place.prefix(BeerLog.placeMaxLength))
+            data["place"] = BeerLog.clampPlace(place)
             if let c = beer.placeCoordinate {
                 data["placeCoordinate"] = GeoPoint(latitude: c.latitude, longitude: c.longitude)
             }

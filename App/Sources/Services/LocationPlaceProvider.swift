@@ -147,15 +147,10 @@ final class LocationPlaceProvider: NSObject, PlaceProviding, CLLocationManagerDe
         item.placemark.location?.distance(from: origin) ?? .greatestFiniteMagnitude
     }
 
-    /// Fallback when no drinking spot is nearby: just the city.
-    /// "Café De Zon · Prinsengracht 12" when the street is known, else the name
-    /// on its own. Both, because the name says which bar and the street says
-    /// where — and either alone has been wrong for someone.
+    /// The bar's name plus its street, dropping the street rather than cutting
+    /// it when the pair would not fit — see `BeerLog.placeName`.
     private static func withStreet(_ name: String, from placemark: CLPlacemark) -> String {
-        guard let street = street(from: placemark), !name.localizedCaseInsensitiveContains(street) else {
-            return name
-        }
-        return "\(name) · \(street)"
+        BeerLog.placeName(name, street: street(from: placemark))
     }
 
     /// "Prinsengracht 12", or just the street when there is no number.
@@ -165,6 +160,7 @@ final class LocationPlaceProvider: NSObject, PlaceProviding, CLLocationManagerDe
         return "\(road) \(number)"
     }
 
+    /// Fallback when no drinking spot is nearby: just the city.
     private func cityPlace(
         near coordinate: CLLocationCoordinate2D
     ) async -> (name: String, coordinate: Coordinate?)? {
@@ -173,12 +169,12 @@ final class LocationPlaceProvider: NSObject, PlaceProviding, CLLocationManagerDe
         do {
             let placemarks = try await geocoder.reverseGeocodeLocation(location)
             guard let placemark = placemarks.first else { return nil }
-            // No pub nearby: the street beats the city, and the city is the
-            // last resort rather than the first answer.
-            let area = placemark.locality ?? placemark.subLocality ?? placemark.administrativeArea
-            guard let name = Self.street(from: placemark).map({ street in
-                area.map { "\(street), \($0)" } ?? street
-            }) ?? area else { return nil }
+            // City only, never the street: with no bar nearby this placemark is
+            // the DEVICE's own fix, so a street here would be the drinker's
+            // address — and the promise made in Settings, in the privacy policy
+            // and in firestore.rules is that only a bar name or a city is shared.
+            guard let name = placemark.locality ?? placemark.subLocality ?? placemark.administrativeArea
+            else { return nil }
             // The city's own centre as the geocoder reports it — nil rather than
             // the device fix when it has none.
             let centre = placemark.location?.coordinate
@@ -194,7 +190,7 @@ final class LocationPlaceProvider: NSObject, PlaceProviding, CLLocationManagerDe
         guard let trimmed = name?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else {
             return nil
         }
-        return String(trimmed.prefix(BeerLog.placeMaxLength))
+        return BeerLog.clampPlace(trimmed)
     }
 
     // MARK: - Authorization

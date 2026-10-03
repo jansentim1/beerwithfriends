@@ -342,7 +342,7 @@ struct GroupsView: View {
 
     private var errorBinding: Binding<Bool> {
         Binding(
-            get: { viewModel.errorMessage != nil && !showCreateSheet && !showJoinSheet },
+            get: { viewModel.errorMessage != nil && !showCreateSheet && !showJoinSheet && detailGroup == nil },
             set: { if !$0 { viewModel.errorMessage = nil } }
         )
     }
@@ -376,6 +376,9 @@ private struct GroupDetailSheet: View {
     @State private var didCopy = false
     /// Latest tap wins — an older one must not retire a newer pill.
     @State private var copyToken = 0
+    /// A join is in flight: `joinGroup` is not idempotent, so a second tap would
+    /// come back ALREADY_MEMBER.
+    @State private var isJoining = false
 
     /// The counters keep ticking while the sheet is open: read the live row from
     /// the leaderboard, falling back to the snapshot the row was tapped with
@@ -388,7 +391,8 @@ private struct GroupDetailSheet: View {
         NavigationStack {
             List {
                 headerSection
-                if let code = live.code { inviteSection(code: code) }
+                // The code is readable for every group; only a member gets to see it.
+                if live.isMine, let code = live.code { inviteSection(code: code) }
                 membersSection
                 if live.isMine { leaveSection } else { joinSection }
             }
@@ -406,6 +410,13 @@ private struct GroupDetailSheet: View {
                 }
             }
             .task { await loadMembers() }
+            // This sheet sits on top of GroupsView, whose alert stays quiet while
+            // a sheet is up — so a failed join has to land here or nowhere.
+            .alert("Oops", isPresented: errorBinding) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(viewModel.errorMessage ?? "")
+            }
         }
     }
 
@@ -537,21 +548,44 @@ private struct GroupDetailSheet: View {
     private var joinSection: some View {
         Section {
             Button {
-                Haptics.light()
-                let target = live
-                Task {
-                    if let code = target.code, await viewModel.join(code: code) { dismiss() }
-                }
+                join()
             } label: {
-                Text("Join \(live.name)")
-                    .frame(maxWidth: .infinity, minHeight: 44)
+                if isJoining {
+                    ProgressView()
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                } else {
+                    Text("Join \(live.name)")
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
             }
-            .disabled(live.code == nil)
+            .disabled(live.code == nil || isJoining)
+            .accessibilityLabel("Join \(live.name)")
             .accessibilityIdentifier("groups.detail.join")
         } footer: {
             Text("Your drinks start counting for this group from now on.")
         }
         .listRowBackground(Theme.surface)
+    }
+
+    private var errorBinding: Binding<Bool> {
+        Binding(
+            get: { viewModel.errorMessage != nil },
+            set: { if !$0 { viewModel.errorMessage = nil } }
+        )
+    }
+
+    private func join() {
+        guard !isJoining, let code = live.code else { return }
+        Haptics.light()
+        isJoining = true
+        Task {
+            let joined = await viewModel.join(code: code)
+            isJoining = false
+            if joined {
+                Haptics.success()
+                dismiss()
+            }
+        }
     }
 
     private var leaveSection: some View {

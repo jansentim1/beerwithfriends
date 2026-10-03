@@ -7,7 +7,9 @@ import Combine
 public struct GroupSummary: Codable, Equatable, Identifiable, Sendable {
     public var id: String
     public var name: String
-    /// Join code; only present for groups the user is in.
+    /// Join code. Present for every group, because the rules let any signed-in
+    /// user read `groups/{id}`; what is gated is where it is SHOWN (the invite
+    /// section, members only) and it is what the one-tap Join sends.
     public var code: String?
     public var memberCount: Int
     /// Server-maintained: `todayDate` is "YYYY-MM-DD" in Europe/Amsterdam.

@@ -98,6 +98,34 @@ public struct BeerLog: Codable, Equatable, Identifiable, Sendable {
             .sorted { ($1.count, $0.reaction) < ($0.count, $1.reaction) }
     }
     public static let placeMaxLength = 60
+    /// The one place a place name is cut to length. Firestore rules enforce
+    /// `place.size() <= 60` and `size()` counts unicode scalars, while Swift's
+    /// `prefix` counts graphemes — so a 60-"character" name holding one flag or
+    /// skin-toned emoji is 61+ to the rules, which then reject the whole drink
+    /// write and the user loses the beer. Cuts on grapheme boundaries, so a
+    /// clamped name never ends in half an emoji.
+    public static func clampPlace(_ name: String) -> String {
+        var scalars = 0
+        var end = name.startIndex
+        for i in name.indices {
+            let next = scalars + name[i].unicodeScalars.count
+            if next > placeMaxLength { break }
+            scalars = next
+            end = name.index(after: i)
+        }
+        return String(name[name.startIndex..<end])
+    }
+    /// "Café De Zon · Prinsengracht 12": the name says which bar, the street
+    /// says where, and either on its own has been wrong for someone. When the
+    /// pair does not fit, the street goes entirely — a half-cut
+    /// "Café De Zon · Prinsengr" reads as a bug, and the name is the half that
+    /// still identifies the pub.
+    public static func placeName(_ name: String, street: String?) -> String {
+        guard let street, !street.isEmpty,
+              !name.localizedCaseInsensitiveContains(street) else { return clampPlace(name) }
+        let combined = "\(name) · \(street)"
+        return clampPlace(combined) == combined ? combined : clampPlace(name)
+    }
     public static func expiry(from createdAt: Date) -> Date { createdAt.addingTimeInterval(lifetime) }
 
     /// What the feed and the map show: one drink per person, the newest, and

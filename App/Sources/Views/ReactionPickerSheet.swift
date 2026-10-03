@@ -10,6 +10,10 @@ struct ReactionPickerSheet: View {
     /// True once you have cheersed this drink: the 🍻 tile goes quiet rather
     /// than disappearing, so the row of options keeps its shape.
     let hasCheersed: Bool
+    /// True once you have sent a reaction to this drink. The server allows one
+    /// per mate per drink, so everything but 🍻 goes quiet the same way — before
+    /// this the tiles stayed live, buzzed, and sent nothing.
+    let alreadyReacted: Bool
     /// Called with the raw text, or "🍻" for a cheers; the parent routes it.
     let onSend: (String) -> Void
     /// Opens the list of who already reacted.
@@ -30,16 +34,28 @@ struct ReactionPickerSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
-                    Text("Say something back")
-                        .font(Theme.displayTitle2)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .accessibilityAddTraits(.isHeader)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Say something back")
+                            .font(Theme.displayTitle2)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityAddTraits(.isHeader)
+                        // Quiet tiles with no reason given read as broken.
+                        if alreadyReacted {
+                            Text(hasCheersed
+                                 ? "You already reacted and cheersed this one — one of each is the limit."
+                                 : "You already reacted to this one. You can still cheers it.")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
 
                     // The quick way: one tap, sheet closes.
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3),
                               spacing: 10) {
                         ForEach(tiles, id: \.self) { emoji in
-                            let spent = emoji == Reaction.cheers && hasCheersed
+                            let isCheers = emoji == Reaction.cheers
+                            let spent = isCheers ? hasCheersed : alreadyReacted
                             Button {
                                 send(emoji)
                             } label: {
@@ -56,7 +72,9 @@ struct ReactionPickerSheet: View {
                             }
                             .buttonStyle(.plain)
                             .disabled(spent)
-                            .accessibilityLabel(spent ? "Already cheersed" : "React with \(emoji)")
+                            .accessibilityLabel(spent
+                                                ? (isCheers ? "Already cheersed" : "Already reacted")
+                                                : "React with \(emoji)")
                             .accessibilityIdentifier("reaction.preset.\(emoji)")
                         }
                     }
@@ -75,27 +93,36 @@ struct ReactionPickerSheet: View {
                                                          style: .continuous).fill(Theme.surface))
                             .accessibilityIdentifier("reaction.custom")
                             .accessibilityLabel("Custom reaction")
-                        Text("Up to \(Reaction.maxLength) characters. \(ownerName) sees it on their drink.")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .padding(.horizontal, 4)
+                            .disabled(alreadyReacted)
+                            .opacity(alreadyReacted ? 0.5 : 1)
+                        if !alreadyReacted {
+                            Text("Up to \(Reaction.maxLength) characters. \(ownerName) sees it on their drink.")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .padding(.horizontal, 4)
+                        }
                     }
 
+                    let sendDisabled = trimmed == nil || alreadyReacted
                     Button {
                         if let trimmed { send(trimmed) }
                     } label: {
                         Text("Send")
                     }
                     .buttonStyle(HeroButtonStyle())
-                    .disabled(trimmed == nil)
-                    .opacity(trimmed == nil ? 0.5 : 1)
-                    .animation(Theme.quick, value: trimmed == nil)
+                    .disabled(sendDisabled)
+                    .opacity(sendDisabled ? 0.5 : 1)
+                    .animation(Theme.quick, value: sendDisabled)
                     .accessibilityIdentifier("reaction.send")
 
                     Button {
-                        dismiss()
+                        Haptics.light()
+                        // The names open from this sheet's `onDismiss`: two
+                        // sibling sheets handing over while the first is still
+                        // presented is the tap that does nothing.
                         onSeeWho()
+                        dismiss()
                     } label: {
                         Text("See who reacted")
                     }
@@ -124,6 +151,10 @@ struct ReactionPickerSheet: View {
     }
 
     private func send(_ raw: String) {
+        // The quiet controls are the signal; this is the belt that stops a stale
+        // keyboard submit from buzzing success and sending nothing.
+        let spent = raw == Reaction.cheers ? hasCheersed : alreadyReacted
+        guard !spent else { return }
         Haptics.light()
         onSend(raw)
         dismiss()

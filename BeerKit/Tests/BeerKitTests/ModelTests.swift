@@ -149,6 +149,41 @@ import Testing
         #expect(CaptionLayout.stripOpacity == 0.5)
     }
 
+    @Test func clampPlaceStaysWithinTheRulesLimit() {
+        // Short names are left alone.
+        #expect(BeerLog.clampPlace("Café De Zon") == "Café De Zon")
+        #expect(BeerLog.clampPlace("") == "")
+        // Plain ASCII: cut at the limit, one scalar per Character.
+        let long = String(repeating: "x", count: 100)
+        #expect(BeerLog.clampPlace(long) == String(repeating: "x", count: BeerLog.placeMaxLength))
+        // What firestore.rules counts is scalars, so 60 two-scalar flags must
+        // come back well under 60 Characters — and never split mid-flag.
+        let flags = String(repeating: "🇳🇱", count: BeerLog.placeMaxLength)
+        let clamped = BeerLog.clampPlace(flags)
+        #expect(clamped.unicodeScalars.count <= BeerLog.placeMaxLength)
+        #expect(clamped == String(repeating: "🇳🇱", count: BeerLog.placeMaxLength / 2))
+        // A grapheme that does not fit whole is dropped whole.
+        let family = "👨‍👩‍👧‍👦"
+        #expect(BeerLog.clampPlace(String(repeating: family, count: 10)).unicodeScalars.count
+                    <= BeerLog.placeMaxLength)
+    }
+
+    @Test func placeNameDropsTheStreetRatherThanCutIt() {
+        #expect(BeerLog.placeName("Café De Zon", street: "Prinsengracht 12")
+                    == "Café De Zon · Prinsengracht 12")
+        #expect(BeerLog.placeName("Café De Zon", street: nil) == "Café De Zon")
+        // Already in the name: no point repeating it.
+        #expect(BeerLog.placeName("Prinsengracht 12 Bar", street: "Prinsengracht 12")
+                    == "Prinsengracht 12 Bar")
+        // Over the limit the street goes entirely, not half of it.
+        let longName = String(repeating: "y", count: 55)
+        #expect(BeerLog.placeName(longName, street: "Prinsengracht 12") == longName)
+        // And a name that is itself too long is still clamped.
+        let tooLong = String(repeating: "z", count: 80)
+        #expect(BeerLog.placeName(tooLong, street: "Prinsengracht 12").unicodeScalars.count
+                    == BeerLog.placeMaxLength)
+    }
+
     @Test func displayNameNormalizes() {
         #expect(DisplayName.normalize("  Timmy   J\n") == "Timmy J")
         #expect(DisplayName.normalize("   ") == nil)
