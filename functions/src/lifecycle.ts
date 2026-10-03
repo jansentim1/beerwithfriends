@@ -85,12 +85,14 @@ export async function deleteAccountCore(db: Firestore, deletePhoto: PhotoDeleter
   await db.recursiveDelete(db.doc(`friendships/${uid}`));
   await db.recursiveDelete(db.doc(`friendRequests/${uid}`));
   await db.recursiveDelete(db.doc(`blocks/${uid}`));
-  // Traces of this user under OTHER users' documents. All three doc types carry
-  // a queryable uid field for exactly this purpose (see firestore.indexes.json):
-  // requests they sent, and cheers/views they left on friends' beers.
+  // Traces of this user under OTHER users' documents. Every one of these doc
+  // types carries a queryable uid field for exactly this purpose (see
+  // firestore.indexes.json): requests they sent, cheers/views they left on
+  // friends' beers, and the notes they wrote to their groups (which carry their
+  // display name, so they cannot survive the account).
   const sentRequests = await db.collectionGroup("incoming").where("fromUid", "==", uid).get();
   for (const d of sentRequests.docs) await d.ref.delete();
-  for (const coll of ["cheers", "views"]) {
+  for (const coll of ["cheers", "views", "notes"]) {
     const traces = await db.collectionGroup(coll).where("uid", "==", uid).get();
     for (const d of traces.docs) await d.ref.delete();
   }

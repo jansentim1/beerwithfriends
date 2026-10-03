@@ -96,3 +96,34 @@ export async function notifyReply(db: Firestore, push: Pusher, beerOwnerUid: str
   const body = legacy ? legacy.body : "Proost!";
   await push([target], title, body, {});
 }
+
+type NoteDoc = { uid: string; displayName: string; text: string };
+
+/**
+ * A member told the group something ("er wordt lekker gejand op deze
+ * zaterdagmiddag"): the other members hear it, the author never does — they
+ * just typed it. Title carries the group name so a push from two groups at
+ * once is still readable.
+ */
+export async function fanoutGroupNote(db: Firestore, push: Pusher, groupId: string, noteId: string, note: NoteDoc) {
+  const [group, members] = await Promise.all([
+    db.doc(`groups/${groupId}`).get(),
+    db.collection(`groups/${groupId}/members`).get(),
+  ]);
+  const targets: PushTarget[] = [];
+  for (const m of members.docs) {
+    if (m.id === note.uid) continue;
+    // Blocks silence pushes in both directions, matching every other push.
+    const [memberBlockedAuthor, authorBlockedMember] = await Promise.all([
+      db.doc(`blocks/${m.id}/blocked/${note.uid}`).get(),
+      db.doc(`blocks/${note.uid}/blocked/${m.id}`).get(),
+    ]);
+    if (memberBlockedAuthor.exists || authorBlockedMember.exists) continue;
+    const target = await targetFor(db, m.id);
+    if (target) targets.push(target);
+  }
+  if (targets.length === 0) return;
+  const name = note.displayName || "Someone";
+  const groupName = group.get("name") as string | undefined;
+  await push(targets, groupName ? `${name} in ${groupName}` : name, note.text, { groupId, noteId });
+}

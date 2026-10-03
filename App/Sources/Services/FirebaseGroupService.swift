@@ -56,14 +56,55 @@ final class FirebaseGroupService: GroupServicing, @unchecked Sendable {
         )
     }
 
+    /// Joined order; the ranking inside the group re-sorts on the counters
+    /// (`GroupMemberRanking`), which countDrinkForGroups writes here.
     func members(of groupId: String) async throws -> [GroupMember] {
         let snapshot = try await db.collection("groups/\(groupId)/members").getDocuments()
         return snapshot.documents.map { doc in
             GroupMember(id: doc.documentID,
                         username: doc.get("username") as? String ?? "?",
                         displayName: doc.get("displayName") as? String ?? (doc.get("username") as? String ?? "?"),
-                        joinedAt: (doc.get("joinedAt") as? Timestamp)?.dateValue() ?? Date())
+                        joinedAt: (doc.get("joinedAt") as? Timestamp)?.dateValue() ?? Date(),
+                        todayDate: doc.get("todayDate") as? String ?? "",
+                        todayCount: doc.get("todayCount") as? Int ?? 0,
+                        totalCount: doc.get("totalCount") as? Int ?? 0)
         }.sorted { $0.joinedAt < $1.joinedAt }
+    }
+
+    /// One-shot, like `members(of:)`: the sheet re-reads after it writes or
+    /// deletes, which is also how it learns that the server's 60 s cooldown
+    /// dropped a note.
+    func notes(of groupId: String) async throws -> [GroupNote] {
+        let snapshot = try await db.collection("groups/\(groupId)/notes")
+            .order(by: "at", descending: true)
+            .limit(to: 50)
+            .getDocuments()
+        let notes = snapshot.documents.compactMap { doc -> GroupNote? in
+            guard let uid = doc.get("uid") as? String, let text = doc.get("text") as? String else { return nil }
+            return GroupNote(id: doc.documentID,
+                             uid: uid,
+                             displayName: doc.get("displayName") as? String ?? "Someone",
+                             text: text,
+                             // `at` is a server timestamp: nil for the moment a
+                             // local echo is still unacknowledged.
+                             at: (doc.get("at") as? Timestamp)?.dateValue() ?? Date())
+        }
+        return GroupNote.newestFirst(notes)
+    }
+
+    func postNote(groupId: String, text: String, displayName: String) async throws {
+        // serverTimestamp() is not a nicety: the rules demand `at == request.time`,
+        // which is what makes the server-side cooldown unfakeable.
+        _ = try await db.collection("groups/\(groupId)/notes").addDocument(data: [
+            "uid": uid,
+            "displayName": String(displayName.prefix(60)),
+            "text": text,
+            "at": FieldValue.serverTimestamp(),
+        ])
+    }
+
+    func deleteNote(groupId: String, noteId: String) async throws {
+        try await db.document("groups/\(groupId)/notes/\(noteId)").delete()
     }
 
     func create(name: String) async throws -> GroupSummary {

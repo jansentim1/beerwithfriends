@@ -2,12 +2,17 @@ import { Firestore, Timestamp, FieldValue, Transaction } from "firebase-admin/fi
 
 // Groups: mates whose drinks are counted together for the leaderboard.
 //   groups/{id}            { name, code, createdBy, createdAt, memberCount, todayDate, todayCount, totalCount }
-//   groups/{id}/members/{uid}  { username, joinedAt }
+//   groups/{id}/members/{uid}  { username, displayName, joinedAt, todayDate, todayCount, totalCount }
+//   groups/{id}/notes/{noteId} { uid, displayName, text, at }
 //   users/{uid}/groups/{id}    { name, joinedAt }   (mirror: "my groups" without a collection-group query)
-// All writes go through these functions (rules deny client writes).
+// All writes go through these functions (rules deny client writes), except notes,
+// which members create themselves (rules validate the shape).
 
 export const GROUP_MAX_MEMBERS = 50;
 export const GROUP_NAME_MAX = 30;
+/** Matches the drink cooldown: a group chat is not what notes are for. The
+ *  1..140 character bound is the rules' job — they see the write first. */
+export const NOTE_COOLDOWN_MS = 60_000;
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no 0/O/1/I
 
 export class GroupError extends Error {
@@ -32,6 +37,11 @@ async function profileOf(db: Firestore, uid: string): Promise<{ username: string
   return { username, displayName: (u.get("displayName") as string | undefined) || username };
 }
 
+/** A new member starts at zero, so the ranking inside the group never shows a gap. */
+function freshMemberCounts(now: Date) {
+  return { todayDate: amsterdamDay(now), todayCount: 0, totalCount: 0 };
+}
+
 export async function createGroupCore(db: Firestore, uid: string, rawName: string, now = new Date(), rnd: () => number = Math.random) {
   const name = rawName.trim();
   if (name.length < 1 || name.length > GROUP_NAME_MAX) throw new GroupError("INVALID_NAME");
@@ -49,7 +59,7 @@ export async function createGroupCore(db: Firestore, uid: string, rawName: strin
     name, code, createdBy: uid, createdAt: Timestamp.fromDate(now), memberCount: 1,
     todayDate: amsterdamDay(now), todayCount: 0, totalCount: 0,
   });
-  batch.set(ref.collection("members").doc(uid), { username, displayName, joinedAt: Timestamp.fromDate(now) });
+  batch.set(ref.collection("members").doc(uid), { username, displayName, joinedAt: Timestamp.fromDate(now), ...freshMemberCounts(now) });
   batch.set(db.doc(`users/${uid}/groups/${ref.id}`), { name, joinedAt: Timestamp.fromDate(now) });
   await batch.commit();
   return { id: ref.id, name, code };
@@ -66,7 +76,7 @@ export async function joinGroupCore(db: Firestore, uid: string, rawCode: string,
     if (!group.exists) throw new GroupError("NOT_FOUND");
     if (member.exists) throw new GroupError("ALREADY_MEMBER");
     if ((group.get("memberCount") ?? 0) >= GROUP_MAX_MEMBERS) throw new GroupError("FULL");
-    tx.set(ref.collection("members").doc(uid), { username, displayName, joinedAt: Timestamp.fromDate(now) });
+    tx.set(ref.collection("members").doc(uid), { username, displayName, joinedAt: Timestamp.fromDate(now), ...freshMemberCounts(now) });
     tx.set(db.doc(`users/${uid}/groups/${ref.id}`), { name: group.get("name"), joinedAt: Timestamp.fromDate(now) });
     tx.update(ref, { memberCount: FieldValue.increment(1) });
     return group.get("name") as string;
@@ -76,24 +86,34 @@ export async function joinGroupCore(db: Firestore, uid: string, rawCode: string,
 
 export async function leaveGroupCore(db: Firestore, uid: string, groupId: string) {
   const ref = db.doc(`groups/${groupId}`);
-  await db.runTransaction(async (tx: Transaction) => {
+  const emptied = await db.runTransaction(async (tx: Transaction) => {
     const [group, member] = await Promise.all([tx.get(ref), tx.get(ref.collection("members").doc(uid))]);
     if (!group.exists) throw new GroupError("NOT_FOUND");
     if (!member.exists) throw new GroupError("NOT_MEMBER");
     tx.delete(ref.collection("members").doc(uid));
     tx.delete(db.doc(`users/${uid}/groups/${groupId}`));
     const remaining = (group.get("memberCount") ?? 1) - 1;
-    if (remaining <= 0) tx.delete(ref); else tx.update(ref, { memberCount: remaining });
+    if (remaining <= 0) { tx.delete(ref); return true; }
+    tx.update(ref, { memberCount: remaining });
+    return false;
   });
+  // Deleting a doc leaves its subcollections behind, so the notes of a group
+  // nobody is in would linger unreadable forever.
+  if (emptied) await db.recursiveDelete(ref);
 }
 
-/** Called for every new drink: +1 today and total on each of the owner's groups. */
+/**
+ * Called for every new drink: +1 today and total on each of the owner's groups,
+ * and on their own member doc — the ranking of PEOPLE inside a group reads off
+ * the member docs the list already loads, so no second query and no fan-in.
+ */
 export async function countDrinkForGroups(db: Firestore, ownerUid: string, createdAt: Date) {
   const day = amsterdamDay(createdAt);
   const memberships = await db.collection(`users/${ownerUid}/groups`).get();
   await Promise.all(memberships.docs.map((m) => db.runTransaction(async (tx: Transaction) => {
     const ref = db.doc(`groups/${m.id}`);
-    const group = await tx.get(ref);
+    const memberRef = ref.collection("members").doc(ownerUid);
+    const [group, member] = await Promise.all([tx.get(ref), tx.get(memberRef)]);
     if (!group.exists) return;
     const sameDay = group.get("todayDate") === day;
     tx.update(ref, {
@@ -101,5 +121,33 @@ export async function countDrinkForGroups(db: Firestore, ownerUid: string, creat
       todayCount: sameDay ? FieldValue.increment(1) : 1,
       totalCount: FieldValue.increment(1),
     });
+    // A stale mirror (left the group, mirror not yet gone) must not resurrect a
+    // member doc, and tx.update on a missing doc would fail the group count too.
+    if (!member.exists) return;
+    const memberSameDay = member.get("todayDate") === day;
+    tx.update(memberRef, {
+      todayDate: day,
+      todayCount: memberSameDay ? FieldValue.increment(1) : 1,
+      totalCount: FieldValue.increment(1),
+    });
   })));
+}
+
+/**
+ * One note per member per minute, the same shape as enforceDrinkCooldown: the
+ * offending doc is deleted and the caller skips the push. Rules pin `at` to
+ * request.time, so the window cannot be faked from the client.
+ */
+export async function enforceNoteCooldown(db: Firestore, groupId: string, noteId: string, uid: string, at: Date): Promise<boolean> {
+  const notes = db.collection(`groups/${groupId}/notes`);
+  const since = Timestamp.fromDate(new Date(at.getTime() - NOTE_COOLDOWN_MS));
+  const recent = await notes
+    .where("uid", "==", uid)
+    .where("at", ">=", since)
+    .where("at", "<", Timestamp.fromDate(at))
+    .limit(1)
+    .get();
+  if (recent.empty) return true;
+  await notes.doc(noteId).delete();
+  return false;
 }

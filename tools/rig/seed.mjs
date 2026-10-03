@@ -36,6 +36,9 @@ const joost = await user("joost@test.local", "joost");
 // The feed shows one drink per person, so a second mate carries the older
 // pils (reply pill + second map pin).
 const menno = await user("menno@test.local", "menno");
+// In De Kroeg, but deliberately NOT one of tim's mates: the group's one-tap
+// "add everyone as mates" needs someone left to ask.
+const sander = await user("sander@test.local", "sander");
 for (const mate of [joost, menno]) {
   await db.doc(`friendships/${tim}/friends/${mate}`).set({ since: Timestamp.now() });
   await db.doc(`friendships/${mate}/friends/${tim}`).set({ since: Timestamp.now() });
@@ -71,15 +74,35 @@ await mk("seed-mine", tim, "tim", "special", 9, {
 });
 
 const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Amsterdam", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
+const usernames = { [tim]: "tim", [joost]: "joost", [menno]: "menno", [sander]: "sander" };
+// `members` is [uid, todayCount, totalCount] per person: the detail sheet ranks
+// people against each other, so without per-member counts every row ties at 0.
 const group = async (id, name, code, members, todayCount, totalCount) => {
-  await db.doc(`groups/${id}`).set({ name, code, createdBy: members[0], createdAt: Timestamp.now(), memberCount: members.length, todayDate: day, todayCount, totalCount });
-  for (const m of members) {
-    const uname = m === tim ? "tim" : "joost";
-    await db.doc(`groups/${id}/members/${m}`).set({ username: uname, displayName: uname === "tim" ? "Tim" : "Joost", joinedAt: Timestamp.now() });
+  await db.doc(`groups/${id}`).set({ name, code, createdBy: members[0][0], createdAt: Timestamp.now(), memberCount: members.length, todayDate: day, todayCount, totalCount });
+  for (const [m, today, total] of members) {
+    const uname = usernames[m];
+    await db.doc(`groups/${id}/members/${m}`).set({
+      username: uname, displayName: uname[0].toUpperCase() + uname.slice(1), joinedAt: Timestamp.now(),
+      todayDate: day, todayCount: today, totalCount: total,
+    });
     await db.doc(`users/${m}/groups/${id}`).set({ name, joinedAt: Timestamp.now() });
   }
 };
-await group("seed-kroeg", "De Kroeg", "KROEG7", [tim, joost], 3, 12);
-await group("seed-rivalen", "De Rivalen", "RIVAL9", [joost], 5, 40);
-await group("seed-stil", "Stille Drinkers", "STIL22", [joost], 0, 3);
+// Sander is in De Kroeg but is not one of tim's mates, so "Add everyone as
+// mates" has someone to ask — and his empty row shows a member at zero.
+await group("seed-kroeg", "De Kroeg", "KROEG7", [[tim, 2, 7], [joost, 1, 5], [sander, 0, 0]], 3, 12);
+await group("seed-rivalen", "De Rivalen", "RIVAL9", [[joost, 5, 40]], 5, 40);
+await group("seed-stil", "Stille Drinkers", "STIL22", [[joost, 0, 3]], 0, 3);
+
+// Two notes in the group the rig opens, from two different authors: the 60 s
+// per-member cooldown (onGroupNoteCreated) would delete a second one from the
+// same uid.
+const note = async (groupId, id, uid, displayName, text, minutesAgo) =>
+  db.doc(`groups/${groupId}/notes/${id}`).set({
+    uid, displayName, text,
+    at: Timestamp.fromDate(new Date(now.getTime() - minutesAgo * 60_000)),
+  });
+await note("seed-kroeg", "seed-note-joost", joost, "Joost",
+  "wilde even meedelen dat er lekker wordt gejand op deze zaterdagmiddag", 7);
+await note("seed-kroeg", "seed-note-tim", tim, "Tim", "om 17:00 bij De Zon, eerste rondje is van mij", 52);
 console.log("seeded:", { tim, joost });

@@ -37,12 +37,12 @@
     <tr><td>Friend list, friend requests, blocks</td><td>To decide whose drinks you see and who can see yours.</td><td class="where">Firestore</td></tr>
     <tr><td>Groups you join</td><td>The Groups leaderboard: group name, join code, your username and nickname as a member, and how many drinks the group logged today and in total.</td><td class="where">Firestore <code>groups/{groupId}</code></td></tr>
     <tr><td>Push notification token</td><td>To send "X is having a beer" and "Y cheersed you" notifications. Stored in a private subcollection only you and the server can read. Removed on sign-out.</td><td class="where">Firestore <code>users/{uid}/private/push</code></td></tr>
-    <tr><td>Place on a drink (optional)</td><td>Off by default. If you switch on "Share where I'm drinking", the name of the bar or the city, and that place's map position, are attached to a drink you log, so mates see it in the feed and on the Map tab. Your phone's exact position is used once, locally, to find the place; the position stored is the bar's or the city centre's, rounded to about 100 metres, never yours.</td><td class="where">Firestore <code>beers/{beerId}.place</code> and <code>placeCoordinate</code>, deleted with the drink</td></tr>
+    <tr><td>Place on a drink</td><td>Required to log a drink. The name of the bar or the city, and that place's map position, are attached to a drink you log, so mates see it in the feed and on the Map tab. Your phone's position is used at the moment you log, to find the place; what is stored is the place's own position, rounded to about 100 metres. Logging is not possible without granting location, and nothing is read when you are not logging.</td><td class="where">Firestore <code>beers/{beerId}.place</code> and <code>placeCoordinate</code>, deleted with the drink</td></tr>
     <tr><td>What you drank</td><td>The drink type you picked (pils, wine, cocktail, ...).</td><td class="where">Firestore <code>beers/{beerId}.drink</code></td></tr>
     <tr><td>Username changes</td><td>The time of your last username change, to limit changes to once a day.</td><td class="where">Firestore <code>users/{uid}.usernameChangedAt</code></td></tr>
     <tr><td>Reports you file</td><td>Trust and safety review. Only the reporter's id, the reported user or drink, and the reason are stored.</td><td class="where">Firestore <code>reports</code></td></tr>
   </table>
-  <p>We do not collect your email, contacts, photo library, analytics, or advertising identifiers. Location is only used, on your phone, to name a place when you opt in. The camera is the only photo source, and only when you tap a glass to log a drink.</p>
+  <p>We do not collect your email, contacts, photo library, analytics, or advertising identifiers. Location is read only at the moment you log a drink, to name the place it goes out with. The camera is the only photo source, and only when you tap a glass to log a drink.</p>
 
   <h2>What we do not do</h2>
   <ul>

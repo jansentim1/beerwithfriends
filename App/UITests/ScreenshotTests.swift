@@ -83,7 +83,30 @@ final class ScreenshotTests: XCTestCase {
         snap("08c-groups-populated")
         app.staticTexts["De Kroeg"].firstMatch.tap()
         sleep(2)
+        // The ranking of people inside the group: each row is one combined
+        // accessibility element, so it is found by what that label carries
+        // (the seed gives Tim 2 today and Joost 1).
+        let joostRank = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label CONTAINS %@", "@joost"))
+            .firstMatch
+        XCTAssertTrue(joostRank.waitForExistence(timeout: 10), "per-member ranking missing")
         snap("08d-group-detail")
+
+        // Notes sit under the ranking, so they need the scroll before they are
+        // in the hierarchy at all (the List is lazy).
+        app.swipeUp()
+        let note = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label CONTAINS %@", "gejand"))
+            .firstMatch
+        XCTAssertTrue(note.waitForExistence(timeout: 10), "seeded group note missing")
+        XCTAssertTrue(app.textFields["groups.detail.noteField"].exists, "note composer missing")
+        snap("08i-group-notes")
+
+        // One click to mate the whole group: seeded Sander is in De Kroeg and is
+        // not one of tim's mates, so the button has someone to ask.
+        app.swipeUp()
+        XCTAssertTrue(app.buttons["groups.detail.addMates"].waitForExistence(timeout: 5),
+                      "add-everyone-as-mates button missing")
         if app.buttons["Close"].exists { app.buttons["Close"].tap() } else { app.swipeDown() }
 
         app.tabBars.buttons["Settings"].tap()

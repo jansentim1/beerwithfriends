@@ -30,6 +30,8 @@ struct HomeView: View {
     /// on its own: a drink without a photo is not a drink (Tim: "ik wil eigenlijk
     /// dat je altijd een foto moet toevoegen").
     @State private var showCamera = false
+    /// Raised when the location was refused: logging cannot continue without it.
+    @State private var showLocationNeeded = false
     @State private var photoViewer: PhotoViewerItem?
     /// The drink whose cheers list is open. Re-read from the live feed while the
     /// sheet is up, so a cheers landing now shows up in it.
@@ -154,6 +156,16 @@ struct HomeView: View {
                 Button("OK", role: .cancel) {}
             } message: {
                 Text(viewModel.errorMessage ?? "")
+            }
+            .alert("PubDates needs your location", isPresented: $showLocationNeeded) {
+                Button("Open Settings") {
+                    if let url = URL(string: UIApplication.openSettingsURLString) {
+                        UIApplication.shared.open(url)
+                    }
+                }
+                Button("Not now", role: .cancel) {}
+            } message: {
+                Text("A drink carries the place you had it, so your mates can find you. Turn Location on for PubDates and tap the glass again.")
             }
         }
         // Changing the id cancels the previous start(); the new one awaits the old
@@ -316,9 +328,21 @@ struct HomeView: View {
     /// as one move — pour, then shoot — rather than a sheet cutting it off.
     private func openCameraAfterPour(_ kind: DrinkKind) {
         Task { @MainActor in
-            try? await Task.sleep(for: .seconds(reduceMotion ? 0.18 : 0.35))
+            // A drink carries where it was had, so the permission is settled
+            // here — before the camera, while the pour is still running (Tim,
+            // 2026-10-03: "i want people to need to accept location to post").
+            // Asking after the shot would throw away a photo just taken.
+            let allowed = await LocationPlaceProvider.shared.requestPermission()
             // A second glass tapped during the pour wins; only the drink still
             // pending gets a camera.
+            guard pendingDrink == kind, !showCamera else { return }
+            guard allowed else {
+                pendingDrink = nil
+                pourReset += 1       // the glass goes back; nothing was logged
+                showLocationNeeded = true
+                return
+            }
+            try? await Task.sleep(for: .seconds(reduceMotion ? 0.18 : 0.35))
             guard pendingDrink == kind, !showCamera else { return }
             showCamera = true
         }

@@ -13,6 +13,12 @@ service cloud.firestore {
       return !exists(/databases/$(db)/documents/blocks/$(otherUid)/blocked/$(me()))
         && !exists(/databases/$(db)/documents/blocks/$(me())/blocked/$(otherUid));
     }
+    // Membership is the server-written members doc — the same doc the group's
+    // member list and the per-person ranking read. (users/{uid}/groups is only
+    // a mirror, so it is not a second source of truth.)
+    function isGroupMember(groupId) {
+      return exists(/databases/$(db)/documents/groups/$(groupId)/members/$(me()));
+    }
     function beerOwner(beerId) {
       return get(/databases/$(db)/documents/beers/$(beerId)).data.ownerUid;
     }
@@ -75,15 +81,42 @@ service cloud.firestore {
       allow delete: if signedIn() && (me() == uid || me() == friendUid);
     }
 
-    // Groups: readable by anyone signed in (the leaderboard is app-wide); all
-    // writes go through the createGroup/joinGroup/leaveGroup callables and the
-    // onBeerCreated counter, so clients never write here.
+    // Groups: readable by anyone signed in (the leaderboard is app-wide). The
+    // group and member docs are server-only — createGroup/joinGroup/leaveGroup
+    // and the onBeerCreated counter write them; notes (below) are the one thing
+    // a client creates here.
     match /groups/{groupId} {
       allow read: if signedIn();
       allow write: if false;
       match /members/{uid} {
+        // todayDate/todayCount/totalCount are written by countDrinkForGroups
+        // only: the per-person ranking cannot be forged from a phone.
         allow read: if signedIn();
         allow write: if false;
+      }
+
+      // Notes: a line to your own group ("er wordt lekker gejand op deze
+      // zaterdagmiddag"). Members only, both ways. Never edited, so the push
+      // text and what the group reads can never drift apart. Delete is the
+      // author's, matching beers: taking back your own words is the one bit of
+      // moderation every UGC app needs, and it is one clause.
+      match /notes/{noteId} {
+        allow read: if signedIn() && isGroupMember(groupId);
+        allow create: if signedIn() && isGroupMember(groupId)
+          && request.resource.data.keys().hasOnly(['uid','displayName','text','at'])
+          && request.resource.data.uid == me()
+          && request.resource.data.displayName is string
+          && request.resource.data.displayName.size() >= 1
+          && request.resource.data.displayName.size() <= 60
+          && request.resource.data.text is string
+          && request.resource.data.text.size() >= 1
+          && request.resource.data.text.size() <= 140
+          // == request.time pins clients to serverTimestamp(), which is what
+          // makes the 60 s server-side cooldown unfakeable.
+          && request.resource.data.at is timestamp
+          && request.resource.data.at == request.time;
+        allow update: if false;
+        allow delete: if signedIn() && resource.data.uid == me();
       }
     }
 

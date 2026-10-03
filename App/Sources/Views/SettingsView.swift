@@ -34,7 +34,12 @@ struct SettingsView: View {
     @State private var errorMessage: String?
     /// Opt-in place naming. The same key `LocationPlaceProvider` reads before it
     /// ever touches Core Location, so this switch alone decides.
-    @AppStorage("sharePlace") private var sharePlace = false
+    /// Whether iOS currently lets us read the location. Read on appear, because
+    /// the person may have changed it in iOS Settings while we were away.
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var locationAuthorized = false
+
+    private var locationStateText: String { locationAuthorized ? "On" : "Off — needed to log" }
 
     // Placeholder until Task 11/12 publish the real policy URL.
     private let privacyPolicyURL = URL(string: "https://example.com/beerwithme/privacy")!
@@ -67,6 +72,11 @@ struct SettingsView: View {
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.large)
             .task { await loadBlocked() }
+            .task { locationAuthorized = LocationPlaceProvider.shared.isLocationAuthorized }
+            .onChange(of: scenePhase) { _, phase in
+                // Coming back from iOS Settings is the usual way this changes.
+                if phase == .active { locationAuthorized = LocationPlaceProvider.shared.isLocationAuthorized }
+            }
             .refreshable { await loadBlocked() }
             // A rebuild with a different profile (another device changed the
             // handle) wins over the locally shown one.
@@ -234,20 +244,31 @@ struct SettingsView: View {
     /// and only to your mates.
     private var privacySection: some View {
         Section {
-            Toggle("Share where I'm drinking", isOn: $sharePlace)
-                // The list tints words with `accentInk`; a switch is a fill.
-                .tint(Theme.accent)
-                .frame(minHeight: 44)
-                .accessibilityIdentifier("settings.sharePlace")
-                .onChange(of: sharePlace) { _, isOn in
-                    // Ask here, where the sentence below explains why — not at
-                    // tap time on the log button.
-                    if isOn { LocationPlaceProvider.shared.requestPermissionIfNeeded() }
+            // Not a switch any more: a drink carries where it was had, or it is
+            // not logged (Tim, 2026-10-03). The only control left is iOS's own.
+            Button {
+                guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+                UIApplication.shared.open(url)
+            } label: {
+                HStack(spacing: 8) {
+                    LabeledContent("Location", value: locationStateText)
+                    Image(systemName: "arrow.up.right")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.tertiary)
+                        .accessibilityHidden(true)
                 }
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("settings.sharePlace")
+            .accessibilityLabel("Location")
+            .accessibilityValue(locationStateText)
+            .accessibilityHint("Opens iOS Settings for PubDates")
         } header: {
             Text("Privacy")
         } footer: {
-            Text("The bar's name and its map position go with your drink, never your own location. Mates only, in the feed and on the Map.")
+            Text("Logging a drink needs your location: the place you're at goes with it, so mates see it in the feed and on the Map. Nothing is shared when you're not logging.")
         }
         .listRowBackground(Theme.surface)
     }

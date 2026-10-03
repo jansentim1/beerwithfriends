@@ -113,6 +113,16 @@ describe("deleteAccountCore", () => {
     await deleteAccountCore(db, deletePhoto, "u1");
     expect((await db.doc("friendRequests/u2/incoming/u1").get()).exists).toBe(false);
   });
+  it("purges the notes the user wrote to their groups", async () => {
+    await seedUser(db, "u1", "tim");
+    await db.doc("groups/g1").set({ name: "De Kroeg", code: "KROEG7", createdBy: "u2", memberCount: 2, todayCount: 0, totalCount: 0 });
+    await db.doc("groups/g1/notes/n1").set({ uid: "u1", displayName: "tim", text: "er wordt lekker gejand", at: Timestamp.fromDate(NOW) });
+    await db.doc("groups/g1/notes/n2").set({ uid: "u2", displayName: "joost", text: "kom erbij", at: Timestamp.fromDate(NOW) });
+    await deleteAccountCore(db, deletePhoto, "u1");
+    expect((await db.doc("groups/g1/notes/n1").get()).exists).toBe(false);
+    expect((await db.doc("groups/g1/notes/n2").get()).exists).toBe(true);
+  });
+
   it("leaves every group: member doc gone, count down, empty group deleted", async () => {
     await seedUser(db, "u1", "tim");
     await db.doc("groups/g1").set({ name: "De Kroeg", code: "KROEG7", createdBy: "u2", memberCount: 2, todayCount: 0, totalCount: 0 });

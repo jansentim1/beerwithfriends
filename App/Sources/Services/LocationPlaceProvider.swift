@@ -28,7 +28,8 @@ final class LocationPlaceProvider: NSObject, PlaceProviding, CLLocationManagerDe
     /// for a name. A second manager would mean a second system prompt.
     static let shared = LocationPlaceProvider()
 
-    /// Mirrors `@AppStorage("sharePlace")` in SettingsView — the master switch.
+    /// Dead as a switch since 2026-10-03 (Tim: "i want people to need to accept
+    /// location to post"), kept only so an old stored value can be cleared.
     static let sharePlaceKey = "sharePlace"
 
     /// Whole-lookup budget. The beer row is already on screen; this is the most
@@ -54,7 +55,6 @@ final class LocationPlaceProvider: NSObject, PlaceProviding, CLLocationManagerDe
     // MARK: - PlaceProviding
 
     func currentPlace() async -> PlaceResult? {
-        guard UserDefaults.standard.bool(forKey: Self.sharePlaceKey) else { return nil }
         // Timeout.run returns nil on timeout, and the operation itself returns an
         // optional result — hence the double optional, flattened here.
         let resolved: PlaceResult?? = await BeerKit.Timeout.run(seconds: Self.overallTimeout) { [self] in
@@ -67,6 +67,22 @@ final class LocationPlaceProvider: NSObject, PlaceProviding, CLLocationManagerDe
     /// user dot only when it is, and asks nothing when it isn't. Goes through the
     /// one shared manager on purpose — a second CLLocationManager would be a
     /// second system prompt waiting to happen.
+    /// Has the person been asked yet? Logging asks before it pours, so a refusal
+    /// is a sentence on screen rather than a drink that silently lands placeless.
+    @MainActor
+    var isLocationDecided: Bool { sharedManager().authorizationStatus != .notDetermined }
+
+    /// Asks and waits, so the caller can act on the answer. Returns whether the
+    /// app may now use the location.
+    func requestPermission() async -> Bool {
+        let status = await currentAuthorizationStatus()
+        if status == .notDetermined {
+            let granted = await requestAuthorizationAndWait()
+            return granted == .authorizedWhenInUse || granted == .authorizedAlways
+        }
+        return status == .authorizedWhenInUse || status == .authorizedAlways
+    }
+
     @MainActor
     var isLocationAuthorized: Bool {
         switch sharedManager().authorizationStatus {

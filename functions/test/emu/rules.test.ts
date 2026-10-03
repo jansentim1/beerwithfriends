@@ -5,7 +5,7 @@ import {
 } from "@firebase/rules-unit-testing";
 import {
   doc, getDoc, setDoc, deleteDoc, updateDoc,
-  collection, getDocs, query, where, serverTimestamp, Timestamp,
+  collection, getDocs, query, where, orderBy, serverTimestamp, Timestamp,
 } from "firebase/firestore";
 import { ref, getBytes, uploadBytes, deleteObject } from "firebase/storage";
 import { GeoPoint } from "firebase/firestore";
@@ -349,6 +349,68 @@ describe("firestore rules: friend requests and friendships", () => {
   it("either side can delete the friendship edge; strangers cannot", async () => {
     await assertSucceeds(deleteDoc(doc(fs("friend"), "friendships/owner/friends/friend")));
     await assertFails(deleteDoc(doc(fs("stranger"), "friendships/owner/friends/friend")));
+  });
+});
+
+describe("firestore rules: group notes", () => {
+  // "member" is in g1, "stranger" is not; membership is the members doc, which
+  // only the server writes.
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, "groups/g1"), { name: "De Kroeg", memberCount: 1, todayDate: "2026-09-12", todayCount: 0, totalCount: 0 });
+      await setDoc(doc(db, "groups/g1/members/member"), { username: "tim", displayName: "Tim", joinedAt: 1, todayDate: "2026-09-12", todayCount: 0, totalCount: 0 });
+    });
+  });
+
+  const note = (uid: string, text: string) => ({ uid, displayName: "Tim", text, at: serverTimestamp() });
+
+  it("a member posts a note; a non-member cannot", async () => {
+    await assertSucceeds(setDoc(doc(fs("member"), "groups/g1/notes/n1"), note("member", "er wordt lekker gejand")));
+    await assertFails(setDoc(doc(fs("stranger"), "groups/g1/notes/n2"), note("stranger", "laat mij erin")));
+  });
+
+  it("notes are 1..140 characters of text, nothing else", async () => {
+    const me = fs("member");
+    await assertSucceeds(setDoc(doc(me, "groups/g1/notes/ok"), note("member", "x".repeat(140))));
+    await assertFails(setDoc(doc(me, "groups/g1/notes/long"), note("member", "x".repeat(141))));
+    await assertFails(setDoc(doc(me, "groups/g1/notes/empty"), note("member", "")));
+    await assertFails(setDoc(doc(me, "groups/g1/notes/num"), { ...note("member", "x"), text: 42 }));
+    await assertFails(setDoc(doc(me, "groups/g1/notes/extra"), { ...note("member", "x"), extra: true }));
+    await assertFails(setDoc(doc(me, "groups/g1/notes/noname"), { uid: "member", text: "x", at: serverTimestamp() }));
+  });
+
+  it("the author cannot be faked and `at` must be the server's clock", async () => {
+    await assertFails(setDoc(doc(fs("member"), "groups/g1/notes/n3"), note("someone-else", "niet van mij")));
+    await assertFails(setDoc(doc(fs("member"), "groups/g1/notes/n4"), { ...note("member", "x"), at: Timestamp.now() }));
+  });
+
+  it("members read the notes, outsiders cannot — not the doc, not the list", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "groups/g1/notes/n1"), { uid: "member", displayName: "Tim", text: "proost", at: 1 });
+    });
+    await assertSucceeds(getDoc(doc(fs("member"), "groups/g1/notes/n1")));
+    await assertSucceeds(getDocs(query(collection(fs("member"), "groups/g1/notes"), orderBy("at", "desc"))));
+    await assertFails(getDoc(doc(fs("stranger"), "groups/g1/notes/n1")));
+    await assertFails(getDocs(collection(fs("stranger"), "groups/g1/notes")));
+  });
+
+  it("a note is never edited; only its author deletes it", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, "groups/g1/notes/n1"), { uid: "member", displayName: "Tim", text: "proost", at: 1 });
+      await setDoc(doc(db, "groups/g1/members/other"), { username: "joost", displayName: "Joost", joinedAt: 1 });
+    });
+    await assertFails(updateDoc(doc(fs("member"), "groups/g1/notes/n1"), { text: "iets anders" }));
+    await assertFails(deleteDoc(doc(fs("other"), "groups/g1/notes/n1")));   // fellow member, not the author
+    await assertSucceeds(deleteDoc(doc(fs("member"), "groups/g1/notes/n1")));
+  });
+
+  it("group and member docs stay server-only: a client cannot forge a ranking", async () => {
+    await assertFails(updateDoc(doc(fs("member"), "groups/g1/members/member"), { todayCount: 99, totalCount: 99 }));
+    await assertFails(setDoc(doc(fs("member"), "groups/g1/members/member"), { username: "tim", displayName: "Tim", joinedAt: 1, todayDate: "2026-09-12", todayCount: 99, totalCount: 99 }));
+    await assertFails(deleteDoc(doc(fs("member"), "groups/g1/members/member")));
+    await assertFails(updateDoc(doc(fs("member"), "groups/g1"), { totalCount: 999 }));
   });
 });
 

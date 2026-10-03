@@ -8,10 +8,10 @@ import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
 import { getMessaging } from "firebase-admin/messaging";
 import { getPhotoOnceCore, PhotoError, PhotoErrorCode } from "./photo";
-import { fanoutBeerCreated, notifyCheers, notifyFriendRequest, notifyReply, Pusher, reactionValue } from "./pushes";
+import { fanoutBeerCreated, fanoutGroupNote, notifyCheers, notifyFriendRequest, notifyReply, Pusher, reactionValue } from "./pushes";
 import { sendApns, deadTokens } from "./apns";
 import { loadApnsKey } from "./apnsKey";
-import { createGroupCore, joinGroupCore, leaveGroupCore, countDrinkForGroups, GroupError } from "./groups";
+import { createGroupCore, joinGroupCore, leaveGroupCore, countDrinkForGroups, enforceNoteCooldown, GroupError } from "./groups";
 import { mirrorFriendship, severOnBlock, cleanupExpiredCore, deleteAccountCore, changeUsernameCore, changeDisplayNameCore, enforceDrinkCooldown, supersedeOlderDrinks, mirrorCheersName, mirrorReplyName, UsernameError, DisplayNameError, PhotoDeleter } from "./lifecycle";
 
 // Colocated with Firestore + Storage (europe-west4); see .firebaserc / tools/deploy.sh.
@@ -176,6 +176,22 @@ export const leaveGroup = onCall(async (req) => {
   if (typeof req.data?.groupId !== "string") throw new HttpsError("invalid-argument", "groupId required");
   await groupCall(() => leaveGroupCore(getFirestore(), req.auth!.uid, req.data.groupId));
   return { ok: true };
+});
+
+export const onGroupNoteCreated = onDocumentCreated("groups/{groupId}/notes/{noteId}", async (event) => {
+  const note = event.data?.data();
+  if (!note) return;
+  const at = (note.at as { toDate?: () => Date } | undefined)?.toDate?.() ?? new Date();
+  // Anti-spam: one note per member per minute; extras are deleted, no pushes.
+  // Fail OPEN like the drink cooldown: a broken check must not silence a group.
+  try {
+    const ok = await enforceNoteCooldown(getFirestore(), event.params.groupId, event.params.noteId, note.uid, at);
+    if (!ok) { console.warn(`cooldown: dropped groups/${event.params.groupId}/notes/${event.params.noteId} from ${note.uid}`); return; }
+  } catch (e) {
+    console.error("note cooldown check failed, continuing with fanout", e);
+  }
+  await fanoutGroupNote(getFirestore(), push, event.params.groupId, event.params.noteId,
+    note as { uid: string; displayName: string; text: string });
 });
 
 export const onReplyCreated = onDocumentCreated("beers/{beerId}/replies/{uid}", async (event) => {

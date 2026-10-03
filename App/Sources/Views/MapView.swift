@@ -30,7 +30,8 @@ struct MapView: View {
     @State private var beers: [BeerLog] = []
     /// Opens on the Netherlands rather than a whole-globe `.automatic` view: with
     /// no pins and no blue dot, `.automatic` has nothing to frame and lands on a
-    /// view of the planet. Handed back to `.automatic` the moment pins exist.
+    /// view of the planet. Replaced by a region around the pins the moment there
+    /// are any — see `frameFirstPins()`.
     @State private var position: MapCameraPosition = MapView.defaultPosition
     /// Set once, the first time pins arrive, so re-framing never yanks a camera
     /// the user has since panned.
@@ -95,10 +96,14 @@ struct MapView: View {
         }
     }
 
-    /// One pin: the drawn glass of whoever poured last, on a 36 pt amber wash
+    /// One pin: the drawn glass of whoever poured last, on a 48 pt amber wash
     /// over a surface disc (a wash on a card, per the No-Shadow Rule), plus a
     /// count when several mates share the spot. No initials badge — at 20 pt the
     /// letters are 8 pt and unreadable, and the callout names everyone here.
+    ///
+    /// 48 and not 36: testers could not find the pin on a map zoomed out past a
+    /// city ("embleempje mag wat groter", 2026-10-03). The proportions are the
+    /// old ones scaled, so the glass still reads as the feed's glass.
     private func marker(for cluster: DrinkCluster) -> some View {
         let newest = cluster.newest
         return Button {
@@ -107,26 +112,28 @@ struct MapView: View {
         } label: {
             Circle()
                 .fill(Theme.surface)
-                .frame(width: 36, height: 36)
+                .frame(width: 60, height: 60)
                 .overlay {
                     Circle().fill(Theme.accentSoft)
                 }
                 .overlay {
                     // The glass drains with the beer, exactly as in the feed.
-                    DrinkGlassView(kind: newest.drink, level: newest.fillLevel(now: Date()), size: 22)
+                    DrinkGlassView(kind: newest.drink, level: newest.fillLevel(now: Date()), size: 38)
                 }
                 .overlay(alignment: .topTrailing) {
                     if cluster.beers.count > 1 {
                         Text("\(cluster.beers.count)")
-                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                            .font(.system(size: 13, weight: .bold, design: .rounded))
                             .foregroundStyle(Theme.onAccent)
-                            .frame(width: 18, height: 18)
+                            .frame(width: 22, height: 22)
                             .background(Theme.accent, in: Circle())
-                            .offset(x: 5, y: -5)
+                            .offset(x: 6, y: -6)
                     }
                 }
-                // The paint is 36 pt; the target is 44 (the 44-Point Rule).
-                .frame(width: 44, height: 44)
+                // 60 pt: a pin has to carry a drawn glass and read at a glance on
+                // a map, which 36 and then 48 still did not (Tim, twice). Paint
+                // and target are the one circle; the badge overhangs it.
+                .frame(width: 60, height: 60)
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
@@ -235,7 +242,9 @@ struct MapView: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
                 }
-                Text(beer.createdAt, style: .relative)
+                // `style: .relative` spells this out as "5 hrs, 50 min"; the feed
+                // says "5 h". Same formatter, so the two can never drift.
+                Text(HomeView.relativeLabel(beer.createdAt, now: Date()))
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -305,14 +314,56 @@ struct MapView: View {
         )
     }
 
-    /// The first snapshot that has pins hands the camera to MapKit, which frames
-    /// them (and the blue dot, when it is showing). Once only: after that the
+    /// Zoom bounds for the first framing, in degrees of latitude/longitude.
+    ///
+    /// `.automatic` used to do this job and opened Ireland-to-Tunisia for a
+    /// single drink in Noord-Holland (tester screenshot, 2026-10-03): with one
+    /// coordinate and no blue dot it has no extent to fit, so it falls back to a
+    /// continent. A lone pin belongs at a street you could walk, hence the floor;
+    /// the ceiling keeps mates two countries apart on one screen instead of
+    /// framing them so wide that every pin is a speck again.
+    private static let minimumFramingSpan = 0.03
+    private static let maximumFramingSpan = 6.0
+    /// Extra breathing room around the pins, as a fraction of their extent, so no
+    /// pin is painted half off the edge it defines.
+    private static let framingMargin = 0.4
+
+    /// The box every pin fits in, padded and clamped. `nil` with no pins, which
+    /// is what keeps `defaultPosition` on screen until there is something to frame.
+    private static func framingRegion(for coordinates: [Coordinate]) -> MKCoordinateRegion? {
+        guard let first = coordinates.first else { return nil }
+        var minLatitude = first.latitude, maxLatitude = first.latitude
+        var minLongitude = first.longitude, maxLongitude = first.longitude
+        for coordinate in coordinates.dropFirst() {
+            minLatitude = min(minLatitude, coordinate.latitude)
+            maxLatitude = max(maxLatitude, coordinate.latitude)
+            minLongitude = min(minLongitude, coordinate.longitude)
+            maxLongitude = max(maxLongitude, coordinate.longitude)
+        }
+        return MKCoordinateRegion(
+            center: CLLocationCoordinate2D(
+                latitude: (minLatitude + maxLatitude) / 2,
+                longitude: (minLongitude + maxLongitude) / 2
+            ),
+            span: MKCoordinateSpan(
+                latitudeDelta: clampedSpan(maxLatitude - minLatitude),
+                longitudeDelta: clampedSpan(maxLongitude - minLongitude)
+            )
+        )
+    }
+
+    private static func clampedSpan(_ extent: Double) -> Double {
+        min(maximumFramingSpan, max(minimumFramingSpan, extent * (1 + framingMargin)))
+    }
+
+    /// The first snapshot that has pins frames them. Once only: after that the
     /// camera belongs to whoever is panning it.
     @MainActor
     private func frameFirstPins() {
-        guard !hasFramedPins, !clusters.isEmpty else { return }
+        guard !hasFramedPins,
+              let region = Self.framingRegion(for: clusters.map(\.coordinate)) else { return }
         hasFramedPins = true
-        withAnimation(Theme.spring) { position = .automatic }
+        withAnimation(Theme.spring) { position = .region(region) }
     }
 
     // MARK: - Clustering

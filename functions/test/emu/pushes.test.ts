@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Timestamp } from "firebase-admin/firestore";
 import { initTestDb, seedUser, seedFriends, clearDb } from "./helpers";
-import { fanoutBeerCreated, notifyCheers, notifyFriendRequest, notifyReply, reactionValue, Pusher, PushTarget } from "../../src/pushes";
+import { fanoutBeerCreated, fanoutGroupNote, notifyCheers, notifyFriendRequest, notifyReply, reactionValue, Pusher, PushTarget } from "../../src/pushes";
 
 const db = initTestDb();
 type Sent = { tokens: string[]; targets: PushTarget[]; title: string; body: string };
@@ -111,3 +111,40 @@ describe("notifyFriendRequest", () => {
   });
 });
 
+describe("fanoutGroupNote", () => {
+  const note = { uid: "owner", displayName: "Gijs", text: "er wordt lekker gejand op deze zaterdagmiddag" };
+  beforeEach(async () => {
+    await db.doc("groups/g1").set({ name: "De Kroeg", memberCount: 3 });
+    for (const uid of ["owner", "friend", "blocker"]) {
+      await db.doc(`groups/g1/members/${uid}`).set({ username: uid, displayName: uid, todayCount: 0, totalCount: 0 });
+    }
+  });
+
+  it("tells the other members, names the group, never the author", async () => {
+    await fanoutGroupNote(db, push, "g1", "n1", note);
+    expect(sent).toHaveLength(1);
+    expect(sent[0].tokens).toEqual(["tok-friend"]);   // "blocker" blocked owner, author excluded
+    expect(sent[0].title).toBe("Gijs in De Kroeg");
+    expect(sent[0].body).toBe(note.text);
+  });
+
+  it("stays silent across a block the author made", async () => {
+    await db.doc("blocks/owner/blocked/friend").set({ at: Timestamp.now() });
+    await fanoutGroupNote(db, push, "g1", "n1", note);
+    expect(sent).toHaveLength(0);
+  });
+
+  it("skips members without a device instead of failing", async () => {
+    await seedUser(db, "silent", "piet");   // no push token
+    await db.doc("groups/g1/members/silent").set({ username: "piet", displayName: "Piet" });
+    await fanoutGroupNote(db, push, "g1", "n1", note);
+    expect(sent[0].tokens).toEqual(["tok-friend"]);
+  });
+
+  it("a note in a group of one pushes nobody", async () => {
+    await db.doc("groups/g1/members/friend").delete();
+    await db.doc("groups/g1/members/blocker").delete();
+    await fanoutGroupNote(db, push, "g1", "n1", note);
+    expect(sent).toHaveLength(0);
+  });
+});
