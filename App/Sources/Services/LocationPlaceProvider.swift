@@ -131,7 +131,12 @@ final class LocationPlaceProvider: NSObject, PlaceProviding, CLLocationManagerDe
             // Nameless (or no) match: fall through to the city, exactly as before.
             guard let nearest, let name = nearest.name else { return nil }
             let spot = nearest.placemark.coordinate
-            return (name, Coordinate(latitude: spot.latitude, longitude: spot.longitude))
+            // The POI's own placemark already carries the street, so naming it
+            // costs no extra round trip (Tim, 2026-10-03: the pub name alone was
+            // unrecognisable — "Super knajpka przy sluzie" for a spot everyone
+            // knows as het sluysje).
+            return (Self.withStreet(name, from: nearest.placemark),
+                    Coordinate(latitude: spot.latitude, longitude: spot.longitude))
         } catch {
             // Silent by design: MapKit errors can echo the query location.
             return nil
@@ -143,6 +148,23 @@ final class LocationPlaceProvider: NSObject, PlaceProviding, CLLocationManagerDe
     }
 
     /// Fallback when no drinking spot is nearby: just the city.
+    /// "Café De Zon · Prinsengracht 12" when the street is known, else the name
+    /// on its own. Both, because the name says which bar and the street says
+    /// where — and either alone has been wrong for someone.
+    private static func withStreet(_ name: String, from placemark: CLPlacemark) -> String {
+        guard let street = street(from: placemark), !name.localizedCaseInsensitiveContains(street) else {
+            return name
+        }
+        return "\(name) · \(street)"
+    }
+
+    /// "Prinsengracht 12", or just the street when there is no number.
+    private static func street(from placemark: CLPlacemark) -> String? {
+        guard let road = placemark.thoroughfare else { return nil }
+        guard let number = placemark.subThoroughfare else { return road }
+        return "\(road) \(number)"
+    }
+
     private func cityPlace(
         near coordinate: CLLocationCoordinate2D
     ) async -> (name: String, coordinate: Coordinate?)? {
@@ -151,8 +173,12 @@ final class LocationPlaceProvider: NSObject, PlaceProviding, CLLocationManagerDe
         do {
             let placemarks = try await geocoder.reverseGeocodeLocation(location)
             guard let placemark = placemarks.first else { return nil }
-            guard let name = placemark.locality ?? placemark.subLocality ?? placemark.administrativeArea
-            else { return nil }
+            // No pub nearby: the street beats the city, and the city is the
+            // last resort rather than the first answer.
+            let area = placemark.locality ?? placemark.subLocality ?? placemark.administrativeArea
+            guard let name = Self.street(from: placemark).map({ street in
+                area.map { "\(street), \($0)" } ?? street
+            }) ?? area else { return nil }
             // The city's own centre as the geocoder reports it — nil rather than
             // the device fix when it has none.
             let centre = placemark.location?.coordinate

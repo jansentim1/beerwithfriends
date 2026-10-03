@@ -36,7 +36,10 @@ const photoErrorStatus: Record<PhotoErrorCode, FunctionsErrorCode> = {
   ALREADY_VIEWED: "failed-precondition",
 };
 
-export const getPhotoOnce = onCall(async (req) => {
+// One instance stays warm. Measured in production: warm this answers in
+// 0.1–0.35 s, but new instances spun up several times a day and a cold Node
+// start is seconds — which is the pause before a photo appears.
+export const getPhotoOnce = onCall({ minInstances: 1 }, async (req) => {
   if (!req.auth) throw new HttpsError("unauthenticated", "Sign in required");
   const beerId = req.data?.beerId;
   if (typeof beerId !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(beerId)) {

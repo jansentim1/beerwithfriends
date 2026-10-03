@@ -9,6 +9,11 @@ public enum Reaction {
     /// text size; the two that a push notification can also send are in here.
     public static let presets = ["🔥", "😂", "🤤", "🏃", "😩", "🎉"]
 
+    /// Not a reaction like the rest: cheers has its own counter and its own
+    /// push. It sits in the picker so one tap reaches everything, and the
+    /// caller routes this value to `cheers` instead of `reply`.
+    public static let cheers = "🍻"
+
     /// Characters, counted the way a person would: a skin-toned emoji is one.
     public static let maxLength = 24
 

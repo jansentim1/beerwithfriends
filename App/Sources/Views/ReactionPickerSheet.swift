@@ -7,8 +7,18 @@ import SwiftUI
 /// so this closes as soon as something is sent.
 struct ReactionPickerSheet: View {
     let ownerName: String
-    /// Called with the raw text; the view model normalizes and sends.
+    /// True once you have cheersed this drink: the 🍻 tile goes quiet rather
+    /// than disappearing, so the row of options keeps its shape.
+    let hasCheersed: Bool
+    /// Called with the raw text, or "🍻" for a cheers; the parent routes it.
     let onSend: (String) -> Void
+    /// Opens the list of who already reacted.
+    let onSeeWho: () -> Void
+
+    /// Cheers first — it is the one everyone reaches for, and the pill that
+    /// opens this sheet is the 🍻 pill (Tim, 2026-10-03: pressing it should
+    /// open the options, not just send a like).
+    private var tiles: [String] { [Reaction.cheers] + Reaction.presets }
 
     @Environment(\.dismiss) private var dismiss
     @State private var custom = ""
@@ -28,7 +38,8 @@ struct ReactionPickerSheet: View {
                     // The quick way: one tap, sheet closes.
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3),
                               spacing: 10) {
-                        ForEach(Reaction.presets, id: \.self) { emoji in
+                        ForEach(tiles, id: \.self) { emoji in
+                            let spent = emoji == Reaction.cheers && hasCheersed
                             Button {
                                 send(emoji)
                             } label: {
@@ -36,11 +47,16 @@ struct ReactionPickerSheet: View {
                                     .font(.system(size: 30))
                                     .frame(maxWidth: .infinity)
                                     .frame(height: 60)
-                                    .background(Theme.accentSoft, in: RoundedRectangle(
-                                        cornerRadius: Theme.cardRadius, style: .continuous))
+                                    .background(
+                                        spent ? AnyShapeStyle(Color(.tertiarySystemFill))
+                                              : AnyShapeStyle(Theme.accentSoft),
+                                        in: RoundedRectangle(cornerRadius: Theme.cardRadius,
+                                                             style: .continuous))
+                                    .opacity(spent ? 0.5 : 1)
                             }
                             .buttonStyle(.plain)
-                            .accessibilityLabel("React with \(emoji)")
+                            .disabled(spent)
+                            .accessibilityLabel(spent ? "Already cheersed" : "React with \(emoji)")
                             .accessibilityIdentifier("reaction.preset.\(emoji)")
                         }
                     }
@@ -76,6 +92,17 @@ struct ReactionPickerSheet: View {
                     .opacity(trimmed == nil ? 0.5 : 1)
                     .animation(Theme.quick, value: trimmed == nil)
                     .accessibilityIdentifier("reaction.send")
+
+                    Button {
+                        dismiss()
+                        onSeeWho()
+                    } label: {
+                        Text("See who reacted")
+                    }
+                    .buttonStyle(PillButtonStyle(emphasis: .quiet))
+                    .frame(minHeight: 44)
+                    .frame(maxWidth: .infinity)
+                    .accessibilityIdentifier("reaction.seeWho")
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 20)

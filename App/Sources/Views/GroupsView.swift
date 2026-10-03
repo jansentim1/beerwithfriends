@@ -390,7 +390,7 @@ private struct GroupDetailSheet: View {
                 headerSection
                 if let code = live.code { inviteSection(code: code) }
                 membersSection
-                if live.isMine { leaveSection }
+                if live.isMine { leaveSection } else { joinSection }
             }
             .listStyle(.insetGrouped)
             .scrollContentBackground(.hidden)
@@ -527,6 +527,29 @@ private struct GroupDetailSheet: View {
             }
         } header: {
             Eyebrow(text: "Mates")
+        }
+        .listRowBackground(Theme.surface)
+    }
+
+    /// Every group is readable in the app, so a group you are not in already
+    /// shows you its name, its tally and its code. Asking you to copy that code
+    /// into another sheet was busywork (Tim, 2026-10-03: "make it easier").
+    private var joinSection: some View {
+        Section {
+            Button {
+                Haptics.light()
+                let target = live
+                Task {
+                    if let code = target.code, await viewModel.join(code: code) { dismiss() }
+                }
+            } label: {
+                Text("Join \(live.name)")
+                    .frame(maxWidth: .infinity, minHeight: 44)
+            }
+            .disabled(live.code == nil)
+            .accessibilityIdentifier("groups.detail.join")
+        } footer: {
+            Text("Your drinks start counting for this group from now on.")
         }
         .listRowBackground(Theme.surface)
     }

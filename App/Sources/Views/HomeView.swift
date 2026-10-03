@@ -192,10 +192,17 @@ struct HomeView: View {
         }
         .sheet(item: $reactionTarget) { beer in
             ReactionPickerSheet(
-                ownerName: beer.ownerUid == profile.id ? "You" : beer.ownerName
-            ) { raw in
-                Task { await viewModel.reply(beer, reaction: raw, myUid: profile.id) }
-            }
+                ownerName: beer.ownerUid == profile.id ? "You" : beer.ownerName,
+                hasCheersed: viewModel.cheersedBeerIds.contains(beer.id),
+                onSend: { raw in
+                    if raw == Reaction.cheers {
+                        Task { await viewModel.cheers(beer) }
+                    } else {
+                        Task { await viewModel.reply(beer, reaction: raw, myUid: profile.id) }
+                    }
+                },
+                onSeeWho: { openReactions(beer) }
+            )
         }
         .sheet(isPresented: reactionsBinding) {
             if let beer = viewModel.feed.first(where: { $0.id == reactionsBeerId }) {
@@ -658,14 +665,12 @@ struct HomeView: View {
     private func cheersButton(for beer: BeerLog) -> some View {
         // Cheersed already? The pill keeps its quiet look but changes job: it
         // opens the names instead of being a control that does nothing.
+        // One tap opens everything you can send back, cheers included. Sending
+        // a cheers straight from the pill made the other reactions invisible.
         let hasCheersed = viewModel.cheersedBeerIds.contains(beer.id)
         return Button {
-            if hasCheersed {
-                openReactions(beer)
-            } else {
-                Haptics.light()
-                Task { await viewModel.cheers(beer) }
-            }
+            Haptics.light()
+            reactionTarget = beer
         } label: {
             HStack(spacing: 4) {
                 Text("🍻")
@@ -681,7 +686,7 @@ struct HomeView: View {
                 ? "Cheersed, \(beer.cheersCount) so far"
                 : "Cheers, \(beer.cheersCount) so far"
         )
-        .accessibilityHint(hasCheersed ? "See who cheersed" : "")
+        .accessibilityHint("Opens cheers and the other reactions")
     }
 
     // MARK: - Actions
