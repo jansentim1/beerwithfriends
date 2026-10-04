@@ -116,17 +116,33 @@ final class LocationPlaceProvider: NSObject, PlaceProviding, CLLocationManagerDe
         guard status == .authorizedWhenInUse || status == .authorizedAlways else { return nil }
 
         guard let coordinate = await awaitLocationFix() else { return nil }
-        // The coordinate that leaves this class is ALWAYS the place's, never the
-        // device fix above: the POI's own coordinate, or the one the reverse
-        // geocoder gives for the city. `Coordinate` rounds it to ~100 m again.
-        if let poi = await nearbyPointOfInterest(near: coordinate) {
-            guard let name = shortened(poi.name) else { return nil }
-            return PlaceResult(name: name, coordinate: poi.coordinate)
+        // Tim, 2026-10-04, after being told this publishes a home address when
+        // someone drinks at home: "home address is fine, you only share with
+        // your friends right?" — which is true, `beers/{id}` is readable by the
+        // owner and accepted mates only. So the label is the street you are
+        // actually standing in, not a pub that happens to be within 120 m; the
+        // nearby-pub guess kept naming the wrong place.
+        let here = await address(near: coordinate)
+        // A venue at the same spot is still named, because "Café De Zon ·
+        // Prinsengracht 12" reads better than an address alone.
+        let venue = await nearbyPointOfInterest(near: coordinate)?.name
+
+        if let street = here?.street {
+            return PlaceResult(name: BeerLog.placeName(venue ?? street,
+                                                       street: venue == nil ? nil : street),
+                               coordinate: Coordinate(latitude: coordinate.latitude,
+                                                      longitude: coordinate.longitude))
         }
-        guard let city = await cityPlace(near: coordinate), let name = shortened(city.name) else {
-            return nil
+        // No street from the geocoder (open water, a field): the venue, else the city.
+        if let venue, let name = shortened(venue) {
+            return PlaceResult(name: name,
+                               coordinate: Coordinate(latitude: coordinate.latitude,
+                                                      longitude: coordinate.longitude))
         }
-        return PlaceResult(name: name, coordinate: city.coordinate)
+        guard let city = here?.city, let name = shortened(city) else { return nil }
+        return PlaceResult(name: name,
+                           coordinate: Coordinate(latitude: coordinate.latitude,
+                                                  longitude: coordinate.longitude))
     }
 
     /// The bar itself, when there is one within `poiRadius` — filtered to places
@@ -174,6 +190,24 @@ final class LocationPlaceProvider: NSObject, PlaceProviding, CLLocationManagerDe
         guard let road = placemark.thoroughfare else { return nil }
         guard let number = placemark.subThoroughfare else { return road }
         return "\(road) \(number)"
+    }
+
+    /// The street you are standing in, from a reverse geocode of the device fix.
+    /// This is the one lookup here that really is about the person rather than a
+    /// venue, which is why the privacy policy names it explicitly.
+    private func address(
+        near coordinate: CLLocationCoordinate2D
+    ) async -> (street: String?, city: String?)? {
+        let geocoder = CLGeocoder()
+        let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+        do {
+            let placemarks = try await geocoder.reverseGeocodeLocation(location)
+            guard let placemark = placemarks.first else { return nil }
+            let city = placemark.locality ?? placemark.subLocality ?? placemark.administrativeArea
+            return (Self.street(from: placemark), city)
+        } catch {
+            return nil
+        }
     }
 
     /// Fallback when no drinking spot is nearby: just the city.

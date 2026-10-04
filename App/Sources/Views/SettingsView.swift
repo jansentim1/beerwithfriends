@@ -268,7 +268,7 @@ struct SettingsView: View {
         } header: {
             Text("Privacy")
         } footer: {
-            Text("Logging a drink needs your location: the place you're at goes with it, so mates see it in the feed and on the Map. Nothing is shared when you're not logging.")
+            Text("Logging a drink needs your location: the address you're at goes with it, so your mates can come find you. Only mates you accepted can see it, and it goes when the drink does.")
         }
         .listRowBackground(Theme.surface)
     }
