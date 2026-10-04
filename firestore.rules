@@ -28,6 +28,13 @@ service cloud.firestore {
       return beerOwner(beerId) == me() || isFriendOf(beerOwner(beerId));
     }
 
+    // The update floor, read before anyone is signed in (that is the point of
+    // it), written only from the console or a deploy. Nothing private lives here.
+    match /config/{doc} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     match /users/{uid} {
       allow get: if signedIn();
       allow list: if false;  // no directory dumping

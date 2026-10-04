@@ -191,3 +191,23 @@ import Testing
         #expect(DisplayName.normalize(String(repeating: "x", count: 30)) != nil)
     }
 }
+
+@Suite struct VersionGateTests {
+    @Test func blocksOnlyBelowTheFloor() {
+        #expect(VersionGate.isSupported(build: "37", minimum: 37))
+        #expect(VersionGate.isSupported(build: "38", minimum: 37))
+        #expect(!VersionGate.isSupported(build: "36", minimum: 37))
+        #expect(!VersionGate.isSupported(build: "1", minimum: 37))
+    }
+    @Test func failsOpenOnAnythingItCannotRead() {
+        // No config yet, no build string, or a build this code cannot parse:
+        // never brick the app over a read that did not land.
+        #expect(VersionGate.isSupported(build: "37", minimum: nil))
+        #expect(VersionGate.isSupported(build: nil, minimum: 37))
+        #expect(VersionGate.isSupported(build: "nonsense", minimum: 37))
+    }
+    @Test func acceptsADottedBuildString() {
+        #expect(VersionGate.isSupported(build: "37.2", minimum: 37))
+        #expect(!VersionGate.isSupported(build: "36.9", minimum: 37))
+    }
+}

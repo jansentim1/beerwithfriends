@@ -85,6 +85,9 @@ struct BeerWithFriendsApp: App {
             RootView()
                 .environmentObject(appState)
                 .task { appState.start() }
+                // Independent of sign-in: an out-of-date build should not reach
+                // a feed at all. Fails open, so a missed read changes nothing.
+                .task { await appState.checkVersionFloor() }
                 // pubdates://add/<username> — hand the name to FriendsView and
                 // bring that tab forward.
                 .onOpenURL { url in
@@ -107,14 +110,18 @@ struct RootView: View {
     @EnvironmentObject private var appState: AppState
 
     var body: some View {
-        switch appState.phase {
-        case .loading:
-            ProgressView("Pouring…")
-        case .signedOut, .needsUsername, .profileUnavailable:
-            OnboardingView()
-        case .ready(let profile):
-            MainTabView(profile: profile)
-                .id(profile.id) // fresh view state (and HomeViewModel) per account
+        if appState.needsUpdate {
+            UpdateRequiredView()
+        } else {
+            switch appState.phase {
+            case .loading:
+                ProgressView("Pouring…")
+            case .signedOut, .needsUsername, .profileUnavailable:
+                OnboardingView()
+            case .ready(let profile):
+                MainTabView(profile: profile)
+                    .id(profile.id) // fresh view state (and HomeViewModel) per account
+            }
         }
     }
 }

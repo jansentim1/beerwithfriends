@@ -46,6 +46,19 @@ final class AppState: ObservableObject {
 
     /// Attach the Firebase auth listener. Call once from the root view's `.task`
     /// (after `FirebaseApp.configure()` has run in the AppDelegate).
+    /// False once the server says this build is too old to run. Fails open: a
+    /// failed read must never lock anyone out (see `VersionGate`).
+    @Published public private(set) var needsUpdate = false
+
+    /// Reads the update floor. Called once at launch, before and independently
+    /// of sign-in, because an out-of-date build should not get as far as a feed.
+    func checkVersionFloor() async {
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String
+        let snap = try? await Firestore.firestore().document("config/app").getDocument()
+        let minimum = snap?.get("minBuild") as? Int
+        needsUpdate = !VersionGate.isSupported(build: build, minimum: minimum)
+    }
+
     func start() {
         guard authListener == nil else { return }
         authListener = Auth.auth().addStateDidChangeListener { [weak self] _, user in
