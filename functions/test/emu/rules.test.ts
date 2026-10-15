@@ -141,6 +141,12 @@ describe("firestore rules: beers", () => {
     await assertFails(setDoc(doc(me, "beers/bc5"), { ...validBeer("owner"), caption: 42 }));
   });
 
+  it("beer create: a client cannot set the server-only noPush flag", async () => {
+    const me = fs("owner");
+    await assertFails(setDoc(doc(me, "beers/bn1"), { ...validBeer("owner"), noPush: true }));
+    await assertFails(setDoc(doc(me, "beers/bn2"), { ...validBeer("owner"), noPush: false }));
+  });
+
   it("beer create rejects immortal or malformed lifetimes", async () => {
     const me = fs("owner");
     // expiresAt beyond the 25h cap

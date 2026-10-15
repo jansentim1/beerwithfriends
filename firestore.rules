@@ -132,6 +132,8 @@ service cloud.firestore {
       // feed's multi-owner `in` query within the rules get() budget.
       allow read: if signedIn() && (resource.data.ownerUid == me()
         || isFriendOf(resource.data.ownerUid));
+      // hasOnly also keeps clients from `noPush`, the flag on the review
+      // mate's server-written drinks that skips the push fanout.
       allow create: if signedIn()
         && request.resource.data.keys().hasOnly(['ownerUid','ownerName','createdAt','expiresAt','hasPhoto','photoPath','cheersCount','place','placeCoordinate','drink','caption'])
         // Optional caption, drawn onto the photo and kept as text for VoiceOver.

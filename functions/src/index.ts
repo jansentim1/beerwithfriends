@@ -12,6 +12,9 @@ import { fanoutBeerCreated, fanoutGroupNote, notifyCheers, notifyFriendRequest, 
 import { sendApns, deadTokens } from "./apns";
 import { loadApnsKey } from "./apnsKey";
 import { createGroupCore, joinGroupCore, leaveGroupCore, countDrinkForGroups, enforceNoteCooldown, GroupError } from "./groups";
+import { REVIEW_UID, autoAcceptReviewRequest, keepReviewMateAliveCore, PhotoUploader } from "./reviewMate";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { mirrorFriendship, severOnBlock, cleanupExpiredCore, deleteAccountCore, changeUsernameCore, changeDisplayNameCore, enforceDrinkCooldown, supersedeOlderDrinks, mirrorCheersName, mirrorReplyName, UsernameError, DisplayNameError, PhotoDeleter } from "./lifecycle";
 
 // Colocated with Firestore + Storage (europe-west4); see .firebaserc / tools/deploy.sh.
@@ -101,6 +104,8 @@ export const onBeerCreated = onDocumentCreated("beers/{beerId}", async (event) =
   }
   // Leaderboard: count the drink for every group the owner is in (never blocks pushes).
   countDrinkForGroups(getFirestore(), beer.ownerUid, createdAt).catch((e) => console.error("group count failed", e));
+  // Server-written drinks (the review mate's) set noPush; rules keep clients from it.
+  if (beer.noPush === true) return;
   await fanoutBeerCreated(getFirestore(), push, event.params.beerId,
     beer as { ownerUid: string; ownerName: string; hasPhoto: boolean; place?: string });
 });
@@ -214,6 +219,11 @@ const storagePhotoDeleter: PhotoDeleter = async (path) => {
 export const onFriendRequestCreated = onDocumentCreated("friendRequests/{toUid}/incoming/{fromUid}", async (event) => {
   const data = event.data?.data();
   if (!data) return;
+  // The review mate says yes by itself; it has no device to push to.
+  if (event.params.toUid === REVIEW_UID) {
+    await autoAcceptReviewRequest(getFirestore(), push, event.params.fromUid);
+    return;
+  }
   const name = (data.fromDisplayName as string | undefined) || (data.fromUsername as string | undefined) || "Someone";
   await notifyFriendRequest(getFirestore(), push, event.params.toUid, event.params.fromUid, name);
 });
@@ -228,6 +238,18 @@ export const onBlockCreated = onDocumentCreated("blocks/{uid}/blocked/{blockedUi
 
 export const cleanupExpired = onSchedule("every 60 minutes", async () => {
   await cleanupExpiredCore(getFirestore(), storagePhotoDeleter);
+});
+
+const storagePhotoUploader: PhotoUploader = async (path, bytes) => {
+  await getStorage().bucket().file(path).save(bytes, { contentType: "image/jpeg", resumable: false });
+};
+
+// Keeps a live drink on the review account while config/app.reviewMate is
+// true (see docs/RUNBOOK.md "Review mate"). Off, it reads one doc and stops.
+export const keepReviewMateAlive = onSchedule("every 45 minutes", async () => {
+  const photo = readFileSync(join(__dirname, "..", "assets", "review-pint.jpg"));
+  const result = await keepReviewMateAliveCore(getFirestore(), storagePhotoUploader, storagePhotoDeleter, photo);
+  if (result !== "off") console.log(`review mate: ${result}`);
 });
 
 export const deleteAccount = onCall(async (req) => {
