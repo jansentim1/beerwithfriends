@@ -31,8 +31,12 @@ final class FakeGroups: GroupServicing, @unchecked Sendable {
 
 @Suite struct GroupsTests {
     let now = { Date(timeIntervalSince1970: 1_789_000_000) } // 2026-09-10 in Amsterdam
-    func g(_ id: String, today: Int, total: Int, date: String = "2026-09-10", mine: Bool = false) -> GroupSummary {
-        GroupSummary(id: id, name: id, memberCount: 3, todayDate: date, todayCount: today, totalCount: total, isMine: mine)
+    /// 2026-09-10 at `hh:mm` UTC, for "first out" stamps.
+    func at(_ hh: Int, _ mm: Int = 0) -> Date { Date(timeIntervalSince1970: 1_788_998_400 + Double(hh * 3600 + mm * 60)) }
+    func g(_ id: String, out: Int, firstAt: Date? = nil, today: Int = 0, total: Int = 0,
+           date: String = "2026-09-10", mine: Bool = false) -> GroupSummary {
+        GroupSummary(id: id, name: id, memberCount: 3, todayDate: date, todayCount: today, totalCount: total,
+                     todayOutCount: out, todayFirstAt: firstAt, isMine: mine)
     }
 
     @Test func todayIsAmsterdamDate() {
@@ -41,22 +45,46 @@ final class FakeGroups: GroupServicing, @unchecked Sendable {
         #expect(GroupDay.today(now: Date(timeIntervalSince1970: 1_789_083_000)) == "2026-09-11")
     }
 
-    @Test @MainActor func rankingUsesTodayThenTotalAndTreatsStaleAsZero() async {
+    @Test func anchorDateIsTheTenthInAmsterdam() {
+        #expect(GroupDay.today(now: at(0)) == "2026-09-10")
+        #expect(GroupDay.clock(at(17, 12)) == "19:12")   // CEST
+    }
+
+    @Test @MainActor func rankingUsesWhoIsOutNotHowMuch() async {
         let svc = FakeGroups()
         let vm = LeaderboardViewModel(service: svc, now: now)
         let running = Task { await vm.start() }
         while svc.continuation == nil { await Task.yield() }
         svc.continuation?.yield([
-            g("quiet", today: 9, total: 90, date: "2026-09-09"),   // stale: counts as 0 today
-            g("busy", today: 4, total: 10),
-            g("steady", today: 4, total: 40, mine: true),
-            g("new", today: 0, total: 0),
+            g("quiet", out: 5, firstAt: at(9), today: 30, total: 90, date: "2026-09-09"), // stale: nobody out today
+            g("late", out: 2, firstAt: at(20), today: 12, total: 10),  // drank the most: irrelevant
+            g("early", out: 2, firstAt: at(17), today: 2, total: 40, mine: true),
+            g("crowd", out: 3, firstAt: at(21), today: 3),
+            g("new", out: 0),
         ])
         for _ in 0..<50 where vm.groups.isEmpty { await Task.yield() }
-        #expect(vm.ranked.map(\.id) == ["steady", "busy", "quiet", "new"])
-        #expect(vm.rank(of: vm.groups.first { $0.id == "busy" }!) == 2)
-        #expect(vm.mine.map(\.id) == ["steady"])
+        #expect(vm.ranked.map(\.id) == ["crowd", "early", "late", "new", "quiet"])
+        #expect(vm.rank(of: vm.groups.first { $0.id == "early" }!) == 2)
+        #expect(vm.mine.map(\.id) == ["early"])
         running.cancel(); await running.value
+    }
+
+    @Test func groupOutTodayIgnoresAStaleDay() {
+        let stale = g("x", out: 4, firstAt: at(18), date: "2026-09-09")
+        #expect(stale.outToday("2026-09-10") == 0)
+        #expect(stale.firstOutAt("2026-09-10") == nil)
+        let live = g("y", out: 4, firstAt: at(18))
+        #expect(live.outToday("2026-09-10") == 4)
+        #expect(live.firstOutAt("2026-09-10") == at(18))
+    }
+
+    @Test func groupSummaryDecodesDocsFromBeforeWhoIsOut() throws {
+        let old = Data(#"{"id":"g","name":"De Kroeg","memberCount":3,"todayDate":"2026-09-10","todayCount":4,"totalCount":9,"isMine":true}"#.utf8)
+        let group = try JSONDecoder().decode(GroupSummary.self, from: old)
+        #expect(group.todayOutCount == 0)
+        #expect(group.todayFirstAt == nil)
+        #expect(group.outToday("2026-09-10") == 0)
+        #expect(group.todayCount == 4)
     }
 
     @Test @MainActor func createValidatesName() async {
@@ -78,31 +106,43 @@ final class FakeGroups: GroupServicing, @unchecked Sendable {
         #expect(vm.errorMessage?.contains("ZZZ") == true)
     }
 
-    func m(_ id: String, today: Int, total: Int, date: String = "2026-09-10", name: String? = nil) -> GroupMember {
+    func m(_ id: String, today: Int, total: Int, date: String = "2026-09-10", name: String? = nil,
+           firstAt: Date? = nil) -> GroupMember {
         GroupMember(id: id, username: id, displayName: name ?? id, joinedAt: Date(timeIntervalSince1970: 0),
-                    todayDate: date, todayCount: today, totalCount: total)
+                    todayDate: date, todayCount: today, totalCount: total, todayFirstAt: firstAt)
     }
 
-    @Test func memberRankingMatchesTheGroupLeaderboardOrder() {
+    @Test func memberRankingPutsFirstOutFirstNotMostDrinks() {
         let ranking = GroupMemberRanking([
-            m("quiet", today: 9, total: 90, date: "2026-09-09"),  // stale: counts as 0 today
-            m("busy", today: 4, total: 10),
-            m("steady", today: 4, total: 40),
-            m("new", today: 0, total: 0),
+            m("quiet", today: 9, total: 90, date: "2026-09-09", firstAt: at(8)),  // stale: not out today
+            m("heavy", today: 12, total: 10, firstAt: at(20)),                    // most drinks, out last
+            m("early", today: 1, total: 40, firstAt: at(17, 12)),
+            m("zed", today: 0, total: 0, name: "Zed"),
+            m("anna", today: 0, total: 50, name: "anna"),
         ], today: "2026-09-10")
-        #expect(ranking.members.map(\.id) == ["steady", "busy", "quiet", "new"])
-        #expect(ranking.rank(of: "steady") == 1)
-        #expect(ranking.rank(of: "busy") == 2)
+        #expect(ranking.members.map(\.id) == ["early", "heavy", "anna", "quiet", "zed"])
+        #expect(ranking.rank(of: "early") == 1)
+        #expect(ranking.rank(of: "heavy") == 2)
         #expect(ranking.rank(of: "nobody") == 0)
-        #expect(ranking.leader?.id == "steady")
+        #expect(ranking.leader?.id == "early")
     }
 
-    @Test func memberRankingBreaksFullTiesOnDisplayName() {
+    @Test func memberRankingBreaksSameMinuteTiesOnDisplayName() {
         let ranking = GroupMemberRanking([
-            m("b", today: 2, total: 2, name: "Zoë"),
-            m("a", today: 2, total: 2, name: "anna"),
+            m("b", today: 2, total: 2, name: "Zoë", firstAt: at(18)),
+            m("a", today: 1, total: 2, name: "anna", firstAt: at(18)),
         ], today: "2026-09-10")
         #expect(ranking.members.map(\.displayName) == ["anna", "Zoë"])
+        #expect(Set([ranking.rank(of: "a"), ranking.rank(of: "b")]) == [1, 2])   // still distinct
+    }
+
+    @Test func memberOutTodayOnlyCountsTheCurrentDay() {
+        #expect(m("a", today: 1, total: 1, firstAt: at(18)).outToday("2026-09-10") == at(18))
+        #expect(m("a", today: 1, total: 1, date: "2026-09-09", firstAt: at(18)).outToday("2026-09-10") == nil)
+        // Joined today, nothing logged yet: todayDate is today but they are not out.
+        #expect(m("a", today: 0, total: 0).outToday("2026-09-10") == nil)
+        // Logged today before the stamp existed: out, time unknown, still sorted as out.
+        #expect(m("a", today: 2, total: 2).outToday("2026-09-10") == .distantPast)
     }
 
     @Test func memberCountsDefaultToZeroForDocsFromBeforeTheCounters() throws {
@@ -113,6 +153,8 @@ final class FakeGroups: GroupServicing, @unchecked Sendable {
         #expect(member.todayCount == 0)
         #expect(member.totalCount == 0)
         #expect(member.countToday("2026-09-10") == 0)
+        #expect(member.todayFirstAt == nil)
+        #expect(member.outToday("2026-09-10") == nil)
     }
 
     @Test func noteTextIsTrimmedAndBounded() {
