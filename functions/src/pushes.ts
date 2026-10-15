@@ -12,7 +12,7 @@ async function targetFor(db: Firestore, uid: string): Promise<PushTarget | undef
   return { uid, apns, fcm };
 }
 
-type BeerDoc = { ownerUid: string; ownerName: string; hasPhoto: boolean; place?: string; drink?: string };
+export type BeerDoc = { ownerUid: string; ownerName: string; hasPhoto: boolean; place?: string; drink?: string };
 
 const drinkPhrase: Record<string, string> = {
   pils: "a pils 🍺", pint: "a pint 🍺", stein: "a stein 🍻", special: "a special beer 🍻", stout: "a stout 🍺",
@@ -33,12 +33,30 @@ export async function fanoutBeerCreated(db: Firestore, push: Pusher, beerId: str
     if (target) targets.push(target);
   }
   if (targets.length === 0) return;
+  const { title, body } = beerPushCopy(beer);
+  await push(targets, title, body, { beerId });
+}
+
+/** The "X is having a pint at Y" title and body, shared by the fanout and notifyBeerTo. */
+export function beerPushCopy(beer: BeerDoc): { title: string; body: string } {
   const body = beer.hasPhoto ? "They added a photo 📸 — you get one look!" : "Cheers back? 🍻";
   const what = drinkPhrase[beer.drink ?? "pils"] ?? drinkPhrase.pils;
   const title = beer.place
     ? `${beer.ownerName} is having ${what} at ${beer.place}`
     : `${beer.ownerName} is having ${what}`;
-  await push(targets, title, body, { beerId });
+  return { title, body };
+}
+
+/**
+ * The drink push for ONE person, e.g. a new mate of the review account who
+ * should hear about its live drink once (its drinks are written with
+ * `noPush`, so the normal fanout never runs for them). Caller checks blocks.
+ */
+export async function notifyBeerTo(db: Firestore, push: Pusher, uid: string, beerId: string, beer: BeerDoc) {
+  const target = await targetFor(db, uid);
+  if (!target) return;
+  const { title, body } = beerPushCopy(beer);
+  await push([target], title, body, { beerId });
 }
 
 /**

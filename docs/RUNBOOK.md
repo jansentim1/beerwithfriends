@@ -127,3 +127,48 @@ gh run view <id> --log | grep -E 'error:|warning:.*App/Sources'
 
 Free-plan budget is roughly 200 macOS minutes a month for a private repo. A compile run
 costs about 5, a TestFlight run about 15.
+
+## 8. Review mate (App Review)
+
+A reviewer signs in with their own Apple ID and has no mates, so the server
+keeps one for them: uid `review-pubdates`, username `pubdates`, display name
+"PubDates". No Firebase Auth user; it only owns docs. Code: `functions/src/reviewMate.ts`.
+
+- Switch: `config/app.reviewMate` (boolean). Set `true` before submitting for
+  App Review, `false` after approval. Missing or false: the scheduled function
+  reads that one doc and writes nothing.
+- `keepReviewMateAlive` (every 45 min): creates `users/review-pubdates` and
+  `usernames/pubdates` if missing (never takes the name from a real person; it
+  logs `review mate: username-taken` instead), and keeps one live pint with a
+  photo at "Café De Zon · Prinsengracht 12, Amsterdam". A drink older than 60 min,
+  or whose photo is gone, is replaced: a viewer's feed drops a drink 2 h after
+  first seeing it and the photo is view-once. These drinks carry `noPush: true`,
+  so mates are not pushed every run.
+- `onFriendRequestCreated`: a request to `review-pubdates` is accepted at once
+  (both friendship docs, request deleted) unless a block exists either way, and
+  the new mate gets one "PubDates is having a pint" push for the live drink.
+- Switching off leaves the account and its mates; the last drink expires within
+  a day. To remove it fully, delete the docs in the console.
+
+Set the flag from tim-server (leaves `minBuild` alone):
+
+```
+T=$(gcloud auth print-access-token)
+curl -s -X PATCH -H "Authorization: Bearer $T" -H "x-goog-user-project: beerwithme-prod" \
+  -H "Content-Type: application/json" -d '{"fields":{"reviewMate":{"booleanValue":true}}}' \
+  "https://firestore.googleapis.com/v1/projects/beerwithme-prod/databases/(default)/documents/config/app?updateMask.fieldPaths=reviewMate"
+```
+
+Verify after the next run (or force one:
+`gcloud scheduler jobs run firebase-schedule-keepReviewMateAlive-europe-west4 --location europe-west4`):
+
+```
+curl -s -X POST -H "Authorization: Bearer $T" -H "x-goog-user-project: beerwithme-prod" \
+  -H "Content-Type: application/json" \
+  -d '{"structuredQuery":{"from":[{"collectionId":"beers"}],"where":{"fieldFilter":{"field":{"fieldPath":"ownerUid"},"op":"EQUAL","value":{"stringValue":"review-pubdates"}}}}}' \
+  "https://firestore.googleapis.com/v1/projects/beerwithme-prod/databases/(default)/documents:runQuery"
+```
+
+Expect exactly one doc with `expiresAt` in the future, `hasPhoto: true` and
+`photoPath: photos/<id>.jpg`, and `usernames/pubdates` holding
+`{uid: "review-pubdates"}`. Function logs say `review mate: created` or `alive`.
