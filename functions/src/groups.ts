@@ -1,8 +1,14 @@
 import { Firestore, Timestamp, FieldValue, Transaction } from "firebase-admin/firestore";
 
-// Groups: mates whose drinks are counted together for the leaderboard.
-//   groups/{id}            { name, code, createdBy, createdAt, memberCount, todayDate, todayCount, totalCount }
-//   groups/{id}/members/{uid}  { username, displayName, joinedAt, todayDate, todayCount, totalCount }
+// Groups: mates who go out together. The app ranks by who is OUT tonight (first
+// one out is #1), never by how much anyone drank (App Store guideline 1.4.3).
+//   groups/{id}            { name, code, createdBy, createdAt, memberCount, todayDate, todayCount, totalCount,
+//                            todayOutCount, todayFirstAt }
+//   groups/{id}/members/{uid}  { username, displayName, joinedAt, todayDate, todayCount, totalCount, todayFirstAt }
+// todayOutCount: distinct members with a drink on `todayDate`. todayFirstAt: when
+// the first of those landed (group), or this member's first drink that day (member).
+// Both are absent on docs from before 2026-10-15; readers treat that as 0 / nil.
+// todayCount/totalCount are still written but are no longer the headline.
 //   groups/{id}/notes/{noteId} { uid, displayName, text, at }
 //   users/{uid}/groups/{id}    { name, joinedAt }   (mirror: "my groups" without a collection-group query)
 // All writes go through these functions (rules deny client writes), except notes,
@@ -19,7 +25,7 @@ export class GroupError extends Error {
   constructor(public code: "INVALID_NAME" | "NOT_FOUND" | "FULL" | "ALREADY_MEMBER" | "NOT_MEMBER" | "NO_PROFILE") { super(code); }
 }
 
-/** "YYYY-MM-DD" in Europe/Amsterdam: the day the leaderboard counts in. */
+/** "YYYY-MM-DD" in Europe/Amsterdam: the day "who's out" counts in. */
 export function amsterdamDay(now = new Date()): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Amsterdam", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
 }
@@ -57,7 +63,7 @@ export async function createGroupCore(db: Firestore, uid: string, rawName: strin
   const batch = db.batch();
   batch.set(ref, {
     name, code, createdBy: uid, createdAt: Timestamp.fromDate(now), memberCount: 1,
-    todayDate: amsterdamDay(now), todayCount: 0, totalCount: 0,
+    todayDate: amsterdamDay(now), todayCount: 0, totalCount: 0, todayOutCount: 0,
   });
   batch.set(ref.collection("members").doc(uid), { username, displayName, joinedAt: Timestamp.fromDate(now), ...freshMemberCounts(now) });
   batch.set(db.doc(`users/${uid}/groups/${ref.id}`), { name, joinedAt: Timestamp.fromDate(now) });
@@ -106,6 +112,10 @@ export async function leaveGroupCore(db: Firestore, uid: string, groupId: string
  * Called for every new drink: +1 today and total on each of the owner's groups,
  * and on their own member doc — the ranking of PEOPLE inside a group reads off
  * the member docs the list already loads, so no second query and no fan-in.
+ *
+ * "Who's out": a member's first drink of the Amsterdam day stamps their
+ * `todayFirstAt` and adds one to the group's `todayOutCount`; the group's own
+ * first drink of the day resets that to 1 and stamps the group's `todayFirstAt`.
  */
 export async function countDrinkForGroups(db: Firestore, ownerUid: string, createdAt: Date) {
   const day = amsterdamDay(createdAt);
@@ -115,20 +125,37 @@ export async function countDrinkForGroups(db: Firestore, ownerUid: string, creat
     const memberRef = ref.collection("members").doc(ownerUid);
     const [group, member] = await Promise.all([tx.get(ref), tx.get(memberRef)]);
     if (!group.exists) return;
+    const at = Timestamp.fromDate(createdAt);
     const sameDay = group.get("todayDate") === day;
-    tx.update(ref, {
+    // A stale mirror (left the group, mirror not yet gone) must not resurrect a
+    // member doc, and tx.update on a missing doc would fail the group count too.
+    // Nor does it count as "out": nobody in the group can see that person.
+    const memberSameDay = member.exists && member.get("todayDate") === day;
+    // Not `!memberSameDay`: a member who joined today starts at todayDate=today
+    // with todayCount 0 (freshMemberCounts), and is not out until this drink.
+    const firstOutToday = member.exists && !(memberSameDay && (member.get("todayCount") ?? 0) > 0);
+    const groupUpdate: Record<string, unknown> = {
       todayDate: day,
       todayCount: sameDay ? FieldValue.increment(1) : 1,
       totalCount: FieldValue.increment(1),
-    });
-    // A stale mirror (left the group, mirror not yet gone) must not resurrect a
-    // member doc, and tx.update on a missing doc would fail the group count too.
+    };
+    if (!sameDay) {
+      // The group's day rolled over: whoever logged this opens the round.
+      groupUpdate.todayOutCount = firstOutToday ? 1 : 0;
+      groupUpdate.todayFirstAt = firstOutToday ? at : FieldValue.delete();
+    } else if (firstOutToday) {
+      groupUpdate.todayOutCount = FieldValue.increment(1);
+      // A doc from before the field gets its stamp from the first member out
+      // after the deploy; an existing stamp is earlier and stays.
+      if (!group.get("todayFirstAt")) groupUpdate.todayFirstAt = at;
+    }
+    tx.update(ref, groupUpdate);
     if (!member.exists) return;
-    const memberSameDay = member.get("todayDate") === day;
     tx.update(memberRef, {
       todayDate: day,
       todayCount: memberSameDay ? FieldValue.increment(1) : 1,
       totalCount: FieldValue.increment(1),
+      ...(firstOutToday ? { todayFirstAt: at } : {}),
     });
   })));
 }
