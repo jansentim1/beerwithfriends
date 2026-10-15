@@ -30,8 +30,12 @@ struct HomeView: View {
     /// on its own: a drink without a photo is not a drink (Tim: "ik wil eigenlijk
     /// dat je altijd een foto moet toevoegen").
     @State private var showCamera = false
-    /// Raised when the location was refused: logging cannot continue without it.
-    @State private var showLocationNeeded = false
+    /// Raised when the location was refused (or Location Services are off):
+    /// instead of a dead end, you type where you are (Tim, 2026-10-15).
+    @State private var showTypedPlace = false
+    /// The place typed in that sheet, for the drink waiting for its photo. Set
+    /// by Post, consumed with the photo; nil means the drink asks the device.
+    @State private var typedPlace: String?
     @State private var photoViewer: PhotoViewerItem?
     /// The drink whose cheers list is open. Re-read from the live feed while the
     /// sheet is up, so a cheers landing now shows up in it.
@@ -157,16 +161,6 @@ struct HomeView: View {
             } message: {
                 Text(viewModel.errorMessage ?? "")
             }
-            .alert("PubDates needs your location", isPresented: $showLocationNeeded) {
-                Button("Open Settings") {
-                    if let url = URL(string: UIApplication.openSettingsURLString) {
-                        UIApplication.shared.open(url)
-                    }
-                }
-                Button("Not now", role: .cancel) {}
-            } message: {
-                Text("A drink carries the place you had it, so your mates can find you. Turn Location on for PubDates and tap the glass again.")
-            }
         }
         // Changing the id cancels the previous start(); the new one awaits the old
         // stream's teardown itself, so no sleep is needed here.
@@ -197,14 +191,22 @@ struct HomeView: View {
                 // Consuming `pendingDrink` here is also how `cameraDismissed()`
                 // tells a used camera from a cancelled one.
                 let drink = pendingDrink ?? .pils
+                let place = typedPlace
                 pendingDrink = nil
+                typedPlace = nil
                 pourReset += 1 // the logged row takes the glass from here
                 Task {
-                    await viewModel.logBeer(photoJPEG: data, drink: drink,
-                                            caption: caption, myUid: profile.id)
+                    await viewModel.logBeer(photoJPEG: data, drink: drink, caption: caption,
+                                            typedPlace: place, myUid: profile.id)
                 }
             }
             .ignoresSafeArea()
+        }
+        // Location refused: type the place, then the same camera as always. The
+        // camera opens from `onDismiss`, once this sheet is really gone — two
+        // presentations handing over mid-flight is the one that never appears.
+        .sheet(isPresented: $showTypedPlace, onDismiss: typedPlaceDismissed) {
+            TypedPlaceSheet { place in typedPlace = place }
         }
         .sheet(item: $reactionTarget, onDismiss: openPendingReactions) { beer in
             ReactionPickerSheet(
@@ -327,6 +329,7 @@ struct HomeView: View {
     /// Motion) and the cover comes up on the beat after it, so the gesture reads
     /// as one move — pour, then shoot — rather than a sheet cutting it off.
     private func openCameraAfterPour(_ kind: DrinkKind) {
+        typedPlace = nil
         Task { @MainActor in
             // A drink carries where it was had, so the permission is settled
             // here — before the camera, while the pour is still running (Tim,
@@ -347,9 +350,10 @@ struct HomeView: View {
             // pending gets a camera.
             guard pendingDrink == kind, !showCamera else { return }
             guard allowed else {
-                pendingDrink = nil
-                pourReset += 1       // the glass goes back; nothing was logged
-                showLocationNeeded = true
+                // No location (refused, restricted, or Location Services off):
+                // the drink stays poured and you type where you are instead.
+                // App Review 5.1.1(iv): offer a manual place when Location is declined.
+                showTypedPlace = true
                 return
             }
             try? await Task.sleep(for: .seconds(reduceMotion ? 0.18 : 0.35))
@@ -358,15 +362,30 @@ struct HomeView: View {
         }
     }
 
+    /// The typed-place sheet closed. Post left a place behind: on to the camera,
+    /// exactly as a granted location would. Cancel (or "Use my location
+    /// instead") left none: the glass goes back and nothing is logged.
+    private func typedPlaceDismissed() {
+        guard pendingDrink != nil, typedPlace != nil else {
+            pendingDrink = nil
+            typedPlace = nil
+            pourReset += 1
+            return
+        }
+        showCamera = true
+    }
+
     /// The camera closed. `onCapture` consumes `pendingDrink`, so one still
     /// sitting here means the shot was cancelled: the glass goes back to its
     /// resting level and nothing is logged — except under the UI-test flag below.
     private func cameraDismissed() {
         guard let drink = pendingDrink else { return }
+        let place = typedPlace
         pendingDrink = nil
+        typedPlace = nil
         pourReset += 1
         if Self.logsCancelledDrinkWithoutPhoto {
-            Task { await viewModel.logBeer(photoJPEG: nil, drink: drink, myUid: profile.id) }
+            Task { await viewModel.logBeer(photoJPEG: nil, drink: drink, typedPlace: place, myUid: profile.id) }
         }
     }
 

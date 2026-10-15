@@ -73,8 +73,13 @@ final class LocationPlaceProvider: NSObject, PlaceProviding, CLLocationManagerDe
     var isLocationDecided: Bool { sharedManager().authorizationStatus != .notDetermined }
 
     /// Asks and waits, so the caller can act on the answer. Returns whether the
-    /// app may now use the location.
+    /// app may now use the location: false when refused, restricted, or when
+    /// Location Services are off for the whole phone (then the caller offers a
+    /// typed place instead).
     func requestPermission() async -> Bool {
+        // Documented as slow on the main thread; this async function is not
+        // main-actor isolated, so it runs off it.
+        guard CLLocationManager.locationServicesEnabled() else { return false }
         let status = await currentAuthorizationStatus()
         if status == .notDetermined {
             let granted = await requestAuthorizationAndWait()

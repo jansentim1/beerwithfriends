@@ -161,9 +161,12 @@ public final class HomeViewModel: ObservableObject {
     /// photo upload blocks the button (a second photo mid-upload makes no sense).
     /// Returns false (and logs nothing) while the cooldown after the previous
     /// drink is still running; the picker shakes instead.
+    /// `typedPlace` is the place typed when location was refused: it goes on the
+    /// drink as-is (normalized) with no coordinate, and the location lookup is
+    /// skipped entirely.
     @discardableResult
     public func logBeer(photoJPEG: Data?, drink: DrinkKind = .pils, caption: String? = nil,
-                        myUid: String? = nil) async -> Bool {
+                        typedPlace: String? = nil, myUid: String? = nil) async -> Bool {
         if let myUid, cooldownRemaining(myUid: myUid) > 0 { return false }
         if photoJPEG != nil {
             guard !isUploadingPhoto else { return false }
@@ -177,7 +180,11 @@ public final class HomeViewModel: ObservableObject {
         upsert(beer)
         // Opt-in place lookup runs AFTER the row is visible; beers are immutable
         // server-side, so the place must be known before the write.
-        if let placeProvider, let place = await placeProvider.currentPlace() {
+        if let typed = typedPlace.flatMap(TypedPlace.normalize) {
+            beer.place = typed
+            beer.placeCoordinate = nil
+            upsert(beer)
+        } else if let placeProvider, let place = await placeProvider.currentPlace() {
             beer.place = BeerLog.clampPlace(place.name)
             beer.placeCoordinate = place.coordinate
             upsert(beer)

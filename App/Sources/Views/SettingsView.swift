@@ -39,7 +39,7 @@ struct SettingsView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var locationAuthorized = false
 
-    private var locationStateText: String { locationAuthorized ? "On" : "Off — needed to log" }
+    private var locationStateText: String { locationAuthorized ? "On" : "Off, you type the place" }
 
     // Placeholder until Task 11/12 publish the real policy URL.
     private let privacyPolicyURL = URL(string: "https://example.com/beerwithme/privacy")!
@@ -240,12 +240,13 @@ struct SettingsView: View {
         .padding(.vertical, 2)
     }
 
-    /// One switch, plainly worded: what leaves the phone is a bar name or a city,
-    /// and only to your mates.
+    /// The location row, plainly worded: what leaves the phone is the address
+    /// you're at (or the place you typed), and only to your mates.
     private var privacySection: some View {
         Section {
-            // Not a switch any more: a drink carries where it was had, or it is
-            // not logged (Tim, 2026-10-03). The only control left is iOS's own.
+            // Not a switch: iOS's own permission is the only control. With it a
+            // drink carries the address you're at; without it you type the place
+            // (Tim, 2026-10-15), so it is never required to log.
             Button {
                 guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
                 UIApplication.shared.open(url)
@@ -268,7 +269,7 @@ struct SettingsView: View {
         } header: {
             Text("Privacy")
         } footer: {
-            Text("Logging a drink needs your location: the address you're at goes with it, so your mates can come find you. Only mates you accepted can see it, and it goes when the drink does.")
+            Text("With Location on, the address you're at goes on your drink, so your mates can come find you. With it off, you type where you are. Only mates you accepted can see it, and it goes when the drink does.")
         }
         .listRowBackground(Theme.surface)
     }

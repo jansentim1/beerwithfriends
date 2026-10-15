@@ -1,6 +1,6 @@
 # PubDates Privacy Policy
 
-_Last updated: 2026-09-16_
+_Last updated: 2026-10-15_
 
 PubDates is a small app for telling friends you are having a beer. This policy explains
 what the app stores, why, and how to get rid of it. It is written to be read, not to be
@@ -17,13 +17,13 @@ scrolled past.
 | View and screenshot receipts | A view record is how the server enforces view-once: it has to know who has already looked. A screenshot record is kept alongside it. Neither is shown to anyone in the app today — you see who cheersed or replied, never who looked. Deleted with the drink. | Firestore under `beers/{beerId}` |
 | Friend list, friend requests, blocks | To decide whose beers you see and who can see yours. | Firestore |
 | Push notification token | To send "X is having a beer" and "Y cheersed you" notifications. Stored in a private subcollection only you and the server can read. Removed on sign-out. | Firestore `users/{uid}/private/push` |
-| Place on a drink | Required to log a drink. The street address you are at when you log, and that position rounded to about 100 metres, are attached to the drink, so mates see where you are in the feed and on the Map tab. If you are at a named venue its name goes in front of the address. Drinking at home therefore shares your home address. Only people whose mate request you accepted can read it, and it is deleted with the drink. Logging is not possible without granting location, and nothing is read when you are not logging. | Firestore `beers/{beerId}.place` and `placeCoordinate`, deleted with the drink |
+| Place on a drink | Logging a drink asks for your location. If you grant it, the street address you are at and that position rounded to about 100 metres go on the drink. If you refuse, you type where you are instead and no position is stored. Mates see the place in the feed, and a drink with a position also shows on the Map tab. If you are at a named venue its name goes in front of the address. Drinking at home with location granted therefore shares your home address. Only people whose mate request you accepted can read it, and it is deleted with the drink. Nothing is read when you are not logging. | Firestore `beers/{beerId}.place` and `placeCoordinate`, deleted with the drink |
 | What you drank | The drink type you picked (pils, wine, cocktail, ...). | Firestore `beers/{beerId}.drink` |
 | Username changes | The time of your last username change, to limit changes to once a day. | Firestore `users/{uid}.usernameChangedAt` |
 | Reports you file | Trust and safety review. Only the reporter's id, the reported user or beer, and the reason are stored. | Firestore `reports` |
 
 We do not collect your email, contacts, photo library, analytics, or advertising
-identifiers. Location is read only at the moment you log a drink, to name the place it goes out with. The camera is the only photo source, and only when you tap the camera button.
+identifiers. Location is read only at the moment you log a drink, and only if you allow it, to name the place it goes out with. The camera is the only photo source, and only when you tap the camera button.
 
 ## What we do not do
 
