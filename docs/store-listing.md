@@ -16,7 +16,7 @@ docs/app-store-checklist.md section B.
 
 Having a beer? Tap the glass. Your mates get a nudge, cheers you back, and can see where you are if they fancy joining.
 
-PubDates is a private app for a small circle of friends. There is no public feed, no followers, no likes to chase. Only the mates whose request you accepted see anything, and every drink disappears after an hour.
+PubDates is a private app for a small circle of friends. There is no public feed, no followers, no likes to chase. Only the mates whose request you accepted see anything, and every drink is gone a couple of hours after your mates have seen it, a day at the latest.
 
 HOW IT WORKS
 • Tap the glass, pick what you're drinking, snap a photo if you like.
@@ -27,14 +27,14 @@ HOW IT WORKS
 
 WHAT IT IS NOT
 • Not public. No strangers, no discovery, no search beyond a username you were given.
-• Not permanent. A drink leaves the feed after an hour, a photo can be seen once per mate.
+• Not permanent. A drink leaves the feed a couple of hours after a mate sees it, a photo can be seen once per mate.
 • Not tracked. No analytics, no ads, no selling of data. Location is read only when you log a drink, and you can type where you are instead.
 
 PubDates is for adults of legal drinking age. Drink responsibly, and look after your mates.
 
 ## What's new (1.0)
 
-First release. Drinks, photos, cheers, Map, Groups, and nothing that lasts longer than an hour.
+First release. Drinks, photos, cheers, Map, Groups, and nothing that outlives the night.
 
 ## Age rating answers
 

@@ -21,6 +21,7 @@ scrolled past.
 | What you drank | The drink type you picked (pils, wine, cocktail, ...). | Firestore `beers/{beerId}.drink` |
 | Username changes | The time of your last username change, to limit changes to once a day. | Firestore `users/{uid}.usernameChangedAt` |
 | Reports you file | Trust and safety review. Only the reporter's id, the reported user or beer, and the reason are stored. | Firestore `reports` |
+| Groups you join | The Groups tab: group name, join code, your username and nickname as a member, how many drinks you and the group logged today and in total, and the time of your first drink of the day (so the group shows who is out). | Firestore `groups/{groupId}` |
 
 We do not collect your email, contacts, photo library, analytics, or advertising
 identifiers. Location is read only at the moment you log a drink, and only if you allow it, to name the place it goes out with. The camera is the only photo source, and only when you tap the camera button.
