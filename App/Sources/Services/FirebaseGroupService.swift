@@ -11,7 +11,7 @@ final class FirebaseGroupService: GroupServicing, @unchecked Sendable {
 
     init(uid: String) { self.uid = uid }
 
-    /// Two listeners merged: every group (leaderboard) and my membership mirror
+    /// Two listeners merged: every group (tonight's round) and my membership mirror
     /// (to flag `isMine`).
     func observeGroups() -> AsyncThrowingStream<[GroupSummary], Error> {
         let db = self.db
@@ -52,11 +52,13 @@ final class FirebaseGroupService: GroupServicing, @unchecked Sendable {
             todayDate: d["todayDate"] as? String ?? "",
             todayCount: d["todayCount"] as? Int ?? 0,
             totalCount: d["totalCount"] as? Int ?? 0,
+            todayOutCount: d["todayOutCount"] as? Int ?? 0,
+            todayFirstAt: (d["todayFirstAt"] as? Timestamp)?.dateValue(),
             isMine: false
         )
     }
 
-    /// Joined order; the ranking inside the group re-sorts on the counters
+    /// Joined order; the ranking inside the group re-sorts on who is out
     /// (`GroupMemberRanking`), which countDrinkForGroups writes here.
     func members(of groupId: String) async throws -> [GroupMember] {
         let snapshot = try await db.collection("groups/\(groupId)/members").getDocuments()
@@ -67,7 +69,8 @@ final class FirebaseGroupService: GroupServicing, @unchecked Sendable {
                         joinedAt: (doc.get("joinedAt") as? Timestamp)?.dateValue() ?? Date(),
                         todayDate: doc.get("todayDate") as? String ?? "",
                         todayCount: doc.get("todayCount") as? Int ?? 0,
-                        totalCount: doc.get("totalCount") as? Int ?? 0)
+                        totalCount: doc.get("totalCount") as? Int ?? 0,
+                        todayFirstAt: (doc.get("todayFirstAt") as? Timestamp)?.dateValue())
         }.sorted { $0.joinedAt < $1.joinedAt }
     }
 

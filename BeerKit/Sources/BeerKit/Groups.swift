@@ -3,7 +3,8 @@ import Foundation
 import Combine
 #endif
 
-/// A group of mates whose drinks are counted together, for the leaderboard.
+/// A group of mates who go out together. Ranked by how many of them are OUT
+/// today, never by how much anyone drank (App Store guideline 1.4.3).
 public struct GroupSummary: Codable, Equatable, Identifiable, Sendable {
     public var id: String
     public var name: String
@@ -16,17 +17,50 @@ public struct GroupSummary: Codable, Equatable, Identifiable, Sendable {
     public var todayDate: String
     public var todayCount: Int
     public var totalCount: Int
+    /// Server-maintained: distinct members with a drink on `todayDate`, and when
+    /// the first of them logged (the one who opened the round). Absent on docs
+    /// from before 2026-10-15, which read as 0 / nil.
+    public var todayOutCount: Int
+    public var todayFirstAt: Date?
     public var isMine: Bool
 
     public init(id: String, name: String, code: String? = nil, memberCount: Int,
-                todayDate: String, todayCount: Int, totalCount: Int, isMine: Bool) {
+                todayDate: String, todayCount: Int, totalCount: Int,
+                todayOutCount: Int = 0, todayFirstAt: Date? = nil, isMine: Bool) {
         self.id = id; self.name = name; self.code = code; self.memberCount = memberCount
         self.todayDate = todayDate; self.todayCount = todayCount; self.totalCount = totalCount
+        self.todayOutCount = todayOutCount; self.todayFirstAt = todayFirstAt
         self.isMine = isMine
     }
 
     /// The count that belongs to `today`; stale groups show 0 without a server write.
     public func countToday(_ today: String) -> Int { todayDate == today ? todayCount : 0 }
+
+    /// How many members are out `today`; a stale group shows 0, like `countToday`.
+    public func outToday(_ today: String) -> Int { todayDate == today ? todayOutCount : 0 }
+
+    /// When the first member went out `today`; nil for a stale group.
+    public func firstOutAt(_ today: String) -> Date? { todayDate == today ? todayFirstAt : nil }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, code, memberCount, todayDate, todayCount, totalCount, todayOutCount, todayFirstAt, isMine
+    }
+
+    /// Hand-written for the same reason as GroupMember's: group docs from before
+    /// the "who's out" fields must still decode.
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        name = try c.decode(String.self, forKey: .name)
+        code = try c.decodeIfPresent(String.self, forKey: .code)
+        memberCount = try c.decodeIfPresent(Int.self, forKey: .memberCount) ?? 0
+        todayDate = try c.decodeIfPresent(String.self, forKey: .todayDate) ?? ""
+        todayCount = try c.decodeIfPresent(Int.self, forKey: .todayCount) ?? 0
+        totalCount = try c.decodeIfPresent(Int.self, forKey: .totalCount) ?? 0
+        todayOutCount = try c.decodeIfPresent(Int.self, forKey: .todayOutCount) ?? 0
+        todayFirstAt = try c.decodeIfPresent(Date.self, forKey: .todayFirstAt)
+        isMine = try c.decodeIfPresent(Bool.self, forKey: .isMine) ?? false
+    }
 
     public static let nameMaxLength = 30
 }
@@ -41,18 +75,31 @@ public struct GroupMember: Codable, Equatable, Identifiable, Sendable {
     public var todayDate: String
     public var todayCount: Int
     public var totalCount: Int
+    /// Server-maintained: this person's first drink on `todayDate`, i.e. when
+    /// they went out. nil on docs from before 2026-10-15.
+    public var todayFirstAt: Date?
 
     public init(id: String, username: String, displayName: String? = nil, joinedAt: Date,
-                todayDate: String = "", todayCount: Int = 0, totalCount: Int = 0) {
+                todayDate: String = "", todayCount: Int = 0, totalCount: Int = 0, todayFirstAt: Date? = nil) {
         self.id = id; self.username = username; self.displayName = displayName ?? username; self.joinedAt = joinedAt
         self.todayDate = todayDate; self.todayCount = todayCount; self.totalCount = totalCount
+        self.todayFirstAt = todayFirstAt
     }
 
     /// The count that belongs to `today`; a member who last drank on another day
     /// shows 0 without waiting for a server write, exactly like GroupSummary.
     public func countToday(_ today: String) -> Int { todayDate == today ? todayCount : 0 }
 
-    private enum CodingKeys: String, CodingKey { case id, username, displayName, joinedAt, todayDate, todayCount, totalCount }
+    /// When this person went out `today`, or nil when they haven't (a stale day
+    /// reads as not out, without waiting for a server write). A doc that has a
+    /// count today but no stamp (written before the field existed) is out, at an
+    /// unknown time: it falls back to `distantPast` so it still sorts as out.
+    public func outToday(_ today: String) -> Date? {
+        guard todayDate == today, todayCount > 0 || todayFirstAt != nil else { return nil }
+        return todayFirstAt ?? .distantPast
+    }
+
+    private enum CodingKeys: String, CodingKey { case id, username, displayName, joinedAt, todayDate, todayCount, totalCount, todayFirstAt }
 
     /// Hand-written so member docs from before the counters existed still decode:
     /// synthesized Codable ignores property defaults and would throw on the
@@ -66,24 +113,31 @@ public struct GroupMember: Codable, Equatable, Identifiable, Sendable {
         todayDate = try c.decodeIfPresent(String.self, forKey: .todayDate) ?? ""
         todayCount = try c.decodeIfPresent(Int.self, forKey: .todayCount) ?? 0
         totalCount = try c.decodeIfPresent(Int.self, forKey: .totalCount) ?? 0
+        todayFirstAt = try c.decodeIfPresent(Date.self, forKey: .todayFirstAt)
     }
 }
 
 /// The ranking of PEOPLE inside one group. Built once from a members list, then
 /// asked for positions, so a row does not re-sort per cell.
 ///
-/// Same order as `LeaderboardViewModel.ranked` for groups — today's count, then
-/// total, then name — so the two leaderboards feel like one idea. Ties break on
-/// the name, which means every rank is distinct (no shared 2nd place).
+/// "Who's out", never how much: members out today come first, in the order they
+/// went out (first one out is #1, the crown); everyone else follows by name.
+/// Ties (same minute, or nobody out) break on the name, which means every rank
+/// is distinct (no shared 2nd place). Same idea as `LeaderboardViewModel.ranked`
+/// for groups, one scale down.
 public struct GroupMemberRanking: Equatable, Sendable {
-    /// Best first.
+    /// First one out first.
     public let members: [GroupMember]
     private let positions: [String: Int]
 
     public init(_ members: [GroupMember], today: String = GroupDay.today()) {
         let sorted = members.sorted {
-            let a = ($0.countToday(today), $0.totalCount), b = ($1.countToday(today), $1.totalCount)
-            if a != b { return a > b }
+            switch ($0.outToday(today), $1.outToday(today)) {
+            case let (a?, b?) where a != b: return a < b
+            case (.some, nil): return true
+            case (nil, .some): return false
+            default: break
+            }
             return $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending
         }
         self.members = sorted
@@ -93,6 +147,8 @@ public struct GroupMemberRanking: Equatable, Sendable {
     /// 1-based rank, matching `LeaderboardViewModel.rank(of:)`; 0 for a member
     /// that is not in this ranking.
     public func rank(of memberId: String) -> Int { positions[memberId] ?? 0 }
+    /// Rank 1. Out today only if `outToday` says so: on a quiet day it is just
+    /// the first name alphabetically.
     public var leader: GroupMember? { members.first }
 }
 
@@ -186,6 +242,17 @@ public enum GroupDay {
         f.dateFormat = "yyyy-MM-dd"
         return f.string(from: now)
     }
+
+    /// "19:12": the 24-hour clock in Europe/Amsterdam, the zone the day is
+    /// counted in, for "Out since 19:12".
+    public static func clock(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.calendar = Calendar(identifier: .gregorian)
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(identifier: "Europe/Amsterdam")
+        f.dateFormat = "HH:mm"
+        return f.string(from: date)
+    }
 }
 
 @MainActor
@@ -202,18 +269,23 @@ public final class LeaderboardViewModel: ObservableObject {
         self.now = now
     }
 
-    /// Mine first, then by today's count, then total, then name.
+    /// Most members out today first, then the group whose first member went out
+    /// earliest, then name. Never by how much anyone drank (guideline 1.4.3).
+    /// A group with people out but no stamp (a doc from before the field) sorts
+    /// after the stamped ones at the same head count.
     public var ranked: [GroupSummary] {
         let today = GroupDay.today(now: now())
         return groups.sorted {
-            let a = ($0.countToday(today), $0.totalCount), b = ($1.countToday(today), $1.totalCount)
+            let a = $0.outToday(today), b = $1.outToday(today)
             if a != b { return a > b }
+            let fa = $0.firstOutAt(today) ?? .distantFuture, fb = $1.firstOutAt(today) ?? .distantFuture
+            if fa != fb { return fa < fb }
             return $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
         }
     }
     public var mine: [GroupSummary] { ranked.filter(\.isMine) }
     public var others: [GroupSummary] { ranked.filter { !$0.isMine } }
-    /// 1-based rank in the overall leaderboard.
+    /// 1-based rank in tonight's round across all groups.
     public func rank(of group: GroupSummary) -> Int { (ranked.firstIndex(where: { $0.id == group.id }) ?? 0) + 1 }
 
     public func start() async {
@@ -222,7 +294,7 @@ public final class LeaderboardViewModel: ObservableObject {
             do {
                 for try await list in service.observeGroups() { self.groups = list }
             } catch {
-                if !Task.isCancelled { self.errorMessage = "Couldn't load the leaderboard." }
+                if !Task.isCancelled { self.errorMessage = "Couldn't load the groups." }
             }
         }
         observation = task

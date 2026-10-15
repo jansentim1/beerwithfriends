@@ -10,7 +10,10 @@ import UIKit
 /// andere groepen; er is een leaderboard-pagina waar je kan zien welke groepen
 /// er zijn en hoeveel er deze dag al gelogd is."
 ///
-/// Two sections: my groups and the whole leaderboard for today, with the two
+/// 2026-10-15 (App Store guideline 1.4.3): ranked by who is OUT tonight, first
+/// one out on top, never by how much anyone drank.
+///
+/// Two sections: my groups and tonight's round across all groups, with the two
 /// actions that change membership in a clear row of their own between them. My
 /// groups are marked by an amber name, not by a washed row. Consumes only
 /// `GroupServicing` + `LeaderboardViewModel` — never Firebase types.
@@ -126,7 +129,7 @@ struct GroupsView: View {
         VStack(spacing: 10) {
             Text("No groups yet")
                 .font(Theme.displayTitle2)
-            Text("Make one, share the code, and every drink your crew logs counts today.")
+            Text("Make one, share the code, and see who's out tonight.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -210,7 +213,7 @@ struct GroupsView: View {
         }
     }
 
-    // MARK: - Leaderboard
+    // MARK: - Tonight's round
 
     private var leaderboardSection: some View {
         Section {
@@ -220,18 +223,18 @@ struct GroupsView: View {
                     .accessibilityIdentifier("groups.row.\(group.id)")
             }
         } header: {
-            Eyebrow(text: "Leaderboard · \(todayLabel)")
+            Eyebrow(text: "Tonight's round · \(todayLabel)")
         }
         .listRowBackground(Theme.surface)
     }
 
     /// One anatomy for both sections: the rank disc, the name over its tally,
-    /// and today's count on the trailing edge. A group of mine is marked by the
+    /// and how many are out today on the trailing edge. A group of mine is marked by the
     /// amber name — the row itself stays a plain card. At accessibility sizes
     /// the pill drops under the text.
     private func groupRow(_ group: GroupSummary) -> some View {
         let rank = viewModel.rank(of: group)
-        let count = group.countToday(today)
+        let out = group.outToday(today)
         let isAccessibilitySize = dynamicTypeSize.isAccessibilitySize
         let layout = isAccessibilitySize
             ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
@@ -241,7 +244,7 @@ struct GroupsView: View {
             detailGroup = group
         } label: {
             HStack(alignment: isAccessibilitySize ? .top : .center, spacing: 12) {
-                RankBadge(rank: rank)
+                RankBadge(rank: rank, isOut: out > 0)
                 layout {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(group.name)
@@ -255,8 +258,8 @@ struct GroupsView: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                    StatusPill(text: "🍺 \(count)")
-                        // The count ticks while the screen is open.
+                    StatusPill(text: outLabel(out))
+                        // The head count ticks while the screen is open.
                         .contentTransition(.numericText())
                 }
             }
@@ -269,7 +272,7 @@ struct GroupsView: View {
             .alignmentGuide(.listRowSeparatorLeading) { d in d[.leading] + RankBadge.size + 12 }
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(rankSpoken(rank)), \(group.name), \(count) today, \(group.totalCount) total, \(mates(group.memberCount))\(group.isMine ? ", one of your groups" : "")")
+        .accessibilityLabel("\(rankSpoken(rank, isOut: out > 0)), \(group.name), \(outLabel(out)), \(group.totalCount) total, \(mates(group.memberCount))\(group.isMine ? ", one of your groups" : "")")
     }
 
     private func subtitle(for group: GroupSummary) -> String {
@@ -308,7 +311,7 @@ struct GroupsView: View {
         Task {
             if await viewModel.join(code: code) {
                 Haptics.success()
-                infoMessage = "Your drinks count for this group from now on."
+                infoMessage = "You're in. The group sees when you're out."
             }
         }
     }
@@ -330,18 +333,20 @@ struct GroupsView: View {
 
 // MARK: - Rank marker
 
-/// The one rank marker, drawn: a crown for the leader, `#n` for everyone else —
-/// amber on the wash for the podium, quiet grey below it. Shared by the group
-/// leaderboard and the ranking of people inside a group, because they are the
-/// same idea at two scales.
+/// The one rank marker, drawn: a crown for the first one out, `#n` for everyone
+/// else — amber on the wash for the first three out, quiet grey otherwise. Only
+/// someone (or a group) actually out today gets the crown or the amber; on a
+/// quiet night #1 is just the first name. Shared by tonight's round of groups
+/// and "who's out" inside a group, because they are the same idea at two scales.
 private struct RankBadge: View {
     let rank: Int
+    var isOut: Bool = true
     static let size: CGFloat = 30
 
     var body: some View {
-        let isPodium = rank <= 3
+        let isPodium = rank <= 3 && isOut
         return Group {
-            if rank == 1 {
+            if rank == 1 && isOut {
                 Image(systemName: "crown.fill")
                     .font(.caption.weight(.bold))
             } else {
@@ -356,13 +361,22 @@ private struct RankBadge: View {
     }
 }
 
-private func rankSpoken(_ rank: Int) -> String {
-    switch rank {
-    case 1: return "First place"
-    case 2: return "Second place"
-    case 3: return "Third place"
-    default: return "Number \(rank)"
-    }
+/// Spoken twin of RankBadge: the crown reads "First out", never a place won.
+private func rankSpoken(_ rank: Int, isOut: Bool = true) -> String {
+    rank == 1 && isOut ? "First out" : "Number \(rank)"
+}
+
+/// "3 out", "1 out", "Nobody out": the head count, never a drink count.
+private func outLabel(_ out: Int) -> String {
+    out > 0 ? "\(out) out" : "Nobody out"
+}
+
+/// "Out since 19:12" for a member who is out today, nil for one who isn't.
+/// A stamp-less member (logged before the field existed) is out at an unknown
+/// time: plain "Out".
+private func outSinceLabel(_ since: Date?) -> String? {
+    guard let since else { return nil }
+    return since == .distantPast ? "Out" : "Out since \(GroupDay.clock(since))"
 }
 
 // MARK: - Detail
@@ -478,14 +492,14 @@ private struct GroupDetailSheet: View {
         let layout = dynamicTypeSize.isAccessibilitySize
             ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
             : AnyLayout(HStackLayout(alignment: .center, spacing: 8))
-        let count = live.countToday(today)
+        let out = live.outToday(today)
         return layout {
-            StatusPill(text: "🍺 \(count) today")
+            StatusPill(text: outLabel(out))
             StatusPill(text: "\(live.totalCount) total")
             StatusPill(text: live.memberCount == 1 ? "1 mate" : "\(live.memberCount) mates")
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(count) today, \(live.totalCount) in total, \(live.memberCount) mates")
+        .accessibilityLabel("\(outLabel(out)), \(live.totalCount) in total, \(live.memberCount) mates")
     }
 
     /// Only for a group I'm in: the code is what a mate types, the link is what
@@ -540,8 +554,8 @@ private struct GroupDetailSheet: View {
         .listRowBackground(Theme.surface)
     }
 
-    /// The people in this group, ranked against each other on the same rule as
-    /// the group leaderboard (today, then total, then name).
+    /// The people in this group, in the order they went out today (first one
+    /// out is #1), then everyone else by name. Never by how much they drank.
     private var ranking: GroupMemberRanking { GroupMemberRanking(members, today: today) }
 
     private var membersSection: some View {
@@ -571,12 +585,12 @@ private struct GroupDetailSheet: View {
                 }
             }
         } header: {
-            Eyebrow(text: "Ranking")
+            Eyebrow(text: "Who's out")
         } footer: {
             // A quiet day is a state, not a bug: everyone still has a place, and
             // the line says what would change it.
-            if !isLoadingMembers, !members.isEmpty, (ranking.leader?.countToday(today) ?? 0) == 0 {
-                Text("Nobody's logged a thing today. First one takes the crown.")
+            if !isLoadingMembers, !members.isEmpty, ranking.leader?.outToday(today) == nil {
+                Text("Nobody's out yet. First one opens the round.")
             }
         }
         .listRowBackground(Theme.surface)
@@ -584,18 +598,18 @@ private struct GroupDetailSheet: View {
 
     /// The group row's anatomy, one scale down: the rank marker takes the leading
     /// slot (an avatar beside it made two discs fight over the same row), the
-    /// name goes amber when it's me, today's count is the headline number in the
-    /// pill and the total is the quiet one under the name.
+    /// name goes amber when it's me, the pill says when they went out ("Out since
+    /// 19:12", no pill when they aren't) and the total is the quiet line under the name.
     private func memberRow(_ member: GroupMember) -> some View {
         let rank = ranking.rank(of: member.id)
-        let count = member.countToday(today)
+        let outSince = outSinceLabel(member.outToday(today))
         let isMe = member.id == profile.id
         let isAccessibilitySize = dynamicTypeSize.isAccessibilitySize
         let layout = isAccessibilitySize
             ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
             : AnyLayout(HStackLayout(alignment: .center, spacing: 12))
         return HStack(alignment: isAccessibilitySize ? .top : .center, spacing: 12) {
-            RankBadge(rank: rank)
+            RankBadge(rank: rank, isOut: outSince != nil)
             layout {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(member.displayName)
@@ -610,8 +624,9 @@ private struct GroupDetailSheet: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-                StatusPill(text: "🍺 \(count)")
-                    .contentTransition(.numericText())
+                if let outSince {
+                    StatusPill(text: outSince)
+                }
             }
         }
         .padding(.vertical, 6)
@@ -620,7 +635,7 @@ private struct GroupDetailSheet: View {
         // whatever the badge happens to draw.
         .alignmentGuide(.listRowSeparatorLeading) { d in d[.leading] + RankBadge.size + 12 }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(rankSpoken(rank)), \(member.displayName)\(isMe ? ", you" : ""), @\(member.username), \(count) today, \(member.totalCount) total")
+        .accessibilityLabel("\(rankSpoken(rank, isOut: outSince != nil)), \(member.displayName)\(isMe ? ", you" : ""), @\(member.username), \(outSince ?? "not out yet"), \(member.totalCount) total")
         .accessibilityIdentifier("groups.detail.member.\(member.id)")
     }
 
@@ -825,7 +840,7 @@ private struct GroupDetailSheet: View {
             .accessibilityLabel("Join \(live.name)")
             .accessibilityIdentifier("groups.detail.join")
         } footer: {
-            Text("Your drinks start counting for this group from now on.")
+            Text("The group sees when you're out from now on.")
         }
         .listRowBackground(Theme.surface)
     }
@@ -873,7 +888,7 @@ private struct GroupDetailSheet: View {
                 }
                 Button("Cancel", role: .cancel) {}
             } message: {
-                Text("Your beers stop counting for this group. You can join again with the code.")
+                Text("You drop out of this group's round. You can join again with the code.")
             }
         }
         .listRowBackground(Theme.surface)
@@ -1005,7 +1020,7 @@ private struct CreateGroupSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
-                    Text("Name it after the crew. Every beer a mate logs counts for the group.")
+                    Text("Name it after the crew. Everyone in it sees who's out tonight.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)

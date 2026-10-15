@@ -75,24 +75,33 @@ await mk("seed-mine", tim, "tim", "special", 9, {
 
 const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Amsterdam", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
 const usernames = { [tim]: "tim", [joost]: "joost", [menno]: "menno", [sander]: "sander" };
-// `members` is [uid, todayCount, totalCount] per person: the detail sheet ranks
-// people against each other, so without per-member counts every row ties at 0.
+// `members` is [uid, todayCount, totalCount, minutesAgoOut] per person: the
+// detail sheet ranks people by who went out first (todayFirstAt), so a member
+// with a drink today needs the stamp; minutesAgoOut is null for one not out.
 const group = async (id, name, code, members, todayCount, totalCount) => {
-  await db.doc(`groups/${id}`).set({ name, code, createdBy: members[0][0], createdAt: Timestamp.now(), memberCount: members.length, todayDate: day, todayCount, totalCount });
-  for (const [m, today, total] of members) {
+  const outAt = (mins) => Timestamp.fromDate(new Date(now.getTime() - mins * 60_000));
+  const out = members.filter(([, , , mins]) => mins != null);
+  const firstMins = out.length ? Math.max(...out.map(([, , , mins]) => mins)) : null;
+  await db.doc(`groups/${id}`).set({
+    name, code, createdBy: members[0][0], createdAt: Timestamp.now(), memberCount: members.length,
+    todayDate: day, todayCount, totalCount, todayOutCount: out.length,
+    ...(firstMins != null ? { todayFirstAt: outAt(firstMins) } : {}),
+  });
+  for (const [m, today, total, mins] of members) {
     const uname = usernames[m];
     await db.doc(`groups/${id}/members/${m}`).set({
       username: uname, displayName: uname[0].toUpperCase() + uname.slice(1), joinedAt: Timestamp.now(),
       todayDate: day, todayCount: today, totalCount: total,
+      ...(mins != null ? { todayFirstAt: outAt(mins) } : {}),
     });
     await db.doc(`users/${m}/groups/${id}`).set({ name, joinedAt: Timestamp.now() });
   }
 };
 // Sander is in De Kroeg but is not one of tim's mates, so "Add everyone as
-// mates" has someone to ask — and his empty row shows a member at zero.
-await group("seed-kroeg", "De Kroeg", "KROEG7", [[tim, 2, 7], [joost, 1, 5], [sander, 0, 0]], 3, 12);
-await group("seed-rivalen", "De Rivalen", "RIVAL9", [[joost, 5, 40]], 5, 40);
-await group("seed-stil", "Stille Drinkers", "STIL22", [[joost, 0, 3]], 0, 3);
+// mates" has someone to ask — and his row shows a member who is not out.
+await group("seed-kroeg", "De Kroeg", "KROEG7", [[tim, 2, 7, 95], [joost, 1, 5, 40], [sander, 0, 0, null]], 3, 12);
+await group("seed-rivalen", "De Rivalen", "RIVAL9", [[joost, 5, 40, 40]], 5, 40);
+await group("seed-stil", "Stille Drinkers", "STIL22", [[joost, 0, 3, null]], 0, 3);
 
 // Two notes in the group the rig opens, from two different authors: the 60 s
 // per-member cooldown (onGroupNoteCreated) would delete a second one from the

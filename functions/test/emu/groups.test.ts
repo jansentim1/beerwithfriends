@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { initTestDb, seedUser, clearDb } from "./helpers";
-import { Timestamp } from "firebase-admin/firestore";
+import { Timestamp, FieldValue } from "firebase-admin/firestore";
 import { createGroupCore, joinGroupCore, leaveGroupCore, countDrinkForGroups, enforceNoteCooldown, GROUP_MAX_MEMBERS } from "../../src/groups";
 
 const db = initTestDb();
@@ -90,6 +90,82 @@ describe("per-member counters", () => {
     await countDrinkForGroups(db, "u2", new Date("2026-09-09T20:00:00Z"));
     expect((await db.doc(`groups/${g.id}`).get()).get("totalCount")).toBe(1);
     expect((await db.doc(`groups/${g.id}/members/u2`).get()).exists).toBe(false);
+  });
+});
+
+describe("who's out today", () => {
+  const ms = (t: unknown) => (t as Timestamp | undefined)?.toMillis();
+
+  it("first drink of the day sets todayFirstAt and makes todayOutCount 1", async () => {
+    const g = await createGroupCore(db, "u1", "De Kroeg", new Date("2026-09-09T12:00:00Z"));
+    expect((await db.doc(`groups/${g.id}`).get()).get("todayOutCount")).toBe(0);
+    const first = new Date("2026-09-09T17:12:00Z");
+    await countDrinkForGroups(db, "u1", first);
+    const group = (await db.doc(`groups/${g.id}`).get()).data()!;
+    const m1 = (await db.doc(`groups/${g.id}/members/u1`).get()).data()!;
+    expect(group.todayOutCount).toBe(1);
+    expect(ms(group.todayFirstAt)).toBe(first.getTime());
+    expect(ms(m1.todayFirstAt)).toBe(first.getTime());
+  });
+
+  it("a second drink by the same member the same day changes neither", async () => {
+    const g = await createGroupCore(db, "u1", "De Kroeg", new Date("2026-09-09T12:00:00Z"));
+    const first = new Date("2026-09-09T17:12:00Z");
+    await countDrinkForGroups(db, "u1", first);
+    await countDrinkForGroups(db, "u1", new Date("2026-09-09T19:00:00Z"));
+    const group = (await db.doc(`groups/${g.id}`).get()).data()!;
+    const m1 = (await db.doc(`groups/${g.id}/members/u1`).get()).data()!;
+    expect(group.todayOutCount).toBe(1);
+    expect(ms(group.todayFirstAt)).toBe(first.getTime());
+    expect(ms(m1.todayFirstAt)).toBe(first.getTime());
+    expect(m1.todayCount).toBe(2); // still counted, just not the headline
+  });
+
+  it("a second member's first drink makes todayOutCount 2 and keeps the group's first stamp", async () => {
+    const g = await createGroupCore(db, "u1", "De Kroeg", new Date("2026-09-09T12:00:00Z"));
+    await joinGroupCore(db, "u2", g.code, new Date("2026-09-09T12:30:00Z"));
+    const first = new Date("2026-09-09T17:12:00Z"), second = new Date("2026-09-09T18:40:00Z");
+    await countDrinkForGroups(db, "u1", first);
+    await countDrinkForGroups(db, "u2", second);
+    const group = (await db.doc(`groups/${g.id}`).get()).data()!;
+    expect(group.todayOutCount).toBe(2);
+    expect(ms(group.todayFirstAt)).toBe(first.getTime());
+    expect(ms((await db.doc(`groups/${g.id}/members/u2`).get()).get("todayFirstAt"))).toBe(second.getTime());
+  });
+
+  it("the group's day rollover resets todayOutCount to 1", async () => {
+    const g = await createGroupCore(db, "u1", "De Kroeg", new Date("2026-09-09T12:00:00Z"));
+    await joinGroupCore(db, "u2", g.code, new Date("2026-09-09T12:30:00Z"));
+    await countDrinkForGroups(db, "u1", new Date("2026-09-09T17:00:00Z"));
+    await countDrinkForGroups(db, "u2", new Date("2026-09-09T18:00:00Z"));
+    expect((await db.doc(`groups/${g.id}`).get()).get("todayOutCount")).toBe(2);
+    const nextDay = new Date("2026-09-10T16:00:00Z");
+    await countDrinkForGroups(db, "u2", nextDay);
+    const group = (await db.doc(`groups/${g.id}`).get()).data()!;
+    expect([group.todayDate, group.todayOutCount]).toEqual(["2026-09-10", 1]);
+    expect(ms(group.todayFirstAt)).toBe(nextDay.getTime());
+    // u1 has not been out today: their member doc is stale, not rewritten.
+    expect((await db.doc(`groups/${g.id}/members/u1`).get()).get("todayDate")).toBe("2026-09-09");
+  });
+
+  it("a group doc from before the fields picks them up from the next first drink", async () => {
+    const g = await createGroupCore(db, "u1", "Old", new Date("2026-09-09T12:00:00Z"));
+    await db.doc(`groups/${g.id}`).update({ todayOutCount: FieldValue.delete() });
+    const first = new Date("2026-09-09T17:00:00Z");
+    await countDrinkForGroups(db, "u1", first);
+    const group = (await db.doc(`groups/${g.id}`).get()).data()!;
+    expect(group.todayOutCount).toBe(1);
+    expect(ms(group.todayFirstAt)).toBe(first.getTime());
+  });
+
+  it("a stale membership mirror does not count as out", async () => {
+    const g = await createGroupCore(db, "u1", "Stale", new Date("2026-09-09T12:00:00Z"));
+    await joinGroupCore(db, "u2", g.code);
+    await db.doc(`groups/${g.id}/members/u2`).delete();
+    await countDrinkForGroups(db, "u2", new Date("2026-09-09T20:00:00Z"));
+    const group = (await db.doc(`groups/${g.id}`).get()).data()!;
+    expect(group.todayOutCount).toBe(0);
+    expect(group.todayFirstAt).toBeUndefined();
   });
 });
 

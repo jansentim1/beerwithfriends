@@ -96,8 +96,9 @@ service cloud.firestore {
       allow read: if signedIn();
       allow write: if false;
       match /members/{uid} {
-        // todayDate/todayCount/totalCount are written by countDrinkForGroups
-        // only: the per-person ranking cannot be forged from a phone.
+        // todayDate/todayCount/totalCount/todayFirstAt are written by countDrinkForGroups
+        // only (as is the group's todayOutCount/todayFirstAt): "who's out" cannot
+        // be forged from a phone.
         allow read: if signedIn();
         allow write: if false;
       }

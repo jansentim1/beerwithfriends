@@ -27,8 +27,9 @@ and a little bit fun.
 The disappearing, view-once photo enforced by the server (not just hidden) plus the
 push-and-cheers loop with zero feed scrolling. Not a personal stats app, not a chat.
 Groups (2026-09-10, Tim: "battelen tegen andere groepen") add one shared number per crew,
-today's drinks, on an app-wide leaderboard; it is a battle between crews, never a
-personal score.
+how many of them are out today, on an app-wide "Tonight's round"; it is a battle between
+crews, never a personal score. Since 2026-10-15 nothing ranks by how much anyone drank
+(App Store guideline 1.4.3): groups by members out, people by who went out first.
 
 ## Operating Context
 
@@ -80,7 +81,7 @@ personal score.
 2. Instant: optimistic UI everywhere; the network never blocks the ritual.
 3. Ephemeral by design: seen-then-two-hours, one live drink per person, and view-once are features; the UI should make them legible.
 4. Friends, not followers: small groups, exact usernames, no discovery, no personal numbers
-   to chase (the only counter is a crew's today, on the Groups leaderboard).
+   to chase (the only headline number is how many of a crew are out today, on the Groups tab).
 5. Native first: an iPhone user should never pause at an off-spec control.
 
 ## Accessibility & Inclusion
