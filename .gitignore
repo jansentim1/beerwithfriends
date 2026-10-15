@@ -14,3 +14,5 @@ App/Resources/GoogleService-Info.plist
 PRODUCT.md.bak
 .impeccable/
 functions/.env*
+.claude/worktrees/
+tools/__pycache__/
