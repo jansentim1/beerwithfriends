@@ -10,7 +10,10 @@ targets:
     sources:
       - App/Sources
       # GoogleService-Info.plist lives here (gitignored; CI writes it from a secret).
-      - { path: App/Resources, optional: true, excludes: ["README.md"] }
+      - { path: App/Resources, optional: true, excludes: ["README.md", "PrivacyInfo.xcprivacy"] }
+      # Privacy manifest (App Review ITMS-91053), listed on its own so it lands in
+      # Copy Bundle Resources whatever XcodeGen's file-type table says about it.
+      - { path: App/Resources/PrivacyInfo.xcprivacy, buildPhase: resources }
     dependencies:
       - package: BeerKit
       - package: Firebase
@@ -47,9 +50,9 @@ targets:
       path: App/Info.plist
       properties:
         NSCameraUsageDescription: "Take a live photo of your beer to share with friends."
-        # Opt-in only (Settings → Privacy → "Share where I'm drinking"); resolved to
-        # a bar or city name and never stored as coordinates.
-        NSLocationWhenInUseUsageDescription: "Only used to name the bar or city on a beer you log, when you turn that on."
+        # Asked on the first drink you log; refusing it means you type the place.
+        # The address goes on the drink with the position rounded to ~100 m.
+        NSLocationWhenInUseUsageDescription: "Puts the address you're drinking at on the drink you log, so your mates can find you. Only read while you log."
         # Name shown in system dialogs ("PubDates would like to access the camera").
         CFBundleName: PubDates
         # Without a launch screen iOS letterboxes the app in a compatibility window.

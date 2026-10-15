@@ -64,6 +64,13 @@ jobs:
           grep -E '(App|BeerKit)/Sources.*warning:' build.log | sort -u || true
           grep -q '\*\* BUILD SUCCEEDED \*\*' build.log
 
+      - name: Privacy manifest is bundled
+        run: |
+          app=$(find ~/Library/Developer/Xcode/DerivedData -type d -path '*Debug-iphonesimulator/BeerWithFriends.app' | head -1)
+          echo "app: $app"
+          test -f "$app/PrivacyInfo.xcprivacy"
+          plutil -lint "$app/PrivacyInfo.xcprivacy"
+
       - name: Upload build log
         if: always()
         uses: actions/upload-artifact@v4
