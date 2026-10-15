@@ -294,7 +294,7 @@ public final class LeaderboardViewModel: ObservableObject {
             do {
                 for try await list in service.observeGroups() { self.groups = list }
             } catch {
-                if !Task.isCancelled { self.errorMessage = "Couldn't load the leaderboard." }
+                if !Task.isCancelled { self.errorMessage = "Couldn't load the groups." }
             }
         }
         observation = task
