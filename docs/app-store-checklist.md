@@ -10,9 +10,10 @@ ordered by what gets a first submission rejected.
 All eight section A items are fixed on main (typed place when location is refused,
 real privacy link, honest purpose string, App Store link in the update screen,
 privacy manifest, Contact row, groups rank by who is out, review mate `pubdates`
-behind `config/app.reviewMate`). Store record filled via the API. Remaining before
-Submit: Tim's phone number for the review contact, the App Privacy labels in the
-browser, screenshots from the rig, and attaching the new build.
+behind `config/app.reviewMate`). Store record filled via the API. Build 39 is attached to version 1.0 and five
+rig screenshots (1260 x 2736) are uploaded. Remaining before Submit: Tim's phone
+number for the review contact (API refuses without it), and the App Privacy labels
+in the browser.
 
 ## A. Rejection risks in the app (fix in code before the store build)
 
