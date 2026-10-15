@@ -11,9 +11,9 @@ All eight section A items are fixed on main (typed place when location is refuse
 real privacy link, honest purpose string, App Store link in the update screen,
 privacy manifest, Contact row, groups rank by who is out, review mate `pubdates`
 behind `config/app.reviewMate`). Store record filled via the API. Build 39 is attached to version 1.0 and five
-rig screenshots (1260 x 2736) are uploaded. Remaining before Submit: Tim's phone
-number for the review contact (API refuses without it), and the App Privacy labels
-in the browser.
+rig screenshots (1260 x 2736) are uploaded. SUBMITTED 2026-10-15 (WAITING_FOR_REVIEW). Submission also needed:
+copyright, contentRightsDeclaration, a price schedule (Free, base NLD) and
+/v2/appAvailabilities for all territories; `tools/submit-review.py` does the submit.
 
 ## A. Rejection risks in the app (fix in code before the store build)
 
