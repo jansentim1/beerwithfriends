@@ -1,88 +1,86 @@
 # App Store submission checklist
 
-Everything App Review will look at for PubDates, and where it is handled.
+Researched 2026-10-15 against Apple's live App Review Guidelines, the App Store
+Connect age-rating definitions and screenshot specifications, and the state of our
+App Store Connect record (app id 6809410863). Everything App Review will look at,
+ordered by what gets a first submission rejected.
 
-## App Store Connect app record
+## Verdict on 2026-10-15
 
-- Bundle id: `com.timjansen.BeerWithFriends` (from `project.yml` `bundleIdPrefix` + target name).
-- Category: Social Networking. Secondary: Food & Drink.
-- Age rating: **17+**. In the questionnaire answer "Frequent/Intense" for
-  "Alcohol, Tobacco, or Drug Use or References" and "Frequent/Intense" for
-  "Unrestricted Web Access: No". User Generated Content: Yes.
-- Privacy policy URL: https://beerwithme-prod.web.app/privacy (site/privacy.html, deployed with `tools/deploy.sh --no-gates --hosting`; keep it in step with docs/privacy-policy.md)
-  and paste the URL. Required for any app with accounts.
-- Support URL: the repo README or the same page.
+Technically we can submit today: a signed build pipeline exists, build 38 passed
+beta review, the backend is live. We should NOT press Submit yet: four things in
+the app itself are near-certain rejections, and the store record is empty.
 
-## App Privacy labels (the "nutrition label")
+## A. Rejection risks in the app (fix in code before the store build)
 
-Declare these as **collected, linked to the user, not used for tracking**:
+| # | Risk | Guideline | Evidence | Fix |
+|---|---|---|---|---|
+| 1 | Privacy policy link in Settings points at `https://example.com/beerwithme/privacy` (dead placeholder) | 5.1.1(i) link must be in-app; 2.1(a) no placeholder content | `App/Sources/Views/SettingsView.swift:45` | Point it at https://beerwithme-prod.web.app/privacy |
+| 2 | Location is required to log a drink; refusal gives a dead end ("Open Settings" alert) | 5.1.2(i): "may not require users to enable system functionalities (e.g. push notifications, location services) in order to access functionality"; 5.1.1(iv): "if a user declines to share Location, offer the ability to manually enter an address" | `HomeView.swift` location alert; build 37 decision | Product decision for Tim: (a) allow logging without location (no pin, no place) or (b) a manual place field when denied. Keep the ask, drop the wall. |
+| 3 | Location purpose string says "when you turn that on" | 5.1.1(ii): purpose strings must "clearly and completely describe your use" | `project.yml` NSLocationWhenInUseUsageDescription | "Puts the address you're drinking at on the drink you log, so your mates can find you. Only read when you log." |
+| 4 | Forced-upgrade screen sends people to TestFlight | 2.1 / 2.3: store build must not reference TestFlight | `UpdateRequiredView.swift` | Link to the App Store page (id 6809410863) once live; copy "Grab the update from the App Store" |
+| 5 | Reviewer signs in with their own Apple ID and sees an empty feed, no mates, nothing to review | 2.1(a) "provide a demo account with full access" | Sign in with Apple is the only login; content is mates-only | Build a review mate: username `pubdates`, server auto-accepts requests to it, a scheduled function keeps a live drink (with photo + place) on it every 45 min while the review flag is on. Review notes tell them to add `pubdates`. |
+| 6 | No `PrivacyInfo.xcprivacy` in the app target; `@AppStorage`/`UserDefaults` are required-reason APIs | ITMS-91053 (upload warning that becomes a block) | `find` found none; Firebase 11 ships its own | Add `App/Resources/PrivacyInfo.xcprivacy` declaring `NSPrivacyAccessedAPICategoryUserDefaults` reason `CA92.1`, no tracking, collected data types matching the labels below |
+| 7 | Daily group "Leaderboard", "First one takes the crown": ranks mates by drinks logged | 1.4.3: apps that "encourage ... excessive amounts of alcohol" are not permitted | `GroupsView.swift:223,579` | Judgement call for Tim. Low-cost hedge: rename to "Today's round", rank by who is out (first to log), not by count. No email warnings so far means nothing; TestFlight beta review is lighter than App Review. |
+| 8 | No in-app contact for support | 1.2 "published contact information", 1.5 support URL "include an easy way to contact you" | Settings has no contact row; site/index.html has none | Add a "Contact" row in Settings (mailto) and a line with the email on the site page used as Support URL |
 
-| Category | Data type | Purpose |
+Already fine: Sign in with Apple as the only login (4.8 satisfied), in-app account
+deletion via `deleteAccount` (5.1.1(v), emulator-tested), report + block in the
+long-press menu (1.2), no analytics or tracking SDKs, `ITSAppUsesNonExemptEncryption`
+false, iPhone only (no iPad screenshots needed), no background location.
+
+## B. App Store Connect record (today it is empty)
+
+Checked via the API on 2026-10-15: name still "Pints With Mates", no category, no age
+rating answered, no description, keywords, screenshots, privacy policy URL, support
+URL or review notes. Version 1.0 is in PREPARE_FOR_SUBMISSION with no build attached.
+
+| Field | Value to set | How |
 |---|---|---|
-| Contact Info | Name (display name) | App functionality |
-| User Content | Photos, Other user content (beer logs) | App functionality |
-| Identifiers | User ID | App functionality |
-| Location | Coarse location (place name and the place's position, opt-in) | App functionality |
-| Contacts | none | |
-| Usage Data | none | |
-| Diagnostics | none (no crash SDK) | |
+| Name | PubDates (iTunes search 2026-10-15: no app with that name) | API `appInfoLocalizations` PATCH, from tim-server |
+| Subtitle | "Tell your mates you're having one" | API |
+| Primary category | Social Networking; secondary Food & Drink | API `appInfos` PATCH |
+| Age rating | Answer: alcohol references **Frequent** (gives 18+), user-generated content Yes, messaging/chat Yes (group notes, reactions), social media **Yes** (feed with reactions; minimum 13+, we are 18+ anyway), unrestricted web access No, contests No | API `ageRatingDeclarations` PATCH. Social-media answers are mandatory for new submissions since September 2026. |
+| Privacy policy URL | https://beerwithme-prod.web.app/privacy | API |
+| Support URL | https://beerwithme-prod.web.app/ with a contact line added (A8) | API |
+| Description, keywords, what's new | from docs/store-listing.md (to write) | API |
+| Screenshots | iPhone 6.9" set, 1320 x 2868 portrait, 3 to 6 images, no alpha. Apple scales the rest. Must be 4+ appropriate (2.3.8): a pint is fine, no drunkenness. Capture on the rig with an iPhone 17 Pro Max simulator, seeded frames. | API `appScreenshotSets` upload |
+| App Privacy labels | No public API. Tim in the browser: Collected, linked to user, not for tracking: Name (display name), User ID, Photos, Other user content, Precise Location (the address and coordinate on a drink), Coarse Location. Nothing used for tracking. | Browser only |
+| App Review notes | See section C | API `appStoreReviewDetails` |
+| Export compliance | Inherited from TestFlight builds (plist key set) | nothing |
+| Build | A fresh `ios-testflight` run after section A is merged, then attach to version 1.0 | API |
+| Release | Manual release after approval, so the TestFlight expiry and `minBuild` can be sequenced | `releaseType: MANUAL` |
 
-Do **not** tick "Data used to track you". Firebase Analytics is not linked, so no
-advertising identifiers.
+## C. App Review notes (paste as reviewNotes)
 
-## User Generated Content requirements (App Review guideline 1.2)
+"PubDates is a private, friends-only app: you log that you are having a drink, and
+only mates who accepted your request see it, for one hour. There is no public
+content. Sign in with Apple is the only login, so there is no demo password: sign in
+with any Apple ID, pick a username, then on the Mates tab add the username
+`pubdates`. That account accepts automatically and always has a live drink with a
+photo and a place, so the Home feed, Map, photo view-once, reactions and Groups all
+have content. Report and Block are in the long-press menu on any drink or mate.
+Delete account is in Settings. Location is asked when you log a drink; logging
+works without it. The camera is the only photo source. Contact: twj.jansen@gmail.com."
 
-All four are implemented; App Review checks each.
+(Rewrite the "logging works without it" sentence to match whatever A2 becomes.)
 
-| Requirement | Where |
-|---|---|
-| Filter objectionable content | Photos are visible only to accepted friends, once, for 24 hours. State this in review notes. |
-| Report mechanism | Long-press any feed row or friend row, Report, pick a reason. Writes `reports/`. |
-| Block mechanism | Long-press feed row or friend row, Block. Server severs friendship both ways. Unblock in Settings. |
-| Contact info for the developer | Privacy policy contact email; Support URL. |
+## D. Order of work
 
-Add to the **App Review notes**: "Content is only shared between mutually accepted friends.
-Every photo expires after 24 hours and can be viewed once per friend. Report and block are
-in the long-press menu on any beer or friend. A demo account is not needed; Sign in with Apple
-works with any Apple ID, and a second reviewer account can add the first by username."
+1. Tim decides A2 (location wall) and A7 (leaderboard wording).
+2. Code: A1, A3, A4, A6, A8, the `pubdates` review mate (A5) with emulator tests, and A2/A7 as decided. Gates green, deploy functions, push.
+3. Store record via API: everything in B except privacy labels. Write docs/store-listing.md first and get Tim's OK on the copy.
+4. Rig screenshots at 1320 x 2868, upload.
+5. `gh workflow run ios-testflight`, attach the build to 1.0, submit for review (API `appStoreVersionSubmissions` / `reviewSubmissions`).
+6. Tim in the browser: App Privacy labels (B), confirm the age-rating result shows 18+, press nothing else.
+7. First review usually answers within 24 to 48 hours. Rejections come with a guideline number; answer in Resolution Center, resubmit the same build if only metadata changed.
+8. After approval: switch `UpdateRequiredView` and the site to the App Store link, keep `minBuild` at or below the approved build, expire TestFlight builds only after the store build is live.
 
-## Sign in with Apple (guideline 4.8)
+## Sources
 
-Sign in with Apple is the **only** sign-in, so the "offer Sign in with Apple if you offer
-other third-party logins" rule is satisfied trivially.
-
-## Account deletion (guideline 5.1.1(v))
-
-Settings, Delete account. Calls the `deleteAccount` Cloud Function which erases everything
-and removes the Firebase Auth user. Reviewers test this; it must work on the production
-project before submission.
-
-## Permissions strings (Info.plist)
-
-- `NSCameraUsageDescription` and `NSLocationWhenInUseUsageDescription` are set in `project.yml`.
-- Notifications: permission is requested only after onboarding finishes, with an in-app
-  explanation on the username screen first.
-- No photo library, microphone or contacts access. Location only when-in-use and only after the user opts in.
-
-## Screenshots needed
-
-Take them on a real device via TestFlight (no simulator in this project). Required sizes are
-generated from a 6.7" and a 6.1" iPhone; upload one set for 6.7" and App Store Connect
-scales the rest if you tick "use for all sizes".
-
-1. Home with a few beers in the feed and one "view once" chip.
-2. The big "I'm drinking a beer" button on an empty feed.
-3. Camera review screen.
-4. Friends tab with an incoming request.
-5. Photo viewer with the "view once" badge.
-
-## Before pressing Submit
-
-- [ ] Production Firebase project deployed: `firebase deploy --only functions,firestore:rules,firestore:indexes,storage`
-- [ ] APNs key uploaded to Firebase Cloud Messaging and a push received on a real device.
-- [ ] Sign in with Apple capability on the App ID and the Apple provider enabled in Firebase Auth.
-- [ ] Account deletion tested end to end on production.
-- [x] Privacy policy URL live (2026-09-11).
-- [ ] Export compliance: answer "No" to non-exempt encryption (only HTTPS); set
-      `ITSAppUsesNonExemptEncryption = NO` in Info.plist to skip the question per build.
-- [ ] Build uploaded via CI, tested on TestFlight by at least two people cheersing each other.
+- App Review Guidelines (1.2, 1.4.3, 1.5, 2.1, 2.3.6, 2.3.8, 4.8, 5.1.1, 5.1.2, 5.1.5): https://developer.apple.com/app-store/review/guidelines/
+- Age rating values and definitions (frequent alcohol = 18+, social media = 13+ minimum): https://developer.apple.com/help/app-store-connect/reference/app-information/age-ratings-values-and-definitions
+- Social media questions mandatory from September 2026: https://9to5mac.com/2026/07/09/apple-adds-social-media-questions-to-app-store-connect-age-rating-questionnaire/
+- Screenshot specifications: https://developer.apple.com/help/app-store-connect/reference/screenshot-specifications
+- Required-reason APIs and ITMS-91053: https://developer.apple.com/forums/thread/750341
+- Rejections over location walls and purpose strings: https://developer.apple.com/forums/thread/757532
