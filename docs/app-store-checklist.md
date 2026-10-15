@@ -5,11 +5,14 @@ Connect age-rating definitions and screenshot specifications, and the state of o
 App Store Connect record (app id 6809410863). Everything App Review will look at,
 ordered by what gets a first submission rejected.
 
-## Verdict on 2026-10-15
+## Status 2026-10-15 evening
 
-Technically we can submit today: a signed build pipeline exists, build 38 passed
-beta review, the backend is live. We should NOT press Submit yet: four things in
-the app itself are near-certain rejections, and the store record is empty.
+All eight section A items are fixed on main (typed place when location is refused,
+real privacy link, honest purpose string, App Store link in the update screen,
+privacy manifest, Contact row, groups rank by who is out, review mate `pubdates`
+behind `config/app.reviewMate`). Store record filled via the API. Remaining before
+Submit: Tim's phone number for the review contact, the App Privacy labels in the
+browser, screenshots from the rig, and attaching the new build.
 
 ## A. Rejection risks in the app (fix in code before the store build)
 
@@ -54,7 +57,7 @@ URL or review notes. Version 1.0 is in PREPARE_FOR_SUBMISSION with no build atta
 ## C. App Review notes (paste as reviewNotes)
 
 "PubDates is a private, friends-only app: you log that you are having a drink, and
-only mates who accepted your request see it, for one hour. There is no public
+only mates who accepted your request see it, for a few hours at most. There is no public
 content. Sign in with Apple is the only login, so there is no demo password: sign in
 with any Apple ID, pick a username, then on the Mates tab add the username
 `pubdates`. That account accepts automatically and always has a live drink with a
@@ -63,7 +66,7 @@ have content. Report and Block are in the long-press menu on any drink or mate.
 Delete account is in Settings. Location is asked when you log a drink; logging
 works without it. The camera is the only photo source. Contact: twj.jansen@gmail.com."
 
-(Rewrite the "logging works without it" sentence to match whatever A2 becomes.)
+
 
 ## D. Order of work
 
