@@ -5,7 +5,7 @@ import SwiftUI
 // iOS 17 SDK APIs under Swift 6 concurrency, not yet compiled.
 
 /// Profile, blocked-user management, sign out, delete account (double
-/// confirmation), privacy policy link, version footer.
+/// confirmation), privacy policy and contact links, version footer.
 ///
 /// Screen 6 of docs/design/direction.md: inset grouped list, a profile header
 /// with the big amber initial, then quiet Blocked / About / Account groups.
@@ -41,8 +41,10 @@ struct SettingsView: View {
 
     private var locationStateText: String { locationAuthorized ? "On" : "Off, you type the place" }
 
-    // Placeholder until Task 11/12 publish the real policy URL.
-    private let privacyPolicyURL = URL(string: "https://example.com/beerwithme/privacy")!
+    /// Served from Firebase Hosting (site/privacy.html, same text as docs/privacy-policy.md).
+    private let privacyPolicyURL = URL(string: "https://beerwithme-prod.web.app/privacy")!
+    /// Support contact (App Review 1.2 and 1.5: an easy way to reach us).
+    private let contactURL = URL(string: "mailto:twj.jansen@gmail.com")!
 
     init(profile: UserProfile) {
         self.profile = profile
@@ -290,6 +292,21 @@ struct SettingsView: View {
             }
             .accessibilityLabel("Privacy policy")
             .accessibilityHint("Opens in your browser")
+
+            Link(destination: contactURL) {
+                HStack {
+                    Label("Contact", systemImage: "envelope")
+                    Spacer(minLength: 12)
+                    Image(systemName: "arrow.up.right")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
+                }
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+            }
+            .accessibilityLabel("Contact")
+            .accessibilityHint("Writes an email to twj.jansen@gmail.com")
         }
         .listRowBackground(Theme.surface)
     }
