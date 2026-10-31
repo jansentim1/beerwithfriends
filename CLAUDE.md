@@ -1,7 +1,7 @@
 # PubDates — working agreement
 
 iPhone app (SwiftUI, iOS 17+) + Firebase backend. Testable core in `BeerKit/` (Swift
-package), Cloud Functions in `functions/` (TypeScript, Node 20), rules at repo root.
+package), Cloud Functions in `functions/` (TypeScript, Node 22; Node 20 was decommissioned by Google on 2026-10-30), rules at repo root.
 Spec: `docs/superpowers/specs/2026-07-11-beerwithme-design.md`.
 Plan + loop protocol: `docs/superpowers/plans/2026-07-11-beerwithme.md`. Loop state: `STATE.md`.
 
