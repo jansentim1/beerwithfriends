@@ -8,6 +8,7 @@
 #   tools/deploy.sh            # gates + deploy
 #   tools/deploy.sh --no-gates # deploy only (you already ran the gates)
 #   tools/deploy.sh --no-gates --hosting # ... plus site/ on Firebase Hosting
+#   tools/deploy.sh --no-gates --hosting-only # site/ only, backend untouched
 set -euo pipefail
 # Service-account auth (tim-server) bills API quota to the SA's home project unless told
 # otherwise; firebase-tools honors this env var.
@@ -33,4 +34,6 @@ echo "== deploy to $(sed -n 's/.*"default": *"\([^"]*\)".*/\1/p' .firebaserc)"
 TARGETS="firestore:rules,firestore:indexes,storage,functions"
 # `--hosting` also publishes site/ (invite pages, Apple association file, /privacy).
 for arg in "$@"; do [[ "$arg" == "--hosting" ]] && TARGETS="$TARGETS,hosting"; done
+# `--hosting-only` publishes just site/ (links, privacy page) without touching the backend.
+for arg in "$@"; do [[ "$arg" == "--hosting-only" ]] && TARGETS="hosting"; done
 firebase deploy --non-interactive --force --only "$TARGETS" 2>&1 | tail -25
