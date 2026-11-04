@@ -4,13 +4,18 @@ import UIKit
 // COMPILE-PARKED (Task 10): no Xcode on this machine — written against
 // iOS 17 SDK APIs under Swift 6 concurrency, not yet compiled.
 
-/// Full-screen, once-only photo display, inside a `ScreenshotShield`. The bytes
-/// were already consumed via `getPhotoOnce` before this view appears — closing it is final (except
-/// for the owner, who is exempt server-side). Tap or swipe down to dismiss.
+/// Full-screen, once-only photo display, inside a `ScreenshotShield`. The viewer
+/// opens the instant the pill is tapped and fetches the bytes itself via `load`
+/// (the `getPhotoOnce` round trip), so the tap answers at once instead of after
+/// the network (Tim, 2026-11-04: "now there is lag"). Once `load` has run the
+/// view is consumed — closing is final (except for the owner, exempt server-side).
+/// Tap or swipe down to dismiss; a failure (already viewed, expired, offline)
+/// shows in place, with the same way out.
 /// A screenshot fires `screenshotReporter(beerId)` (best-effort write of
 /// `beers/{beerId}/screenshots/{me}` so the owner can see who screengrabbed).
 struct PhotoViewerView: View {
-    let url: URL
+    /// Fetches the photo to a temp file, or says why it could not.
+    let load: @MainActor @Sendable () async -> PhotoLoad
     let ownerName: String
     /// Drawn into the photo already; carried as text so VoiceOver can read it.
     var caption: String?
@@ -19,10 +24,19 @@ struct PhotoViewerView: View {
     let onDismiss: () -> Void
 
     @State private var dragOffset: CGFloat = 0
-    /// The photo, once read from the temp file `getPhotoOnce` wrote.
+    /// The photo, once fetched and decoded.
     @State private var loaded: Loaded = .loading
+    /// The temp file `load` wrote; removed when the viewer goes.
+    @State private var fileURL: URL?
 
-    private enum Loaded { case loading, image(UIImage), failed }
+    private enum Loaded { case loading, image(UIImage), failed(String) }
+
+    /// A tap or swipe while the fetch is still running would burn the one view
+    /// on a photo never seen; only the close circle works until it is in.
+    private var isLoading: Bool {
+        if case .loading = loaded { return true }
+        return false
+    }
 
     /// Raised when a screenshot is actually taken, so the black rectangle the
     /// viewer just saved is explained rather than mysterious.
@@ -58,14 +72,14 @@ struct PhotoViewerView: View {
                         .accessibilityLabel(
                             caption.map { "Photo from \(ownerName): \($0)" } ?? "Photo from \(ownerName)"
                         )
-                case .failed:
+                case .failed(let message):
                     VStack(spacing: 12) {
                         Image(systemName: "photo.badge.exclamationmark")
                             .font(.largeTitle)
                             .foregroundStyle(.white.opacity(0.7))
                         Text("Photo unavailable")
                             .font(.headline)
-                        Text("It could not be read — try again from the feed.")
+                        Text(message)
                             .font(.footnote)
                             .foregroundStyle(.white.opacity(0.7))
                             .multilineTextAlignment(.center)
@@ -97,16 +111,16 @@ struct PhotoViewerView: View {
         .offset(y: max(0, dragOffset))
         .contentShape(Rectangle())
         .onTapGesture {
-            onDismiss()
+            if !isLoading { close() }
         }
         .gesture(
             DragGesture()
                 .onChanged { value in
-                    dragOffset = value.translation.height
+                    if !isLoading { dragOffset = value.translation.height }
                 }
                 .onEnded { value in
-                    if value.translation.height > 120 {
-                        onDismiss()
+                    if !isLoading, value.translation.height > 120 {
+                        close()
                     } else {
                         withAnimation(.snappy) { dragOffset = 0 }
                     }
@@ -123,15 +137,28 @@ struct PhotoViewerView: View {
         }
         .statusBarHidden()
         .task {
+            let url: URL
+            switch await load() {
+            case .file(let fetched): url = fetched
+            case .failed(let message):
+                loaded = .failed(message)
+                return
+            }
+            fileURL = url
             // Off the main actor: the file is a downscaled JPEG, but decoding
             // still should not block the presentation animation.
-            let url = url
             let image = await Task.detached(priority: .userInitiated) { () -> UIImage? in
                 guard let data = try? Data(contentsOf: url) else { return nil }
                 return UIImage(data: data)
             }.value
-            loaded = image.map { .image($0) } ?? .failed
+            loaded = image.map { .image($0) } ?? .failed("It could not be read — try again from the feed.")
         }
+    }
+
+    /// View-once: the temp file goes with the viewer.
+    private func close() {
+        if let fileURL { try? FileManager.default.removeItem(at: fileURL) }
+        onDismiss()
     }
 
     /// Says before the fact, and again after it, that a screenshot of this screen
@@ -173,7 +200,7 @@ struct PhotoViewerView: View {
                 .background(.white.opacity(0.18), in: Capsule())
                 .accessibilityLabel("View once")
 
-            Button(action: onDismiss) {
+            Button(action: close) {
                 Image(systemName: "xmark")
                     .font(.headline)
                     .foregroundStyle(.white)
@@ -186,4 +213,11 @@ struct PhotoViewerView: View {
         .padding(.horizontal, 16)
         .padding(.top, 8)
     }
+}
+
+/// What `PhotoViewerView.load` comes back with: the JPEG on disk, or the
+/// sentence to show instead ("You already used your one view 👀", …).
+enum PhotoLoad: Sendable {
+    case file(URL)
+    case failed(String)
 }

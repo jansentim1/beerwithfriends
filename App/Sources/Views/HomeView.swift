@@ -232,18 +232,14 @@ struct HomeView: View {
         }
         .fullScreenCover(item: $photoViewer) { item in
             PhotoViewerView(
-                url: item.url,
+                load: item.load,
                 ownerName: item.ownerName,
                 caption: item.caption,
                 beerId: item.id,
                 // Explicit @Sendable wrapper: passing the stored property through
                 // the SwiftUI content closure drops the attribute (compiler warning).
                 screenshotReporter: { [screenshotReporter] id in await screenshotReporter(id) },
-                onDismiss: {
-                    // View-once: the temp file goes with the viewer.
-                    try? FileManager.default.removeItem(at: item.url)
-                    photoViewer = nil
-                }
+                onDismiss: { photoViewer = nil }
             )
         }
         .confirmationDialog(
@@ -758,18 +754,24 @@ struct HomeView: View {
 
     // MARK: - Actions
 
+    /// The viewer comes up on the tap itself; it runs the fetch and shows the
+    /// spinner meanwhile (the callable is 0.1–0.35 s warm, seconds cold, and
+    /// before this the pill just sat there for that long).
     private func openPhoto(_ beer: BeerLog) {
-        Task {
-            // nil → openPhoto already set viewModel.errorMessage (alert shows).
-            if let url = await viewModel.openPhoto(beer) {
-                photoViewer = PhotoViewerItem(
-                    id: beer.id,
-                    url: url,
-                    ownerName: beer.ownerUid == profile.id ? "You" : beer.ownerName,
-                    caption: beer.caption
-                )
+        let viewModel = viewModel
+        photoViewer = PhotoViewerItem(
+            id: beer.id,
+            ownerName: beer.ownerUid == profile.id ? "You" : beer.ownerName,
+            caption: beer.caption,
+            load: {
+                if let url = await viewModel.openPhoto(beer) { return .file(url) }
+                // openPhoto put the reason in errorMessage for the Home alert;
+                // the viewer shows it in place instead, so take it back out.
+                let message = viewModel.errorMessage ?? "Couldn't open the photo."
+                viewModel.errorMessage = nil
+                return .failed(message)
             }
-        }
+        )
     }
 
     private func submitReport(beer: BeerLog, reason: String) {
@@ -816,9 +818,9 @@ struct HomeView: View {
 /// Identifiable payload for the photo-viewer fullScreenCover.
 private struct PhotoViewerItem: Identifiable {
     let id: String // beerId
-    let url: URL
     let ownerName: String
     let caption: String?
+    let load: @MainActor @Sendable () async -> PhotoLoad
 }
 
 extension Notification.Name {

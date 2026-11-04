@@ -34,8 +34,9 @@ struct CameraView: UIViewControllerRepresentable {
 // MARK: - View controller
 
 /// Full-bleed preview with the iOS camera idiom on top: a white ring shutter
-/// centred above the home indicator, glass circles for cancel and flip, and a
-/// Retake / Use-photo pair in review. See docs/design/direction.md, screen 3.
+/// centred above the home indicator, a glass circle for cancel top-leading, the
+/// flip circle bottom-trailing beside the shutter (Tim, 2026-11-04: one thumb
+/// reaches both), and a Retake / Use-photo pair in review. See docs/design/direction.md, screen 3.
 final class CameraCaptureViewController: UIViewController {
     var onUsePhoto: ((Data, String?) -> Void)?
     var onCancel: (() -> Void)?
@@ -142,7 +143,8 @@ final class CameraCaptureViewController: UIViewController {
     // MARK: UI
 
     private func buildControls() {
-        // Glass circles, Camera-app idiom: cancel leading, flip trailing.
+        // Glass circles: cancel top-leading (Camera-app idiom), flip bottom-trailing
+        // on the shutter's row so the thumb that shoots also flips.
         configureGlassCircle(
             cancelButton, in: cancelBackdrop, symbol: "xmark",
             label: "Cancel", action: #selector(cancelTapped)
@@ -225,12 +227,12 @@ final class CameraCaptureViewController: UIViewController {
             cancelBackdrop.widthAnchor.constraint(equalToConstant: Self.glassDiameter),
             cancelBackdrop.heightAnchor.constraint(equalToConstant: Self.glassDiameter),
 
-            flipBackdrop.topAnchor.constraint(equalTo: safe.topAnchor, constant: 12),
-            flipBackdrop.trailingAnchor.constraint(equalTo: safe.trailingAnchor, constant: -16),
+            flipBackdrop.centerYAnchor.constraint(equalTo: shutterButton.centerYAnchor),
+            flipBackdrop.trailingAnchor.constraint(equalTo: safe.trailingAnchor, constant: -24),
             flipBackdrop.widthAnchor.constraint(equalToConstant: Self.glassDiameter),
             flipBackdrop.heightAnchor.constraint(equalToConstant: Self.glassDiameter),
 
-            // The caption button takes the flip button's corner in review.
+            // The caption button sits top-trailing in review (the flip circle is hidden then).
             captionBackdrop.topAnchor.constraint(equalTo: safe.topAnchor, constant: 12),
             captionBackdrop.trailingAnchor.constraint(equalTo: safe.trailingAnchor, constant: -16),
             captionBackdrop.widthAnchor.constraint(equalToConstant: Self.glassDiameter),
