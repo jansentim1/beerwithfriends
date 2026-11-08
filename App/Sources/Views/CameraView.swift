@@ -78,6 +78,10 @@ final class CameraCaptureViewController: UIViewController {
     private let shutterCore = UIView()
     private let flipButton = UIButton(type: .system)
     private let flipBackdrop = UIVisualEffectView(effect: UIBlurEffect(style: .systemUltraThinMaterialDark))
+    /// The gap between the shutter and the trailing edge; the flip circle sits in
+    /// its middle rather than hugging the corner (Tim, 2026-11-08: "too much in
+    /// the corner").
+    private let flipLane = UILayoutGuide()
     private let cancelButton = UIButton(type: .system)
     private let cancelBackdrop = UIVisualEffectView(effect: UIBlurEffect(style: .systemUltraThinMaterialDark))
     // Review controls
@@ -210,6 +214,8 @@ final class CameraCaptureViewController: UIViewController {
             view.addSubview(control)
         }
 
+        view.addLayoutGuide(flipLane)
+
         // AFTER the others: the caption sits ON the photo, and `previewImageView`
         // fills the screen — added earlier, it covered the strip completely
         // (Tim, build 30: "ik kan wel typen maar zie geen tekst").
@@ -227,8 +233,12 @@ final class CameraCaptureViewController: UIViewController {
             cancelBackdrop.widthAnchor.constraint(equalToConstant: Self.glassDiameter),
             cancelBackdrop.heightAnchor.constraint(equalToConstant: Self.glassDiameter),
 
+            flipLane.leadingAnchor.constraint(equalTo: shutterButton.trailingAnchor),
+            flipLane.trailingAnchor.constraint(equalTo: safe.trailingAnchor),
+            flipLane.topAnchor.constraint(equalTo: shutterButton.topAnchor),
+            flipLane.bottomAnchor.constraint(equalTo: shutterButton.bottomAnchor),
             flipBackdrop.centerYAnchor.constraint(equalTo: shutterButton.centerYAnchor),
-            flipBackdrop.trailingAnchor.constraint(equalTo: safe.trailingAnchor, constant: -24),
+            flipBackdrop.centerXAnchor.constraint(equalTo: flipLane.centerXAnchor),
             flipBackdrop.widthAnchor.constraint(equalToConstant: Self.glassDiameter),
             flipBackdrop.heightAnchor.constraint(equalToConstant: Self.glassDiameter),
 
