@@ -45,6 +45,10 @@ private struct SignInStep: View {
     @Environment(\.colorScheme) private var colorScheme
     @State private var currentNonce: String?
     @State private var isSigningIn = false
+    /// Apple's sheet reports "Sign Up Not Completed" to the app as a plain
+    /// cancel (code 1001), the same as tapping Cancel. After one such cancel
+    /// a footnote names the usual fixes, so the second try has a chance.
+    @State private var showAppleHint = false
     /// The wordmark is the mark: bigger than any text style, but @ScaledMetric
     /// keeps it answering to Dynamic Type.
     @ScaledMetric(relativeTo: .largeTitle) private var wordmarkSize: CGFloat = 44
@@ -119,11 +123,14 @@ private struct SignInStep: View {
                 .accessibilityIdentifier("signin.test")
             }
             #endif
-            Text("No email, no password — just your Apple ID.")
+            Text(showAppleHint
+                 ? "Did Apple say \"Sign Up Not Completed\"? That is Apple's side: this iPhone needs to be signed in to an Apple ID with two-factor authentication on (Settings > your name). Then tap again."
+                 : "No email, no password — just your Apple ID.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("signin.footnote")
         }
         .padding(.horizontal, 20)
         .padding(.top, 8)
@@ -156,6 +163,7 @@ private struct SignInStep: View {
             let nsError = error as NSError
             if nsError.domain == ASAuthorizationError.errorDomain,
                nsError.code == ASAuthorizationError.canceled.rawValue {
+                withAnimation(Theme.quick) { showAppleHint = true }
                 return
             }
             appState.errorMessage = Self.appleSignInFailureMessage(nsError)
