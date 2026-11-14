@@ -95,7 +95,10 @@ final class AppState: ObservableObject {
             _ = try await authService.signInWithApple(idToken: idToken, nonce: nonce)
             // The auth state listener advances `phase`.
         } catch {
-            errorMessage = "Sign in failed — try again."
+            // Firebase side (token exchange). The code goes in the text so a
+            // screenshot tells us whether it was network, audience or auth config.
+            let nsError = error as NSError
+            errorMessage = "Sign in failed — try again. (\(nsError.domain) \(nsError.code))"
         }
     }
 

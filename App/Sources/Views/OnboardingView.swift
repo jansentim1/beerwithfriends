@@ -148,10 +148,39 @@ private struct SignInStep: View {
                 // On success the auth listener flips `phase`; on failure
                 // AppState set `errorMessage` and the alert shows.
             }
-        case .failure:
-            // User cancelled or a system error — no alert spam, just tap again.
-            break
+        case .failure(let error):
+            // A cancelled sheet is silent (just tap again). Anything else used
+            // to be silent too, which left people saying "I can't sign up" with
+            // nothing to go on (2026-11-14). Now the Apple-side reason shows,
+            // with the code, so a screenshot tells us what went wrong.
+            let nsError = error as NSError
+            if nsError.domain == ASAuthorizationError.errorDomain,
+               nsError.code == ASAuthorizationError.canceled.rawValue {
+                return
+            }
+            appState.errorMessage = Self.appleSignInFailureMessage(nsError)
         }
+    }
+
+    /// What to tell someone when Apple's own sign-in sheet fails. The usual
+    /// causes are on the phone, not in the app: no Apple ID signed in on the
+    /// device, an Apple ID without two-factor authentication, or a managed /
+    /// child account. The code stays in the text so a screenshot is enough.
+    static func appleSignInFailureMessage(_ error: NSError) -> String {
+        let code = "\(error.domain) \(error.code)"
+        if error.domain == ASAuthorizationError.errorDomain {
+            switch ASAuthorizationError.Code(rawValue: error.code) {
+            case .notHandled, .unknown, .failed:
+                return "Apple couldn't finish the sign-in. Check that this iPhone is signed in to an Apple ID with two-factor authentication on (Settings > your name), then try again. (\(code))"
+            case .invalidResponse:
+                return "Apple returned an unexpected answer — try again in a minute. (\(code))"
+            case .notInteractive:
+                return "Sign in needs the screen — try again. (\(code))"
+            default:
+                break
+            }
+        }
+        return "Sign in failed — try again. (\(code))"
     }
 }
 
