@@ -28,6 +28,9 @@ final class AppState: ObservableObject {
     @Published var pendingMateUsername: String?
     /// One-shot error copy for the active flow (sign-in / username claim / account).
     @Published var errorMessage: String?
+    /// True while the account is device-only (no Apple ID behind it). Settings
+    /// shows the "add your Apple ID" row and warns before sign-out.
+    @Published private(set) var isAnonymous = false
 
     let authService: any AuthServicing = FirebaseAuthService()
     /// Non-nil exactly while `phase == .ready`.
@@ -100,6 +103,35 @@ final class AppState: ObservableObject {
             let nsError = error as NSError
             errorMessage = "Sign in failed — try again. (\(nsError.domain) \(nsError.code))"
         }
+    }
+
+    /// "Continue without Apple ID": a device-only account. Added 2026-11-14 when
+    /// Apple's sheet started refusing every first-time sign-up with "Sign Up Not
+    /// Completed" on five different iPhones while nothing on our side changed.
+    func signInWithoutApple() async {
+        do {
+            _ = try await authService.signInWithoutApple()
+            // The auth state listener advances `phase`.
+        } catch {
+            let nsError = error as NSError
+            errorMessage = "Couldn't create your account — try again. (\(nsError.domain) \(nsError.code))"
+        }
+    }
+
+    /// Settings → Add your Apple ID. Same account, now with an Apple ID behind
+    /// it. Returns true on success; on failure `errorMessage` says why.
+    func linkApple(idToken: String, nonce: String) async -> Bool {
+        do {
+            try await authService.linkApple(idToken: idToken, nonce: nonce)
+            isAnonymous = authService.isAnonymous
+            return true
+        } catch AppleLinkError.usedByAnotherAccount {
+            errorMessage = "That Apple ID already has its own PubDates account. Sign out and sign in with Apple to use that one instead."
+        } catch {
+            let nsError = error as NSError
+            errorMessage = "Couldn't add your Apple ID — try again. (\(nsError.domain) \(nsError.code))"
+        }
+        return false
     }
 
     /// Normalizes and claims `rawUsername`. On success flips straight to `.ready`.
@@ -221,6 +253,7 @@ final class AppState: ObservableObject {
     // MARK: - Auth state
 
     private func handleAuthChange(uid: String?) async {
+        isAnonymous = authService.isAnonymous
         guard let uid else {
             beerService = nil
             friendService = nil

@@ -30,6 +30,7 @@
   <table>
     <tr><th>Data</th><th>Why</th><th class="where">Where it lives</th></tr>
     <tr><td>Apple account identifier (from Sign in with Apple)</td><td>To sign you in. We never see your email or password; Sign in with Apple gives us an opaque user id.</td><td class="where">Firebase Authentication</td></tr>
+    <tr><td>Device-only account id (if you chose "Continue without Apple ID")</td><td>To sign you in without an Apple ID. It is a random id tied to the app on that phone; it holds no email, name or phone number. Add your Apple ID in Settings to keep the account across phones.</td><td class="where">Firebase Authentication</td></tr>
     <tr><td>Username and nickname</td><td>So friends can find and recognise you.</td><td class="where">Firestore <code>users/{uid}</code>, <code>usernames/{name}</code></td></tr>
     <tr><td>Drink logs (timestamps, cheers count, quick replies)</td><td>The feed. Each entry is deleted 24 hours after it was logged, or as soon as you log your next drink. It leaves a friend's feed two hours after they first see it; that reading position stays on their phone and is never sent to us.</td><td class="where">Firestore <code>beers/{beerId}</code></td></tr>
     <tr><td>Photos taken in the app</td><td>Attached to a drink log. Stored for at most 24 hours. Each friend can view a photo exactly once; the server enforces this.</td><td class="where">Firebase Storage <code>photos/{beerId}.jpg</code></td></tr>

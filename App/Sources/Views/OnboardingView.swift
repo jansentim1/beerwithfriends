@@ -123,9 +123,26 @@ private struct SignInStep: View {
                 .accessibilityIdentifier("signin.test")
             }
             #endif
+            // The way in while Apple's sheet refuses first-time sign-ups
+            // ("Sign Up Not Completed", 2026-11-14). Device-only until an Apple
+            // ID is added in Settings; the footnote says what that costs.
+            Button {
+                isSigningIn = true
+                Task {
+                    await appState.signInWithoutApple()
+                    isSigningIn = false
+                }
+            } label: {
+                Text("Continue without Apple ID")
+                    .frame(maxWidth: .infinity, minHeight: 44)
+            }
+            .buttonStyle(PillButtonStyle(emphasis: .quiet))
+            .disabled(isSigningIn)
+            .accessibilityIdentifier("signin.noapple")
+
             Text(showAppleHint
-                 ? "Did Apple say \"Sign Up Not Completed\"? That is Apple's side: this iPhone needs to be signed in to an Apple ID with two-factor authentication on (Settings > your name). Then tap again."
-                 : "No email, no password — just your Apple ID.")
+                 ? "Did Apple say \"Sign Up Not Completed\"? That is on Apple's side and it has been hitting new accounts since mid-November. Tap \"Continue without Apple ID\" instead, and add your Apple ID later in Settings."
+                 : "Without an Apple ID your account lives on this iPhone until you add one in Settings. Delete the app before that, and it's gone.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -194,7 +211,7 @@ private struct SignInStep: View {
 
 /// Cryptographically random nonce from a 64-character set (uniform — no
 /// modulo bias), per Firebase's Sign in with Apple guidance.
-private func randomNonceString(length: Int = 32) -> String {
+func randomNonceString(length: Int = 32) -> String {
     let charset = Array("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-_")
     precondition(charset.count == 64)
     var bytes = [UInt8](repeating: 0, count: length)
@@ -203,7 +220,7 @@ private func randomNonceString(length: Int = 32) -> String {
     return String(bytes.map { charset[Int($0 & 0x3F)] })
 }
 
-private func sha256Hex(_ input: String) -> String {
+func sha256Hex(_ input: String) -> String {
     SHA256.hash(data: Data(input.utf8))
         .map { String(format: "%02x", $0) }
         .joined()

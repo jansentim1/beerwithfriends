@@ -13,6 +13,28 @@ final class FirebaseAuthService: AuthServicing, @unchecked Sendable {
     enum ServiceError: Error { case notSignedIn }
 
     var currentUid: String? { Auth.auth().currentUser?.uid }
+    var isAnonymous: Bool { Auth.auth().currentUser?.isAnonymous ?? false }
+
+    func signInWithoutApple() async throws -> String {
+        let result = try await Auth.auth().signInAnonymously()
+        return result.user.uid
+    }
+
+    func linkApple(idToken: String, nonce: String) async throws {
+        guard let user = Auth.auth().currentUser else { throw ServiceError.notSignedIn }
+        let credential = OAuthProvider.appleCredential(
+            withIDToken: idToken, rawNonce: nonce, fullName: nil)
+        do {
+            _ = try await user.link(with: credential)
+        } catch {
+            let nsError = error as NSError
+            if nsError.domain == AuthErrorDomain,
+               nsError.code == AuthErrorCode.credentialAlreadyInUse.rawValue {
+                throw AppleLinkError.usedByAnotherAccount
+            }
+            throw error
+        }
+    }
 
     func signInWithApple(idToken: String, nonce: String) async throws -> String {
         let credential = OAuthProvider.appleCredential(

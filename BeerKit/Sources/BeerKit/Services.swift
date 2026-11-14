@@ -4,6 +4,10 @@ public enum PhotoFetchError: Error, Equatable { case alreadyViewed, expired, not
 
 public enum UsernameClaimError: Error, Equatable { case taken, tooSoon }
 
+/// Linking an Apple ID to a device-only account failed because that Apple ID
+/// already belongs to another PubDates account.
+public enum AppleLinkError: Error, Equatable { case usedByAnotherAccount }
+
 /// Server rejected the cheers because it already exists (rules: cheers docs are
 /// create-only). The UI keeps the beer marked as cheersed.
 public enum CheersError: Error, Equatable { case alreadyCheersed }
@@ -40,6 +44,16 @@ public protocol BeerServicing: Sendable {
 public protocol AuthServicing: Sendable {
     var currentUid: String? { get }
     func signInWithApple(idToken: String, nonce: String) async throws -> String  // returns uid
+    /// Device-only account (anonymous auth): the way in while Apple's sheet
+    /// says "Sign Up Not Completed" (2026-11-14). Lives on this device until
+    /// `linkApple` ties an Apple ID to it.
+    func signInWithoutApple() async throws -> String  // returns uid
+    /// Ties an Apple ID to the current device-only account so it survives a
+    /// reinstall or a new phone. Throws `AppleLinkError.usedByAnotherAccount`
+    /// when that Apple ID already has its own PubDates account.
+    func linkApple(idToken: String, nonce: String) async throws
+    /// True while the current account has no Apple ID behind it.
+    var isAnonymous: Bool { get }
     func claimUsername(_ username: String, displayName: String) async throws -> UserProfile
     /// Renames an existing account (server callable; once per day). Throws
     /// `UsernameClaimError.taken` when the name is in use, `.tooSoon` when rate-limited.

@@ -1,3 +1,4 @@
+import AuthenticationServices
 import BeerKit
 import SwiftUI
 
@@ -31,6 +32,12 @@ struct SettingsView: View {
     @State private var isDeleting = false
     @State private var showDeleteConfirm = false
     @State private var showDeleteFinalConfirm = false
+    /// Sign-out of a device-only account throws the account away; ask first.
+    @State private var showSignOutConfirm = false
+    /// Nonce for the "add your Apple ID" link flow (raw to Firebase, SHA256 to Apple).
+    @State private var linkNonce: String?
+    @State private var isLinking = false
+    @Environment(\.colorScheme) private var colorScheme
     @State private var errorMessage: String?
     /// Opt-in place naming. The same key `LocationPlaceProvider` reads before it
     /// ever touches Core Location, so this switch alone decides.
@@ -60,6 +67,9 @@ struct SettingsView: View {
         NavigationStack {
             List {
                 profileSection
+                if appState.isAnonymous {
+                    secureAccountSection
+                }
                 accountDetailsSection
                 blockedSection
                 privacySection
@@ -311,10 +321,79 @@ struct SettingsView: View {
         .listRowBackground(Theme.surface)
     }
 
+    /// Device-only account ("Continue without Apple ID"): the one row that
+    /// makes it survive a new phone. Same Apple sheet as onboarding, but it
+    /// links to the existing account instead of making a new one.
+    private var secureAccountSection: some View {
+        Section {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Your account lives only on this iPhone. Add your Apple ID so it survives a new phone or a reinstall. Nothing else changes.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                SignInWithAppleButton(.continue) { request in
+                    let nonce = randomNonceString()
+                    linkNonce = nonce
+                    request.requestedScopes = [.fullName]
+                    request.nonce = sha256Hex(nonce)
+                } onCompletion: { result in
+                    handleLink(result)
+                }
+                .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
+                .frame(height: 48)
+                .frame(maxWidth: .infinity)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .disabled(isLinking)
+                .opacity(isLinking ? 0.6 : 1)
+                .accessibilityIdentifier("settings.linkapple")
+            }
+            .padding(.vertical, 6)
+        } header: {
+            Text("Add your Apple ID")
+        }
+        .listRowBackground(Theme.surface)
+    }
+
+    private func handleLink(_ result: Result<ASAuthorization, Error>) {
+        switch result {
+        case .success(let authorization):
+            guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
+                  let tokenData = credential.identityToken,
+                  let idToken = String(data: tokenData, encoding: .utf8),
+                  let nonce = linkNonce
+            else {
+                errorMessage = "Apple didn't hand back a sign-in — try again."
+                return
+            }
+            isLinking = true
+            Task {
+                let ok = await appState.linkApple(idToken: idToken, nonce: nonce)
+                isLinking = false
+                if !ok, let message = appState.errorMessage {
+                    errorMessage = message
+                    appState.errorMessage = nil
+                }
+            }
+        case .failure(let error):
+            let nsError = error as NSError
+            if nsError.domain == ASAuthorizationError.errorDomain,
+               nsError.code == ASAuthorizationError.canceled.rawValue {
+                // A plain cancel, or Apple's own "Sign Up Not Completed" (reported
+                // the same way). Nothing to do; the row stays.
+                return
+            }
+            errorMessage = "Apple couldn't finish the sign-in. (\(nsError.domain) \(nsError.code))"
+        }
+    }
+
     private var accountSection: some View {
         Section("Account") {
             Button {
-                Task { await appState.signOut() }
+                if appState.isAnonymous {
+                    showSignOutConfirm = true
+                } else {
+                    Task { await appState.signOut() }
+                }
             } label: {
                 Label("Sign out", systemImage: "rectangle.portrait.and.arrow.right")
                     .frame(minHeight: 44)
@@ -322,6 +401,16 @@ struct SettingsView: View {
             }
             .disabled(isDeleting)
             .accessibilityIdentifier("settings.signout")
+            .confirmationDialog(
+                "This account has no Apple ID yet. Sign out and it is gone for good — your mates, drinks, everything.",
+                isPresented: $showSignOutConfirm,
+                titleVisibility: .visible
+            ) {
+                Button("Sign out and lose it", role: .destructive) {
+                    Task { await appState.signOut() }
+                }
+                Button("Keep my account", role: .cancel) {}
+            }
 
             Button(role: .destructive) {
                 showDeleteConfirm = true
