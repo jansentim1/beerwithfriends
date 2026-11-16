@@ -39,7 +39,7 @@ export async function fanoutBeerCreated(db: Firestore, push: Pusher, beerId: str
 
 /** The "X is having a pint at Y" title and body, shared by the fanout and notifyBeerTo. */
 export function beerPushCopy(beer: BeerDoc): { title: string; body: string } {
-  const body = beer.hasPhoto ? "They added a photo 📸 — you get one look!" : "Cheers back? 🍻";
+  const body = beer.hasPhoto ? "They added a photo. You get one look." : "Cheers back? 🍻";
   const what = drinkPhrase[beer.drink ?? "pils"] ?? drinkPhrase.pils;
   const title = beer.place
     ? `${beer.ownerName} is having ${what} at ${beer.place}`

@@ -119,7 +119,7 @@ struct SettingsView: View {
             } message: {
                 Text("You can't undo this.")
             }
-            .alert("Last call — are you sure?", isPresented: $showDeleteFinalConfirm) {
+            .alert("Last call. Are you sure?", isPresented: $showDeleteFinalConfirm) {
                 Button("Delete everything", role: .destructive) { deleteAccount() }
                 Button("Cancel", role: .cancel) {}
             } message: {
@@ -217,7 +217,7 @@ struct SettingsView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             } else if blockedUsers.isEmpty {
-                Text("You haven't blocked anyone. 🍻")
+                Text("You haven't blocked anyone.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             } else {
@@ -362,7 +362,7 @@ struct SettingsView: View {
                   let idToken = String(data: tokenData, encoding: .utf8),
                   let nonce = linkNonce
             else {
-                errorMessage = "Apple didn't hand back a sign-in — try again."
+                errorMessage = "Apple didn't hand back a sign-in. Try again."
                 return
             }
             isLinking = true
@@ -402,7 +402,7 @@ struct SettingsView: View {
             .disabled(isDeleting)
             .accessibilityIdentifier("settings.signout")
             .confirmationDialog(
-                "This account has no Apple ID yet. Sign out and it is gone for good — your mates, drinks, everything.",
+                "This account has no Apple ID yet. Sign out and it is gone for good, with your mates and your drinks.",
                 isPresented: $showSignOutConfirm,
                 titleVisibility: .visible
             ) {
@@ -453,7 +453,7 @@ struct SettingsView: View {
     private static var versionString: String {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"
         let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "1"
-        return "PubDates \(version) (\(build)) 🍺"
+        return "PubDates \(version) (\(build))"
     }
 
     // MARK: - Actions
@@ -469,7 +469,7 @@ struct SettingsView: View {
         do {
             blockedUsers = try await service.blockedUsers()
         } catch {
-            errorMessage = "Couldn't load your blocked list — pull to retry."
+            errorMessage = "Couldn't load your blocked list. Pull to retry."
         }
     }
 
@@ -480,7 +480,7 @@ struct SettingsView: View {
                 try await service.unblock(uid: blocked.id)
                 blockedUsers.removeAll { $0.id == blocked.id }
             } catch {
-                errorMessage = "Couldn't unblock — try again."
+                errorMessage = "Couldn't unblock. Try again."
             }
         }
     }
@@ -632,10 +632,10 @@ private struct ChangeUsernameSheet: View {
         Group {
             switch availability {
             case .idle:
-                Text("3–15 characters: a–z, 0–9, _ — starts with a letter.")
+                Text("3 to 15 letters, numbers or _, starting with a letter.")
                     .foregroundStyle(.secondary)
             case .invalid:
-                Label("3–15 characters: a–z, 0–9, _ — starts with a letter.", systemImage: "xmark.circle")
+                Label("3 to 15 letters, numbers or _, starting with a letter.", systemImage: "xmark.circle")
                     .foregroundStyle(.red)
             case .checking:
                 HStack(spacing: 6) {
@@ -643,16 +643,16 @@ private struct ChangeUsernameSheet: View {
                     Text("Checking…").foregroundStyle(.secondary)
                 }
             case .available:
-                Label("Available 🍻", systemImage: "checkmark.circle")
+                Label("Available", systemImage: "checkmark.circle")
                     .foregroundStyle(.green)
             case .taken:
-                Label("Taken — try another.", systemImage: "xmark.circle")
+                Label("Taken. Try another.", systemImage: "xmark.circle")
                     .foregroundStyle(.red)
             case .mine:
                 Label("That's you already.", systemImage: "person.crop.circle")
                     .foregroundStyle(.secondary)
             case .unknown:
-                Label("Couldn't check availability — you can still try to save it.", systemImage: "wifi.slash")
+                Label("Couldn't check availability. You can still try to save it.", systemImage: "wifi.slash")
                     .foregroundStyle(.orange)
             }
         }
@@ -703,7 +703,7 @@ private struct ChangeUsernameSheet: View {
             } else {
                 // The reason (taken / once a day / offline) is only known here, and
                 // the sheet stays open so it can be read and acted on.
-                alertMessage = appState.errorMessage ?? "Couldn't change your username — try again."
+                alertMessage = appState.errorMessage ?? "Couldn't change your username. Try again."
                 appState.errorMessage = nil
             }
         }
@@ -823,7 +823,7 @@ private struct ChangeDisplayNameSheet: View {
                 onSaved(normalized)
                 dismiss()
             } else {
-                alertMessage = appState.errorMessage ?? "Couldn't change your nickname — try again."
+                alertMessage = appState.errorMessage ?? "Couldn't change your nickname. Try again."
                 appState.errorMessage = nil
             }
         }

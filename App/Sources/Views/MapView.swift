@@ -154,7 +154,7 @@ struct MapView: View {
                 .allowsHitTesting(false)
             Text(sharePlace
                  ? "You'll show up here when you log a drink. Mates need their own switch on to appear."
-                 : "Only drinks logged with ‘Share where I’m drinking’ on show up here.")
+                 : "Only drinks logged with \"Share where I'm drinking\" turned on show up here.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)

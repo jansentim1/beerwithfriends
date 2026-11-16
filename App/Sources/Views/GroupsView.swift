@@ -531,14 +531,14 @@ private struct GroupDetailSheet: View {
                 .accessibilityLabel("Join code, \(code.map { String($0) }.joined(separator: " "))")
                 .accessibilityHint("Copies the code")
                 .accessibilityIdentifier("groups.detail.code")
-                Text("Read the code out, or send the link — it opens the app and drops them in.")
+                Text("Read the code out or send the link. The link opens the app and drops them in.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 ShareLink(
                     item: URL(string: MateLink.joinLink(for: code))!,
                     subject: Text("Join my PubDates group"),
-                    message: Text("@\(profile.username) wants you in \(live.name) on PubDates 🍺 Tap the link, or use code \(code).")
+                    message: Text("@\(profile.username) wants you in \(live.name) on PubDates. Tap the link, or use code \(code).")
                 ) {
                     Label("Invite to group", systemImage: "square.and.arrow.up")
                         .frame(maxWidth: .infinity, minHeight: 44)
@@ -946,10 +946,10 @@ private struct GroupDetailSheet: View {
                 // means the group never saw this one.
                 await loadNotes()
                 if !notes.contains(where: { $0.uid == profile.id && $0.text == text }) {
-                    noteStatus = "One note a minute — that one didn't stick."
+                    noteStatus = "One note a minute. That one didn't stick."
                 }
             } catch {
-                noteStatus = "Couldn't send that — try again."
+                noteStatus = "Couldn't send that. Try again."
             }
             isSendingNote = false
         }
@@ -973,7 +973,7 @@ private struct GroupDetailSheet: View {
             // Read the mate list at tap time: sending a request to someone who is
             // already a mate would leave a stray request nobody can clear.
             guard let mates = try? await friendService.friends() else {
-                mateSummary = "Couldn't check who you're already mates with — try again."
+                mateSummary = "Couldn't check who you're already mates with. Try again."
                 return
             }
             let mateSet = Set(mates.map(\.id))
@@ -1135,7 +1135,7 @@ private struct JoinGroupSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
-                    Text("Ask a mate for the group's six characters — or just tap their invite link.")
+                    Text("Ask a mate for the group's six characters, or tap their invite link.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)

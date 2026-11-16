@@ -221,7 +221,7 @@ struct QRMateView: View {
             case .denied:
                 notice(
                     title: "Camera access is off",
-                    message: "PubDates only uses the camera to scan a mate's code — turn it on in Settings.",
+                    message: "PubDates only uses the camera to scan a mate's code. Turn it on in Settings.",
                     showsSettings: true
                 )
             case .unavailable:

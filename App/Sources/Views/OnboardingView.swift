@@ -85,7 +85,7 @@ private struct SignInStep: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.5)
                 .accessibilityAddTraits(.isHeader)
-            Text("Tap when you crack one open — your mates hear it and cheers you back.")
+            Text("Tap when you crack one open. Your mates hear it and cheers you back.")
                 .font(.body)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
@@ -162,7 +162,7 @@ private struct SignInStep: View {
                   let idToken = String(data: tokenData, encoding: .utf8),
                   let nonce = currentNonce
             else {
-                appState.errorMessage = "Sign in failed — try again."
+                appState.errorMessage = "Sign in failed. Try again."
                 return
             }
             isSigningIn = true
@@ -198,14 +198,14 @@ private struct SignInStep: View {
             case .notHandled, .unknown, .failed:
                 return "Apple couldn't finish the sign-in. Check that this iPhone is signed in to an Apple ID with two-factor authentication on (Settings > your name), then try again. (\(code))"
             case .invalidResponse:
-                return "Apple returned an unexpected answer — try again in a minute. (\(code))"
+                return "Apple returned an unexpected answer. Try again in a minute. (\(code))"
             case .notInteractive:
-                return "Sign in needs the screen — try again. (\(code))"
+                return "Sign in needs the screen. Try again. (\(code))"
             default:
                 break
             }
         }
-        return "Sign in failed — try again. (\(code))"
+        return "Sign in failed. Try again. (\(code))"
     }
 }
 
@@ -326,7 +326,7 @@ private struct UsernamePickerStep: View {
                         .font(Theme.displayLarge)
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityAddTraits(.isHeader)
-                    Text("Friends add you by exact username — make it one you can shout across a bar.")
+                    Text("Friends add you by exact username. Make it one you can shout across a bar.")
                         .font(.body)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -364,7 +364,7 @@ private struct UsernamePickerStep: View {
                         ProgressView()
                             .tint(Theme.onAccent)
                     } else {
-                        Text("Claim it 🍺")
+                        Text("Claim it")
                     }
                 }
                 .buttonStyle(HeroButtonStyle())
@@ -379,7 +379,7 @@ private struct UsernamePickerStep: View {
                         .font(.footnote)
                         .foregroundStyle(Theme.accentInk)
                         .accessibilityHidden(true)
-                    Text("Next: we'll ask permission to send notifications. That's the whole app — you hear the moment a mate cracks one open, they hear when you do.")
+                    Text("Next we'll ask permission to send notifications. That's the whole app. You hear the moment a mate cracks one open, and they hear when you do.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -423,10 +423,10 @@ private struct UsernamePickerStep: View {
         Group {
             switch availability {
             case .idle:
-                Text("3–15 characters: a–z, 0–9, _ — starts with a letter.")
+                Text("3 to 15 letters, numbers or _, starting with a letter.")
                     .foregroundStyle(.secondary)
             case .invalid:
-                Label("3–15 characters: a–z, 0–9, _ — starts with a letter.", systemImage: "xmark.circle")
+                Label("3 to 15 letters, numbers or _, starting with a letter.", systemImage: "xmark.circle")
                     .foregroundStyle(.red)
             case .checking:
                 HStack(spacing: 6) {
@@ -434,13 +434,13 @@ private struct UsernamePickerStep: View {
                     Text("Checking…").foregroundStyle(.secondary)
                 }
             case .available:
-                Label("Available 🍻", systemImage: "checkmark.circle")
+                Label("Available", systemImage: "checkmark.circle")
                     .foregroundStyle(.green)
             case .taken:
-                Label("Taken — try another.", systemImage: "xmark.circle")
+                Label("Taken. Try another.", systemImage: "xmark.circle")
                     .foregroundStyle(.red)
             case .unknown:
-                Label("Couldn't check availability — you can still try to claim it.", systemImage: "wifi.slash")
+                Label("Couldn't check availability. You can still try to claim it.", systemImage: "wifi.slash")
                     .foregroundStyle(.orange)
             }
         }

@@ -192,7 +192,7 @@ final class FakeGroups: GroupServicing, @unchecked Sendable {
         // A repeat tap is not an error: it reads as a receipt, not a failure.
         #expect(GroupMateInvite.summary(sent: 0, alreadyAsked: 2, failed: 0) == "2 were already waiting.")
         #expect(GroupMateInvite.summary(sent: 2, alreadyAsked: 1, failed: 1)
-            == "2 requests sent. One was already waiting. One didn't go through — try again.")
+            == "2 requests sent. One was already waiting. One didn't go through. Try again.")
         #expect(GroupMateInvite.summary(sent: 0, alreadyAsked: 0, failed: 0).contains("already mates"))
     }
 }

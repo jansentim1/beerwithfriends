@@ -42,7 +42,7 @@ struct ReactionPickerSheet: View {
                         // Quiet tiles with no reason given read as broken.
                         if alreadyReacted {
                             Text(hasCheersed
-                                 ? "You already reacted and cheersed this one — one of each is the limit."
+                                 ? "You already reacted and cheersed this one. One of each is the limit."
                                  : "You already reacted to this one. You can still cheers it.")
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)

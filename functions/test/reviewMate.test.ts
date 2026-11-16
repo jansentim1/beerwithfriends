@@ -24,7 +24,7 @@ describe("review mate constants", () => {
 describe("beerPushCopy", () => {
   it("names the drink and the place", () => {
     expect(beerPushCopy({ ownerUid: "u", ownerName: "PubDates", hasPhoto: true, drink: "pint", place: "Café De Zon" }))
-      .toEqual({ title: "PubDates is having a pint 🍺 at Café De Zon", body: "They added a photo 📸 — you get one look!" });
+      .toEqual({ title: "PubDates is having a pint 🍺 at Café De Zon", body: "They added a photo. You get one look." });
     expect(beerPushCopy({ ownerUid: "u", ownerName: "Tim", hasPhoto: false }).title).toBe("Tim is having a pils 🍺");
   });
 });

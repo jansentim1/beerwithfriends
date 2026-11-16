@@ -75,7 +75,7 @@ struct HomeView: View {
     /// Latest nudge wins — an older one must not switch the caption back early.
     @State private var lockedNudgeToken = 0
 
-    static let reportReasons = ["Not a drink 🚨", "Inappropriate photo", "Harassment", "Other"]
+    static let reportReasons = ["Not a drink", "Inappropriate photo", "Harassment", "Other"]
 
     init(
         profile: UserProfile,
@@ -268,7 +268,7 @@ struct HomeView: View {
         }
         // On its own node (the outer stack) — a second .alert on the same view
         // as the error alert would collide; separate nodes both work.
-        .alert("🍻", isPresented: infoBinding) {
+        .alert("PubDates", isPresented: infoBinding) {
             Button("OK", role: .cancel) {}
         } message: {
             Text(infoMessage ?? "")
@@ -778,9 +778,9 @@ struct HomeView: View {
         Task {
             do {
                 try await friendService.report(beerId: beer.id, uid: beer.ownerUid, reason: reason)
-                infoMessage = "Thanks — we'll take a look."
+                infoMessage = "Thanks, we'll take a look."
             } catch {
-                viewModel.errorMessage = "Couldn't send your report — try again."
+                viewModel.errorMessage = "Couldn't send your report. Try again."
             }
         }
     }
@@ -793,7 +793,7 @@ struct HomeView: View {
                 infoMessage = "\(name) is blocked."
                 feedEpoch += 1 // restart the stream so their beers drop out
             } catch {
-                viewModel.errorMessage = "Couldn't block — try again."
+                viewModel.errorMessage = "Couldn't block. Try again."
             }
         }
     }

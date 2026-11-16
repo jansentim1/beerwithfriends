@@ -29,7 +29,7 @@ describe("fanoutBeerCreated", () => {
     expect(sent).toHaveLength(1);
     expect(sent[0].tokens).toEqual(["tok-friend"]);
     expect(sent[0].title).toBe("Tim is having a pils 🍺");
-    expect(sent[0].body).toContain("📸");
+    expect(sent[0].body).toContain("one look");
   });
   it("place goes into the title", async () => {
     await fanoutBeerCreated(db, push, "b1", { ...beer, place: "Café De Zon" });
@@ -40,7 +40,7 @@ describe("fanoutBeerCreated", () => {
   });
   it("no photo → plain copy", async () => {
     await fanoutBeerCreated(db, push, "b1", { ...beer, hasPhoto: false });
-    expect(sent[0].body).not.toContain("📸");
+    expect(sent[0].body).not.toContain("one look");
   });
   it("skips friends the owner has blocked", async () => {
     await seedUser(db, "outcast", "piet", "tok-outcast");

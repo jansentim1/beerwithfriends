@@ -478,7 +478,7 @@ final class CameraCaptureViewController: UIViewController {
         title.numberOfLines = 0
 
         let label = UILabel()
-        label.text = "PubDates only uses the camera to snap the beer in your hand — turn it on in Settings."
+        label.text = "PubDates only uses the camera to snap the beer in your hand. Turn it on in Settings."
         label.textColor = UIColor(white: 1, alpha: 0.75)
         label.textAlignment = .center
         label.numberOfLines = 0

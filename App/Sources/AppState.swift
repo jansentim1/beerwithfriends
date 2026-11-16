@@ -101,7 +101,7 @@ final class AppState: ObservableObject {
             // Firebase side (token exchange). The code goes in the text so a
             // screenshot tells us whether it was network, audience or auth config.
             let nsError = error as NSError
-            errorMessage = "Sign in failed — try again. (\(nsError.domain) \(nsError.code))"
+            errorMessage = "Sign in failed. Try again. (\(nsError.domain) \(nsError.code))"
         }
     }
 
@@ -114,7 +114,7 @@ final class AppState: ObservableObject {
             // The auth state listener advances `phase`.
         } catch {
             let nsError = error as NSError
-            errorMessage = "Couldn't create your account — try again. (\(nsError.domain) \(nsError.code))"
+            errorMessage = "Couldn't create your account. Try again. (\(nsError.domain) \(nsError.code))"
         }
     }
 
@@ -129,7 +129,7 @@ final class AppState: ObservableObject {
             errorMessage = "That Apple ID already has its own PubDates account. Sign out and sign in with Apple to use that one instead."
         } catch {
             let nsError = error as NSError
-            errorMessage = "Couldn't add your Apple ID — try again. (\(nsError.domain) \(nsError.code))"
+            errorMessage = "Couldn't add your Apple ID. Try again. (\(nsError.domain) \(nsError.code))"
         }
         return false
     }
@@ -137,7 +137,7 @@ final class AppState: ObservableObject {
     /// Normalizes and claims `rawUsername`. On success flips straight to `.ready`.
     func claimUsername(_ rawUsername: String, displayName: String) async {
         guard let username = Username.normalize(rawUsername) else {
-            errorMessage = "Usernames are 3–15 characters: a–z, 0–9, _ — and start with a letter."
+            errorMessage = "Usernames are 3 to 15 letters, numbers or _, and start with a letter."
             return
         }
         do {
@@ -146,9 +146,9 @@ final class AppState: ObservableObject {
                 username, displayName: trimmedName.isEmpty ? username : trimmedName)
             becomeReady(profile)
         } catch UsernameClaimError.taken {
-            errorMessage = "@\(username) is already taken — pick another."
+            errorMessage = "@\(username) is already taken. Pick another."
         } catch {
-            errorMessage = "Couldn't save your username — try again."
+            errorMessage = "Couldn't save your username. Try again."
         }
     }
 
@@ -156,7 +156,7 @@ final class AppState: ObservableObject {
     /// new profile (services are recreated, views get a fresh id).
     func changeUsername(_ rawUsername: String) async -> Bool {
         guard let username = Username.normalize(rawUsername) else {
-            errorMessage = "Usernames are 3–15 characters: a–z, 0–9, _ — and start with a letter."
+            errorMessage = "Usernames are 3 to 15 letters, numbers or _, and start with a letter."
             return false
         }
         do {
@@ -164,11 +164,11 @@ final class AppState: ObservableObject {
             becomeReady(profile)
             return true
         } catch UsernameClaimError.taken {
-            errorMessage = "@\(username) is already taken — pick another."
+            errorMessage = "@\(username) is already taken. Pick another."
         } catch UsernameClaimError.tooSoon {
             errorMessage = "You can change your username once a day."
         } catch {
-            errorMessage = "Couldn't change your username — try again."
+            errorMessage = "Couldn't change your username. Try again."
         }
         return false
     }
@@ -177,7 +177,7 @@ final class AppState: ObservableObject {
     /// so the feed's own rows and the next drink carry the new name.
     func changeDisplayName(_ rawDisplayName: String) async -> Bool {
         guard let displayName = DisplayName.normalize(rawDisplayName) else {
-            errorMessage = "Nicknames are 1–\(DisplayName.maxLength) characters."
+            errorMessage = "Nicknames are 1 to \(DisplayName.maxLength) characters."
             return false
         }
         do {
@@ -185,7 +185,7 @@ final class AppState: ObservableObject {
             becomeReady(profile)
             return true
         } catch {
-            errorMessage = "Couldn't change your nickname — try again."
+            errorMessage = "Couldn't change your nickname. Try again."
         }
         return false
     }
@@ -224,7 +224,7 @@ final class AppState: ObservableObject {
             try authService.signOut()
             // The auth state listener flips `phase` to `.signedOut`.
         } catch {
-            errorMessage = "Couldn't sign out — try again."
+            errorMessage = "Couldn't sign out. Try again."
         }
     }
 
@@ -246,7 +246,7 @@ final class AppState: ObservableObject {
                 errorMessage = "Your data was deleted. Sign in again if you want a fresh start."
             }
         } catch {
-            errorMessage = "Couldn't delete your account — try again."
+            errorMessage = "Couldn't delete your account. Try again."
         }
     }
 

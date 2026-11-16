@@ -206,9 +206,9 @@ public enum GroupMateInvite {
             parts.append(alreadyAsked == 1 ? "One was already waiting." : "\(alreadyAsked) were already waiting.")
         }
         if failed > 0 {
-            parts.append(failed == 1 ? "One didn't go through — try again." : "\(failed) didn't go through — try again.")
+            parts.append(failed == 1 ? "One didn't go through. Try again." : "\(failed) didn't go through. Try again.")
         }
-        if parts.isEmpty { return "Nobody new here — you're already mates with the whole group. 🍻" }
+        if parts.isEmpty { return "Nobody new here. You're already mates with the whole group." }
         return parts.joined(separator: " ")
     }
 }
@@ -304,11 +304,11 @@ public final class LeaderboardViewModel: ObservableObject {
     public func create(name: String) async -> Bool {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard (1...GroupSummary.nameMaxLength).contains(trimmed.count) else {
-            errorMessage = "Group names are 1–\(GroupSummary.nameMaxLength) characters."
+            errorMessage = "Group names are 1 to \(GroupSummary.nameMaxLength) characters."
             return false
         }
         do { _ = try await service.create(name: trimmed); return true }
-        catch { errorMessage = "Couldn't create the group — try again."; return false }
+        catch { errorMessage = "Couldn't create the group. Try again."; return false }
     }
 
     public func join(code: String) async -> Bool {
@@ -317,12 +317,12 @@ public final class LeaderboardViewModel: ObservableObject {
         catch GroupError.notFound { errorMessage = "No group with code \(normalized)." }
         catch GroupError.full { errorMessage = "That group is full." }
         catch GroupError.alreadyMember { errorMessage = "You're already in that group." }
-        catch { errorMessage = "Couldn't join — try again." }
+        catch { errorMessage = "Couldn't join. Try again." }
         return false
     }
 
     public func leave(_ group: GroupSummary) async {
         do { try await service.leave(groupId: group.id) }
-        catch { errorMessage = "Couldn't leave the group — try again." }
+        catch { errorMessage = "Couldn't leave the group. Try again." }
     }
 }

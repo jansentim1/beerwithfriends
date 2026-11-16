@@ -196,7 +196,7 @@ public final class HomeViewModel: ObservableObject {
         } catch {
             pendingIds.remove(beer.id)
             feed.removeAll { $0.id == beer.id }
-            errorMessage = "Couldn't log your beer — try again."
+            errorMessage = "Couldn't log your beer. Try again."
             return false
         }
     }
@@ -225,7 +225,7 @@ public final class HomeViewModel: ObservableObject {
         } catch {
             cheersedBeerIds.remove(beer.id)
             if let i = feed.firstIndex(where: { $0.id == beer.id }) { feed[i].cheersCount -= 1 }
-            errorMessage = "Couldn't send your cheers — try again."
+            errorMessage = "Couldn't send your cheers. Try again."
         }
     }
 
@@ -242,7 +242,7 @@ public final class HomeViewModel: ObservableObject {
             // Already replied earlier (create-only): keep whatever the server has.
         } catch {
             if let i = feed.firstIndex(where: { $0.id == beer.id }) { feed[i].replies[myUid] = nil }
-            errorMessage = "Couldn't send your reply — try again."
+            errorMessage = "Couldn't send your reply. Try again."
         }
     }
 
@@ -255,7 +255,7 @@ public final class HomeViewModel: ObservableObject {
             return url
         } catch PhotoFetchError.alreadyViewed {
             viewedBeerIds.insert(beer.id)
-            errorMessage = "You already used your one view 👀"
+            errorMessage = "You already used your one view."
             return nil
         } catch PhotoFetchError.expired {
             errorMessage = "This photo has expired."

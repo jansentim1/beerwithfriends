@@ -323,7 +323,7 @@ struct FriendsView: View {
         Section {
             ShareLink(item: URL(string: MateLink.link(for: profile.username))!,
                       subject: Text("Add me on PubDates"),
-                      message: Text("Add me on PubDates 🍺 Tap the link: it opens the app and adds me (or gets you the app first).")) {
+                      message: Text("Add me on PubDates. Tap the link and it opens the app and adds me, or gets you the app first.")) {
                 Label("Invite a mate", systemImage: "square.and.arrow.up")
                     .frame(maxWidth: .infinity, minHeight: 44)
             }
@@ -344,7 +344,7 @@ struct FriendsView: View {
             requests = loadedRequests
             friends = loadedFriends
         } catch {
-            errorMessage = "Couldn't load your mates — pull to retry."
+            errorMessage = "Couldn't load your mates. Pull to retry."
         }
     }
 
@@ -361,7 +361,7 @@ struct FriendsView: View {
         do {
             friends = try await friendService.friends()
         } catch {
-            errorMessage = "Couldn't load your mates — pull to retry."
+            errorMessage = "Couldn't load your mates. Pull to retry."
         }
     }
 
@@ -369,7 +369,7 @@ struct FriendsView: View {
         let raw = searchText
         searchStatus = nil
         guard let username = Username.normalize(raw) else {
-            searchStatus = "That's not a valid username (3–15 chars: a–z, 0–9, _)."
+            searchStatus = "That's not a valid username. Use 3 to 15 letters, numbers or _."
             return
         }
         isWorking = true
@@ -377,11 +377,11 @@ struct FriendsView: View {
             defer { isWorking = false }
             do {
                 guard let found = try await friendService.searchUser(username: username) else {
-                    searchStatus = "No one named @\(username) — usernames must match exactly."
+                    searchStatus = "No one named @\(username). Usernames must match exactly."
                     return
                 }
                 if found.id == profile.id {
-                    searchStatus = "That's you! 🍺"
+                    searchStatus = "That's you."
                     return
                 }
                 if friends.contains(where: { $0.id == found.id }) {
@@ -389,15 +389,15 @@ struct FriendsView: View {
                     return
                 }
                 try await friendService.sendRequest(to: found.id)
-                searchStatus = "Request sent to @\(found.username) 🍻"
+                searchStatus = "Request sent to @\(found.username)."
                 searchText = ""
             } catch FriendRequestError.alreadyAsked {
                 // You cannot see your own outgoing requests (only the recipient
                 // can read them), so without this the retry looked like a bug.
-                searchStatus = "Already asked @\(username) — they just need to accept it."
+                searchStatus = "Already asked @\(username). They just need to accept it."
                 searchText = ""
             } catch {
-                searchStatus = "Couldn't send the request — try again."
+                searchStatus = "Couldn't send the request. Try again."
             }
         }
     }
@@ -414,7 +414,7 @@ struct FriendsView: View {
                 // a moment later, so re-reading requests now would resurrect it.
                 await reloadFriends()
             } catch {
-                errorMessage = "Couldn't accept the request — try again."
+                errorMessage = "Couldn't accept the request. Try again."
             }
         }
     }
@@ -427,7 +427,7 @@ struct FriendsView: View {
                     requests.removeAll { $0.id == request.id }
                 }
             } catch {
-                errorMessage = "Couldn't decline the request — try again."
+                errorMessage = "Couldn't decline the request. Try again."
             }
         }
     }
@@ -440,7 +440,7 @@ struct FriendsView: View {
                     friends.removeAll { $0.id == friend.id }
                 }
             } catch {
-                errorMessage = "Couldn't remove @\(friend.username) — try again."
+                errorMessage = "Couldn't remove @\(friend.username). Try again."
             }
         }
     }
@@ -454,7 +454,7 @@ struct FriendsView: View {
                     friends.removeAll { $0.id == friend.id }
                 }
             } catch {
-                errorMessage = "Couldn't block @\(friend.username) — try again."
+                errorMessage = "Couldn't block @\(friend.username). Try again."
             }
         }
     }
@@ -466,7 +466,7 @@ struct FriendsView: View {
                 searchStatus = nil
                 errorMessage = nil
             } catch {
-                errorMessage = "Couldn't send your report — try again."
+                errorMessage = "Couldn't send your report. Try again."
             }
         }
     }

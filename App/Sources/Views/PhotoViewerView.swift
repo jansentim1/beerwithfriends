@@ -151,7 +151,7 @@ struct PhotoViewerView: View {
                 guard let data = try? Data(contentsOf: url) else { return nil }
                 return UIImage(data: data)
             }.value
-            loaded = image.map { .image($0) } ?? .failed("It could not be read — try again from the feed.")
+            loaded = image.map { .image($0) } ?? .failed("It couldn't be read. Try again from the feed.")
         }
     }
 
@@ -167,7 +167,7 @@ struct PhotoViewerView: View {
     /// gets a receipt for an attempt the viewer never understood they made.
     private var screenshotNotice: some View {
         Text(didScreenshot
-             ? "That screenshot came out black — and \(ownerName) was told."
+             ? "That screenshot came out black, and \(ownerName) was told."
              : "Screenshots of this photo come out black.")
             .font(.footnote.weight(.semibold))
             .foregroundStyle(.white)
@@ -216,7 +216,7 @@ struct PhotoViewerView: View {
 }
 
 /// What `PhotoViewerView.load` comes back with: the JPEG on disk, or the
-/// sentence to show instead ("You already used your one view 👀", …).
+/// sentence to show instead ("You already used your one view.", …).
 enum PhotoLoad: Sendable {
     case file(URL)
     case failed(String)
