@@ -141,7 +141,7 @@ private struct SignInStep: View {
             .accessibilityIdentifier("signin.noapple")
 
             Text(showAppleHint
-                 ? "Did Apple say \"Sign Up Not Completed\"? That is on Apple's side and it has been hitting new accounts since mid-November. Tap \"Continue without Apple ID\" instead, and add your Apple ID later in Settings."
+                 ? "Did Apple say \"Sign Up Not Completed\"? That is on Apple's side, not yours. Tap \"Continue without Apple ID\" instead, and add your Apple ID later in Settings."
                  : "Without an Apple ID your account lives on this iPhone until you add one in Settings. Delete the app before that, and it's gone.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
